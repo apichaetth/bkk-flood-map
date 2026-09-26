@@ -19,7 +19,7 @@
     sensors: BMA + 'sensor_profile?limit=-1',
     notif: BMA + 'flood_notification?limit=1500&page=0&sort=-date_created&fields=sensor_profile,value,date_created',
     events: 'https://event.longdo.com/feed/json',
-    traffy: 'https://publicapi.traffy.in.th/share/teamchadchart/search?limit=1000',
+    traffy: 'https://publicapi.traffy.in.th/share/teamchadchart/search?limit=500',
     rain: TW + 'rain_24h',
     wl: TW + 'waterlevel_load',
     cams: 'https://camera.longdo.com/feed/?command=json',
@@ -105,9 +105,10 @@
   const isMobile = matchMedia('(max-width: 860px)').matches;
   const dark = matchMedia('(prefers-color-scheme: dark)').matches && document.documentElement.dataset.theme !== 'light';
   const map = L.map('map', { zoomControl: !isMobile, minZoom: 9, maxZoom: 18, preferCanvas: false }).setView(isMobile ? [13.66, 100.58] : [13.76, 100.55], isMobile ? 10 : 11);
-  L.tileLayer(`https://{s}.basemaps.cartocdn.com/${dark ? 'dark_all' : 'rastertiles/voyager'}/{z}/{x}/{y}{r}.png`, {
-    subdomains: 'abcd', maxZoom: 19,
-    attribution: '© <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> © <a href="https://carto.com/attributions">CARTO</a>',
+  // แผนที่ฐาน OpenStreetMap (ฟรี ไม่ต้องใช้ key) โหมดมืดใช้ CSS filter ใน style.css
+  L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png', {
+    maxZoom: 19, className: 'basemap',
+    attribution: '© <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors',
   }).addTo(map);
   L.control.scale({ imperial: false, position: 'bottomleft' }).addTo(map);
 
@@ -246,7 +247,7 @@
   async function loadTraffy() {
     setFeed('traffy', 'loading');
     try {
-      const d = await getJSON(URL.traffy, 60000);
+      const d = await getJSON(URL.traffy, 90000);
       if (!Array.isArray(d.results)) throw new Error('รูปแบบข้อมูลไม่ถูกต้อง');
       const cutoff = Date.now() - TRAFFY_WINDOW_H * 36e5;
       let newest = null;

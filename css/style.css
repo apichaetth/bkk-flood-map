@@ -148,6 +148,9 @@ h2 { font-size: 14px; font-weight: 600; margin: 18px 0 6px; color: var(--ink2); 
 .mk.news.yt { transform: none; border-radius: 5px; font-size: 9px; }
 .mk.cam { border-radius: 5px; background: #1d2330; font-size: 9px; }
 .mk.stale { background: var(--stale); }
+.basemap { filter: saturate(.55) contrast(.95); }
+@media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) .basemap { filter: invert(1) hue-rotate(180deg) brightness(.85) saturate(.4); } }
+:root[data-theme="dark"] .basemap { filter: invert(1) hue-rotate(180deg) brightness(.85) saturate(.4); }
 .leaflet-container { font-family: "IBM Plex Sans Thai", system-ui, sans-serif; }
 .leaflet-popup-content { margin: 12px 14px; font-size: 13.5px; line-height: 1.5; }
 .pp h3 { margin: 4px 0; font-size: 15px; }
