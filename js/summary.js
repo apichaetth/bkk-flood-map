@@ -1,0 +1,294 @@
+/* หน้าสรุป: รวมทุกแหล่งเป็น "จุดน้ำท่วม" (รวมรายงานที่ห่างกันไม่เกิน 500 ม.) แล้วแสดง 3 แบบ
+ * ภาพรวม + แผนที่เขต/ถนนสีแดง, 10 จุดที่น่าห่วงที่สุด, แยกตามเขต และรายการทุกจุด
+ */
+(function () {
+  'use strict';
+  const F = Flood;
+  const { $, esc, fmtDT, fmtTime, ago, distKm, th, cssVar, store } = F;
+
+  const CLUSTER_KM = 0.5;
+  const ROAD_MATCH_M = 40; // ถนนที่อยู่ห่างจากจุดรายงานไม่เกินนี้ถือว่าเป็นถนนของจุดนั้น
+  const ROAD_SPAN_M = 300; // ระบายสีถนนยาวออกไปจากจุดรายงานไม่เกินนี้
+  const OVERPASS = ['https://overpass-api.de/api/interpreter', 'https://overpass.kumi.systems/api/interpreter'];
+  const ROAD_CACHE = 'bkkflood.roads';
+
+  // ระดับของจุด: 3 = ยืนยันแล้ว, 2 = มีรายงาน, 1 = เสี่ยง
+  const TIER = {
+    3: { label: 'ยืนยันแล้ว', long: 'น้ำท่วม (ยืนยันแล้ว)' },
+    2: { label: 'มีรายงาน', long: 'มีรายงานน้ำท่วม' },
+    1: { label: 'เสี่ยง', long: 'เสี่ยงน้ำท่วม' },
+  };
+  const SRC = {
+    sensor: 'เซ็นเซอร์ กทม.', itic: 'หน่วยงาน/iTIC', traffy: 'ประชาชนแจ้ง (Traffy)',
+    news: 'ข่าว', youtube: 'คลิป YouTube', rain: 'ฝนหนัก', wl: 'ระดับน้ำสูง',
+  };
+  const tag = (tier) => `<span class="tag t${tier}">${TIER[tier].label}</span>`;
+  const mapLink = (c) => `map.html?lat=${c.la.toFixed(5)}&lng=${c.lo.toFixed(5)}&z=16`;
+
+  // ---------- 1) แปลงข้อมูลทุกแหล่งเป็น "สัญญาณ" ----------
+  function signals(D) {
+    const out = [];
+    for (const x of D.sensor || []) if (x.lv > 0) {
+      out.push({ la: x.la, lo: x.lo, src: 'sensor', tier: 3, name: x.s.name || x.s.road, detail: `วัดได้ ${Math.round(x.cm)} ซม.`, cm: x.cm, t: x.t, district: x.s.district });
+    }
+    for (const x of D.event || []) {
+      out.push({ la: x.la, lo: x.lo, src: 'itic', tier: 3, name: String(x.e.title || '').replace(/^น้ำท่วม\s*/, ''), detail: x.why, cm: x.cm || 0, t: x.start });
+    }
+    for (const x of D.traffy || []) {
+      out.push({ la: x.la, lo: x.lo, src: 'traffy', tier: 2, name: String(x.r.address || 'จุดที่ประชาชนแจ้ง').split(/\s+(?:แขวง|เขต)/)[0], detail: x.why, cm: x.cm || 0, t: x.t,
+        link: `https://share.traffy.in.th/teamchadchart/${encodeURIComponent(x.r.ticket_id)}` });
+    }
+    for (const n of D.news || []) {
+      if ((F.SEV_LV[n.severity] || 2) < 2) continue; // ข่าวเตือนภัย/น้ำลดแล้ว ไม่นับเป็นจุดน้ำท่วม
+      for (const p of n.pins || []) if (p.precision === 'place') {
+        out.push({ la: p.lat, lo: p.lng, src: n.kind === 'youtube' ? 'youtube' : 'news', tier: 2, name: p.label, detail: `${n.source}: ${n.title}`, cm: 0, t: new Date(n.published), link: n.link, district: p.district });
+      }
+    }
+    for (const s of D.rain || []) if (s.mm > F.RAIN_HEAVY_MM) {
+      out.push({ la: s.la, lo: s.lo, src: 'rain', tier: 1, name: 'สถานีฝน ' + th(s.x.station.tele_station_name), detail: `ฝน ${s.mm} มม. ใน 24 ชม.`, cm: 0, t: s.t, radius: 1000 });
+    }
+    for (const s of D.wl || []) if (!s.stale && s.pct != null && s.pct >= 90) {
+      out.push({ la: s.la, lo: s.lo, src: 'wl', tier: 1, name: th(s.x.station.tele_station_name), detail: `ระดับน้ำ ${s.pct.toFixed(0)}% ของตลิ่ง`, cm: 0, t: s.t, radius: 600 });
+    }
+    return out;
+  }
+
+  // ---------- 2) รวมสัญญาณที่อยู่ใกล้กันเป็นจุดเดียว ----------
+  const NAME_RANK = { sensor: 0, itic: 1, news: 2, youtube: 3, traffy: 4, wl: 5, rain: 6 };
+  function cluster(sig, geo) {
+    const sorted = [...sig].sort((a, b) => b.tier - a.tier || (b.t || 0) - (a.t || 0));
+    const cl = [];
+    for (const s of sorted) {
+      const hit = cl.find((c) => distKm(c.la, c.lo, s.la, s.lo) <= CLUSTER_KM);
+      if (hit) hit.members.push(s);
+      else cl.push({ la: s.la, lo: s.lo, members: [s] });
+    }
+    for (const c of cl) {
+      const reports = c.members.filter((m) => m.tier >= 2);
+      c.sources = [...new Set(reports.map((m) => m.src))];
+      const maxTier = Math.max(...c.members.map((m) => m.tier));
+      // รายงานจาก 2 แหล่งขึ้นไป (เช่น Traffy + ข่าว) ถือว่ายืนยันแล้ว
+      c.tier = maxTier >= 2 && c.sources.length >= 2 ? 3 : maxTier;
+      const best = [...c.members].sort((a, b) => NAME_RANK[a.src] - NAME_RANK[b.src])[0];
+      c.name = best.name || 'ไม่ระบุชื่อ';
+      c.cm = Math.max(0, ...c.members.map((m) => m.cm || 0));
+      c.t = c.members.reduce((t, m) => (m.t && (!t || m.t > t) ? m.t : t), null);
+      c.district = (geo && F.districtAt(geo, c.la, c.lo)) || c.members.map((m) => m.district).find(Boolean) || '';
+      c.score = c.tier * 1000 + c.sources.length * 100 + c.cm;
+    }
+    return cl.sort((a, b) => b.score - a.score || (b.t || 0) - (a.t || 0));
+  }
+
+  // ---------- 3) สรุปรายเขต ----------
+  function byDistrict(clusters, news) {
+    const m = new Map();
+    const get = (name) => { if (!m.has(name)) m.set(name, { name, 3: 0, 2: 0, 1: 0, news: 0, clusters: [] }); return m.get(name); };
+    for (const c of clusters) if (c.district) { const d = get(c.district); d[c.tier]++; d.clusters.push(c); }
+    // ข่าวที่ระบุได้แค่ระดับเขต นับเป็น "มีรายงาน" ของเขตนั้น
+    for (const n of news || []) if ((F.SEV_LV[n.severity] || 2) >= 2) {
+      for (const p of n.pins || []) if (p.precision === 'district' && p.district) get(p.district).news++;
+    }
+    for (const d of m.values()) {
+      d.level = d[3] ? 3 : d[2] || d.news ? 2 : d[1] ? 1 : 0;
+      d.score = d[3] * 100 + d[2] * 10 + d.news * 5 + d[1];
+    }
+    return [...m.values()].filter((d) => d.level).sort((a, b) => b.level - a.level || b.score - a.score);
+  }
+
+  // ---------- แผนที่ ----------
+  const map = L.map('smap', { scrollWheelZoom: false, minZoom: 9, maxZoom: 17 }).setView([13.75, 100.6], 10);
+  L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png', {
+    maxZoom: 19, className: 'basemap', attribution: '© <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors',
+  }).addTo(map);
+  map.createPane('roads').style.zIndex = 450;
+  const lyr = { districts: L.layerGroup().addTo(map), areas: L.layerGroup().addTo(map), roads: L.layerGroup().addTo(map), spots: L.layerGroup().addTo(map) };
+
+  const RED = () => ({ 3: cssVar('--flood3'), 2: cssVar('--flood2'), 1: cssVar('--flood1') });
+  function drawDistricts(geo, dists) {
+    lyr.districts.clearLayers();
+    if (!geo) return;
+    const lvl = new Map(dists.map((d) => [d.name, d]));
+    const red = cssVar('--flood3');
+    L.geoJSON(geo, {
+      style: (f) => {
+        const d = lvl.get(f.properties.name);
+        const op = !d ? 0 : d.level === 3 ? 0.38 : d.level === 2 ? 0.2 : 0.08;
+        return { color: '#7d8896', weight: 1, opacity: 0.55, fillColor: red, fillOpacity: op };
+      },
+      onEachFeature: (f, layer) => {
+        const d = lvl.get(f.properties.name);
+        layer.bindTooltip(`<b>เขต${esc(f.properties.name)}</b><br>` + (d
+          ? `ยืนยัน ${d[3]} · มีรายงาน ${d[2] + d.news} · เสี่ยง ${d[1]}` : 'ไม่มีรายงาน'), { sticky: true });
+      },
+    }).addTo(lyr.districts);
+  }
+  function drawSpots(clusters) {
+    lyr.spots.clearLayers(); lyr.areas.clearLayers();
+    const red = RED();
+    for (const c of clusters) {
+      const popup = `<div class="pp">${tag(c.tier)}<h3>${esc(c.name)}</h3><div class="m">เขต${esc(c.district || '–')} · ${c.t ? fmtDT(c.t) : ''}</div>
+        <ul class="plist">${c.members.slice(0, 5).map((m) => `<li><b>${SRC[m.src]}</b> ${esc(m.detail)}</li>`).join('')}</ul>
+        <a href="${mapLink(c)}">ดูบนแผนที่ละเอียด →</a></div>`;
+      if (c.tier === 1) {
+        const r = Math.max(...c.members.map((m) => m.radius || 600));
+        L.circle([c.la, c.lo], { radius: r, color: red[3], weight: 1.5, dashArray: '5 5', fillColor: red[3], fillOpacity: 0.1 }).bindPopup(popup).addTo(lyr.areas);
+      } else {
+        // บริเวณรอบจุด (เผื่อไม่มีข้อมูลถนน) + จุด
+        L.circle([c.la, c.lo], { radius: 250, stroke: false, fillColor: red[3], fillOpacity: c.tier === 3 ? 0.22 : 0.14, interactive: false }).addTo(lyr.areas);
+        L.circleMarker([c.la, c.lo], { radius: c.tier === 3 ? 8 : 6, color: '#fff', weight: 2, fillColor: red[c.tier], fillOpacity: 1 }).bindPopup(popup).addTo(lyr.spots);
+      }
+    }
+  }
+
+  // ---------- ถนนสีแดง (OpenStreetMap ผ่าน Overpass API) ----------
+  const mDist = (la1, lo1, la2, lo2) => distKm(la1, lo1, la2, lo2) * 1000;
+  function densify(geom, stepM = 25) {
+    const out = [];
+    for (let i = 0; i < geom.length - 1; i++) {
+      const a = geom[i], b = geom[i + 1];
+      const n = Math.max(1, Math.ceil(mDist(a.lat, a.lon, b.lat, b.lon) / stepM));
+      for (let k = 0; k < n; k++) out.push([a.lat + ((b.lat - a.lat) * k) / n, a.lon + ((b.lon - a.lon) * k) / n]);
+    }
+    if (geom.length) out.push([geom[geom.length - 1].lat, geom[geom.length - 1].lon]);
+    return out;
+  }
+  async function fetchRoads(spots) {
+    const key = spots.map((c) => c.la.toFixed(4) + ',' + c.lo.toFixed(4)).join(';');
+    const cached = store.get(ROAD_CACHE);
+    if (cached && cached.key === key && Date.now() - cached.t < 30 * 60e3) return cached.lines;
+    const hw = '^(motorway|trunk|primary|secondary|tertiary|unclassified|residential|living_street|service|motorway_link|trunk_link|primary_link|secondary_link|tertiary_link)$';
+    const q = `[out:json][timeout:25];(${spots.map((c) => `way(around:${ROAD_MATCH_M},${c.la},${c.lo})[highway~"${hw}"];`).join('')});out geom;`;
+    let data = null, lastErr = null;
+    for (const url of OVERPASS) {
+      try {
+        data = await F.getJSON(url, 35000, { method: 'POST', body: 'data=' + encodeURIComponent(q), headers: { 'Content-Type': 'application/x-www-form-urlencoded' } });
+        break;
+      } catch (e) { lastErr = e; }
+    }
+    if (!data) throw lastErr;
+    const lines = [];
+    for (const w of data.elements || []) {
+      if (!w.geometry || w.geometry.length < 2) continue;
+      const pts = densify(w.geometry);
+      for (const c of spots) {
+        // ถนนเส้นนี้ต้องผ่านใกล้จุดรายงานจริง แล้วระบายเฉพาะช่วงที่อยู่ในรัศมี ROAD_SPAN_M
+        if (!pts.some((p) => mDist(p[0], p[1], c.la, c.lo) <= ROAD_MATCH_M + 15)) continue;
+        let run = [];
+        const flush = () => { if (run.length >= 2) lines.push({ tier: c.tier, pts: run.map((p) => [+p[0].toFixed(6), +p[1].toFixed(6)]) }); run = []; };
+        for (const p of pts) { if (mDist(p[0], p[1], c.la, c.lo) <= ROAD_SPAN_M) run.push(p); else flush(); }
+        flush();
+      }
+    }
+    store.set(ROAD_CACHE, { key, t: Date.now(), lines });
+    return lines;
+  }
+  async function drawRoads(clusters) {
+    lyr.roads.clearLayers();
+    const spots = clusters.filter((c) => c.tier >= 2).slice(0, 60);
+    if (!spots.length) { $('roadNote').textContent = ''; return; }
+    $('roadNote').textContent = 'กำลังโหลดเส้นถนนบริเวณจุดน้ำท่วม…';
+    try {
+      const lines = await fetchRoads(spots);
+      const red = RED();
+      // วาดระดับต่ำก่อน ให้ถนนที่ยืนยันแล้วอยู่ด้านบน
+      for (const l of lines.sort((a, b) => a.tier - b.tier)) {
+        L.polyline(l.pts, { pane: 'roads', color: red[l.tier], weight: l.tier === 3 ? 7 : 5, opacity: 0.9, dashArray: l.tier === 3 ? null : '10 7', lineCap: 'round', interactive: false }).addTo(lyr.roads);
+      }
+      $('roadNote').textContent = lines.length ? `ระบายสีแดงบนถนน ${lines.length} ช่วง ในรัศมีประมาณ ${ROAD_SPAN_M} ม. จากจุดที่มีรายงาน (ข้อมูลถนน © OpenStreetMap)` : 'ไม่พบเส้นถนนใกล้จุดรายงาน แสดงเป็นวงบริเวณแทน';
+    } catch (e) {
+      $('roadNote').textContent = 'โหลดเส้นถนนไม่สำเร็จ (' + e.message + ') แสดงเป็นวงบริเวณสีแดงแทน';
+    }
+  }
+
+  // ---------- ส่วนแสดงผล ----------
+  function sourceChips(c) {
+    const chips = c.sources.map((s) => `<span class="chip">${SRC[s]}</span>`);
+    const risk = c.members.filter((m) => m.tier === 1).map((m) => m.src);
+    for (const r of new Set(risk)) chips.push(`<span class="chip soft">${SRC[r]}</span>`);
+    return chips.join('');
+  }
+  function renderHeadline(clusters, dists, feeds) {
+    const n3 = clusters.filter((c) => c.tier === 3).length, n2 = clusters.filter((c) => c.tier === 2).length, n1 = clusters.filter((c) => c.tier === 1).length;
+    const flooded = dists.filter((d) => d.level >= 2);
+    $('nConfirmed').textContent = n3; $('nReported').textContent = n2; $('nRisk').textContent = n1; $('nDistricts').textContent = flooded.length;
+    const hero = document.querySelector('.hero');
+    hero.dataset.level = n3 ? 3 : n2 ? 2 : n1 ? 1 : 0;
+    if (!n3 && !n2) {
+      $('headline').textContent = n1 ? `ยังไม่พบรายงานน้ำท่วม แต่มี ${n1} พื้นที่เสี่ยง` : 'ขณะนี้ยังไม่พบรายงานน้ำท่วมใน กทม.';
+      $('subline').textContent = n1 ? 'มีฝนตกหนักหรือระดับน้ำในคลองสูง โปรดติดตามสถานการณ์' : 'ข้อมูลจากทุกแหล่งยังไม่มีรายงานน้ำท่วมบนถนน';
+    } else {
+      $('headline').innerHTML = `พบจุดน้ำท่วม <em>${n3 + n2}</em> จุด ใน <em>${flooded.length}</em> เขต`;
+      $('subline').textContent = 'เขตที่น่าห่วง: ' + flooded.slice(0, 5).map((d) => 'เขต' + d.name).join(', ') + (flooded.length > 5 ? ` และอีก ${flooded.length - 5} เขต` : '');
+    }
+    const ok = feeds.filter((f) => f.ok), bad = feeds.filter((f) => !f.ok);
+    $('warn').hidden = !bad.length;
+    $('warn').textContent = bad.length ? `ดึงข้อมูลไม่สำเร็จ ${bad.length} แหล่ง (${bad.map((f) => f.name).join(', ')}) ตัวเลขอาจน้อยกว่าความจริง` : '';
+    $('sources').textContent = `แหล่งข้อมูลที่ใช้ได้รอบนี้ ${ok.length}/${feeds.length}: ${ok.map((f) => f.name).join(', ')} · รายละเอียดดูที่หน้าแผนที่ละเอียด แท็บ "แหล่งข้อมูล"`;
+  }
+  function renderTop(clusters) {
+    const top = clusters.filter((c) => c.tier >= 2).slice(0, 10);
+    $('top10').innerHTML = top.length ? top.map((c) => `<li><a href="${mapLink(c)}">
+        <div class="t-row">${tag(c.tier)}<b>${esc(c.name)}</b></div>
+        <div class="muted small">เขต${esc(c.district || '–')} · ${esc(c.members[0].detail).slice(0, 80)}${c.sources.length > 1 ? ` · ยืนยัน ${c.sources.length} แหล่ง` : ''} · ${c.t ? ago(c.t) : ''}</div>
+      </a></li>`).join('') : '<li class="empty">ยังไม่มีจุดที่มีรายงานน้ำท่วม</li>';
+  }
+  function renderDistricts(dists) {
+    $('districtList').innerHTML = dists.length ? dists.map((d) => `<details class="dist l${d.level}">
+        <summary><span class="dname">เขต${esc(d.name)}</span>
+          <span class="dcount">${d[3] ? `<span class="tag t3">ยืนยัน ${d[3]}</span>` : ''}${d[2] + d.news ? `<span class="tag t2">มีรายงาน ${d[2] + d.news}</span>` : ''}${d[1] ? `<span class="tag t1">เสี่ยง ${d[1]}</span>` : ''}</span></summary>
+        <ul>${d.clusters.map((c) => `<li>${tag(c.tier)} <a href="${mapLink(c)}">${esc(c.name)}</a> <span class="muted small">${esc(c.members[0].detail).slice(0, 70)}</span></li>`).join('')}
+        ${d.news ? `<li class="muted small">มีข่าวน้ำท่วมในเขตนี้ ${d.news} ข่าว (ไม่ระบุจุด) – ดูในแท็บข่าวของหน้าแผนที่ละเอียด</li>` : ''}</ul>
+      </details>`).join('') : '<p class="muted">ยังไม่มีเขตที่มีรายงานน้ำท่วมหรือพื้นที่เสี่ยง</p>';
+  }
+  function card(c) {
+    return `<article class="spot t${c.tier}">
+      <div class="t-row">${tag(c.tier)}<span class="muted small">${c.t ? fmtTime(c.t) + ' · ' + ago(c.t) : ''}</span></div>
+      <h3>${esc(c.name)}</h3>
+      <p class="muted small">เขต${esc(c.district || '–')}${c.cm ? ` · น้ำสูงประมาณ ${Math.round(c.cm)} ซม.` : ''}</p>
+      <p class="small">${esc(c.members[0].detail).slice(0, 140)}</p>
+      <div class="chips">${sourceChips(c)}</div>
+      <a class="go" href="${mapLink(c)}">ดูบนแผนที่ →</a>
+    </article>`;
+  }
+  function renderSpots(clusters) {
+    const main = clusters.filter((c) => c.tier >= 2), risk = clusters.filter((c) => c.tier === 1);
+    $('allCount').textContent = `${main.length} จุด`;
+    $('spots').innerHTML = main.length ? main.map(card).join('') : '<p class="muted">ยังไม่มีจุดที่มีรายงานน้ำท่วม</p>';
+    $('riskSpots').innerHTML = risk.length ? risk.map(card).join('') : '<p class="muted">ไม่มีพื้นที่เสี่ยงในขณะนี้</p>';
+  }
+  async function renderTmd() {
+    try {
+      const d = await F.fetchTmd();
+      const x = d.items[0];
+      $('tmdLine').innerHTML = x ? `<p class="tmdline">⚠ <b>กรมอุตุฯ:</b> ${esc(x.title)} <span class="muted small">(${esc(x.announced)})</span></p>` : '';
+    } catch (e) { $('tmdLine').innerHTML = ''; }
+  }
+
+  // ---------- โหลดทั้งหมด ----------
+  const FEEDS = [['sensor', 'เซ็นเซอร์ กทม.', 'fetchSensors'], ['event', 'หน่วยงาน/iTIC', 'fetchEvents'], ['traffy', 'Traffy', 'fetchTraffy'],
+    ['rain', 'ฝน ThaiWater', 'fetchRain'], ['wl', 'ระดับน้ำ ThaiWater', 'fetchWl'], ['news', 'ข่าว', 'fetchNews']];
+  let last = 0;
+  async function refresh() {
+    last = Date.now();
+    $('updated').textContent = 'กำลังอัปเดต…';
+    renderTmd();
+    const [geo, ...res] = await Promise.all([F.loadDistricts().catch(() => null), ...FEEDS.map(([, , fn]) => F[fn]().catch((e) => ({ error: e })))]);
+    const D = {}, feeds = [];
+    FEEDS.forEach(([k, name], i) => { const r = res[i]; D[k] = r.error ? null : r.items; feeds.push({ name, ok: !r.error }); });
+    const clusters = cluster(signals(D), geo);
+    const dists = byDistrict(clusters, D.news);
+    renderHeadline(clusters, dists, feeds);
+    drawDistricts(geo, dists);
+    drawSpots(clusters);
+    renderTop(clusters);
+    renderDistricts(dists);
+    renderSpots(clusters);
+    $('asof').textContent = `ข้อมูล ณ ${fmtDT(new Date(last))}`;
+    $('updated').textContent = `อัปเดต ${fmtTime(new Date(last))} · รีเฟรชอัตโนมัติทุก 15 นาที`;
+    drawRoads(clusters);
+  }
+  $('refresh').onclick = refresh;
+  document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'visible' && Date.now() - last > F.REFRESH_MS) refresh(); });
+  setInterval(refresh, F.REFRESH_MS);
+  refresh();
+})();

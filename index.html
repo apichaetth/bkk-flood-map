@@ -3,8 +3,8 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-  <title>แผนที่น้ำท่วม กทม.</title>
-  <meta name="description" content="แผนที่สถานการณ์น้ำท่วมกรุงเทพมหานครแบบรายจุด รวมเซ็นเซอร์น้ำท่วมถนน ระดับน้ำ ปริมาณฝน รายงานจากประชาชน กล้อง CCTV สาธารณะ และสรุปข่าว อัปเดตทุก 15 นาที">
+  <title>สรุปน้ำท่วม กทม.</title>
+  <meta name="description" content="สรุปจุดที่มีน้ำท่วมและพื้นที่เสี่ยงน้ำท่วมในกรุงเทพมหานครตอนนี้ รวมจากเซ็นเซอร์ กทม., รายงานหน่วยงาน, ประชาชน, ข่าว, ปริมาณฝนและระดับน้ำ อัปเดตทุก 15 นาที">
   <meta name="theme-color" content="#0f5ea8">
   <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Cpath d='M16 3C11 11 7 15.5 7 20a9 9 0 0 0 18 0c0-4.5-4-9-9-17z' fill='%230f5ea8'/%3E%3C/svg%3E">
   <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -13,95 +13,86 @@
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/leaflet@1.9.4/dist/leaflet.css">
   <link rel="stylesheet" href="css/style.css">
 </head>
-<body>
+<body class="summary">
   <header class="top">
     <div class="brand">
       <svg viewBox="0 0 32 32" aria-hidden="true"><path d="M16 3C11 11 7 15.5 7 20a9 9 0 0 0 18 0c0-4.5-4-9-9-17z"/></svg>
       <div>
-        <h1>แผนที่สถานการณ์น้ำท่วม กทม.</h1>
+        <h1>สรุปสถานการณ์น้ำท่วม กทม.</h1>
         <p id="updated" class="sub">กำลังโหลดข้อมูล…</p>
       </div>
     </div>
+    <nav class="pages" aria-label="หน้า"><a href="./" aria-current="page">สรุป</a><a href="map.html">แผนที่ละเอียด</a></nav>
     <button id="refresh" class="btn" type="button" title="โหลดข้อมูลใหม่">↻ รีเฟรช</button>
   </header>
 
-  <div id="warn" class="warn" hidden></div>
+  <main class="sum">
+    <!-- 1) ภาพรวม (infographic) -->
+    <section class="hero" aria-live="polite">
+      <div class="hero-text">
+        <p class="eyebrow" id="asof">ข้อมูล ณ –</p>
+        <h2 id="headline">กำลังรวบรวมข้อมูลจากทุกแหล่ง…</h2>
+        <p id="subline" class="muted"></p>
+        <div id="tmdLine"></div>
+      </div>
+      <div class="tiles">
+        <div class="tile t3"><span class="tv" id="nConfirmed">–</span><span class="tl">จุดน้ำท่วม<br><b>ยืนยันแล้ว</b></span></div>
+        <div class="tile t2"><span class="tv" id="nReported">–</span><span class="tl">จุดที่<br><b>มีรายงาน</b></span></div>
+        <div class="tile t1"><span class="tv" id="nRisk">–</span><span class="tl">พื้นที่<br><b>เสี่ยง</b></span></div>
+        <div class="tile"><span class="tv" id="nDistricts">–</span><span class="tl">เขตที่<br><b>มีน้ำท่วม</b></span></div>
+      </div>
+    </section>
 
-  <section class="kpis" aria-label="สรุปตัวเลข">
-    <button class="kpi" data-layer="sensor" type="button"><span class="kv" id="kSensor">–</span><span class="kl">ถนนมีน้ำท่วม<br><small>เซ็นเซอร์ กทม.</small></span></button>
-    <button class="kpi" data-layer="event" type="button"><span class="kv" id="kEvent">–</span><span class="kl">จุดรายงานน้ำท่วม<br><small>หน่วยงาน / iTIC</small></span></button>
-    <button class="kpi" data-layer="traffy" type="button"><span class="kv" id="kTraffy">–</span><span class="kl">ประชาชนแจ้ง<br><small>Traffy 24 ชม.</small></span></button>
-    <button class="kpi" data-layer="rain" type="button"><span class="kv" id="kRain">–</span><span class="kl">ฝนสูงสุด 24 ชม.<br><small id="kRainAt">มม.</small></span></button>
-    <button class="kpi" data-layer="news" type="button"><span class="kv" id="kNews">–</span><span class="kl">ข่าว + คลิป<br><small>48 ชม.</small></span></button>
-  </section>
+    <div id="warn" class="warn" hidden></div>
 
-  <main class="layout">
-    <div id="map" role="region" aria-label="แผนที่"></div>
-
-    <aside id="panel" class="panel">
-      <button id="grab" class="grab" type="button" aria-label="ย่อ/ขยายแผง"><span></span></button>
-      <nav class="tabs" role="tablist">
-        <button role="tab" class="on" data-tab="sum">สรุป</button>
-        <button role="tab" data-tab="news">ข่าว</button>
-        <button role="tab" data-tab="fb">Facebook</button>
-        <button role="tab" data-tab="cam">กล้อง</button>
-        <button role="tab" data-tab="src">แหล่งข้อมูล</button>
-      </nav>
-
-      <div class="tab on" id="tab-sum">
-        <div id="tmd"></div>
-        <h2>ถนนที่มีน้ำท่วมตอนนี้</h2>
-        <div id="listFlood" class="list"></div>
-        <h2>คลอง/แม่น้ำ ระดับน้ำสูง</h2>
-        <div id="listWl" class="list"></div>
-        <h2>ฝนสะสม 24 ชม. สูงสุด</h2>
-        <div id="listRain" class="list"></div>
-        <h2>ความหมายของสัญลักษณ์</h2>
-        <div class="legend">
-          <div><i class="sym sensor" style="--c:var(--critical)"></i>เซ็นเซอร์น้ำท่วมถนน กทม. (ตัวเลข = ซม.)</div>
-          <div><i class="sym event" style="--c:var(--serious)"></i>รายงานน้ำท่วมจากหน่วยงาน / iTIC</div>
-          <div><i class="sym traffy" style="--c:var(--warning)"></i>ประชาชนแจ้งผ่าน Traffy Fondue (ยังไม่ยืนยัน)</div>
-          <div><i class="sym wl" style="--c:var(--good)"></i>สถานีวัดระดับน้ำคลอง/แม่น้ำ</div>
-          <div><i class="sym rain" style="--c:var(--rain2)"></i>สถานีวัดฝน (ยิ่งใหญ่และเข้ม = ฝนยิ่งมาก จุดเล็กจาง = ฝนน้อย/ไม่มีฝน)</div>
-          <div><i class="sym rain heavy" style="--c:var(--critical)"></i>ฝนหนัก (&gt; 35 มม./24 ชม.) = จุดเสี่ยงน้ำท่วม</div>
-          <div><i class="sym news" style="--c:var(--critical)"></i>ข่าวรายงานว่ามีน้ำท่วม (สรุปโดย AI)</div>
-          <div><i class="sym news" style="--c:var(--news)"></i>ข่าวเตือนภัย / ฝนตก / น้ำลดแล้ว</div>
-          <div><i class="sym yt" style="--c:var(--yt)"></i>ตำแหน่งจากคลิป YouTube (สรุปโดย AI)</div>
-          <div><i class="sym cam"></i>กล้อง CCTV สาธารณะ</div>
-          <div class="scale">
-            <span style="--c:var(--good)">ปกติ</span><span style="--c:var(--warning)">เล็กน้อย</span><span style="--c:var(--serious)">ท่วม</span><span style="--c:var(--critical)">ท่วมสูง</span>
-          </div>
-          <p class="muted small">เซ็นเซอร์ถนน: เล็กน้อย 5–10 ซม. · ท่วม 10–15 ซม. · ท่วมสูง ≥15 ซม.<br>ระดับน้ำ: % เทียบความจุลำน้ำ (ตลิ่ง) · ≥90% เฝ้าระวัง · ≥100% ล้นตลิ่ง</p>
+    <section class="grid2">
+      <div class="card mapcard">
+        <div class="card-h"><h2>แผนที่จุดน้ำท่วม</h2><a class="more" href="map.html">แผนที่ละเอียด →</a></div>
+        <div id="smap" role="region" aria-label="แผนที่สรุปจุดน้ำท่วม"></div>
+        <div class="legend-row">
+          <span><i class="lg-line t3"></i>ถนนน้ำท่วม (ยืนยัน)</span>
+          <span><i class="lg-line t2"></i>ถนนที่มีรายงาน</span>
+          <span><i class="lg-area"></i>พื้นที่เสี่ยง (ฝนหนัก/น้ำสูง)</span>
+          <span><i class="lg-dist d3"></i><i class="lg-dist d2"></i><i class="lg-dist d1"></i>เขต: สีแดงเข้ม = ท่วมมาก</span>
         </div>
+        <p class="muted small" id="roadNote"></p>
       </div>
 
-      <div class="tab" id="tab-news">
-        <p class="muted small" id="newsNote"></p>
-        <div id="newsFilter" class="chips" role="group" aria-label="กรองประเภท"></div>
-        <div id="listNews" class="news"></div>
+      <div class="card">
+        <div class="card-h"><h2>10 จุดที่น่าห่วงที่สุด</h2></div>
+        <ol id="top10" class="top10"></ol>
       </div>
+    </section>
 
-      <div class="tab" id="tab-fb">
-        <p class="muted small">โพสต์ล่าสุดจากเพจทางการที่เกี่ยวกับน้ำท่วม กทม. (แสดงผ่าน Facebook Page Plugin)</p>
-        <div id="fbPages" class="chips" role="group" aria-label="เลือกเพจ"></div>
-        <div id="fbBox" class="fb-box"></div>
-        <p class="muted small" id="fbNote"></p>
-      </div>
+    <!-- 2) แยกตามเขต -->
+    <section class="card">
+      <div class="card-h"><h2>แยกตามเขต</h2><span class="muted small">กดชื่อเขตเพื่อดูจุดในเขตนั้น</span></div>
+      <div id="districtList" class="dlist"></div>
+    </section>
 
-      <div class="tab" id="tab-cam">
-        <p class="muted small">กล้องจราจรที่เปิดให้ดูเป็นสาธารณะ (กรมทางหลวง / iTIC / Longdo) ที่อยู่ใกล้จุดน้ำท่วมไม่เกิน 1.5 กม. กดเพื่อดูภาพสด</p>
-        <div id="listCam" class="list"></div>
-      </div>
+    <!-- 3) ทุกจุด -->
+    <section class="card">
+      <div class="card-h"><h2>จุดน้ำท่วมทั้งหมด</h2><span class="muted small" id="allCount"></span></div>
+      <div id="spots" class="spots"></div>
+      <h3 class="subh">พื้นที่เสี่ยง (ยังไม่มีรายงานน้ำท่วม)</h3>
+      <div id="riskSpots" class="spots"></div>
+    </section>
 
-      <div class="tab" id="tab-src">
-        <div id="feeds" class="feeds"></div>
-        <p class="muted small">เว็บนี้ไม่ใช่เว็บทางราชการ ข้อมูลรวบรวมจากแหล่งสาธารณะอัตโนมัติ อาจล่าช้าหรือคลาดเคลื่อน โปรดติดตามประกาศทางการจากกรุงเทพมหานคร (โทร 1555) และกรมอุตุนิยมวิทยา · จุดที่ไม่มีรายงาน ≠ ไม่มีน้ำท่วม</p>
-      </div>
-    </aside>
+    <section class="card how">
+      <h2>อ่านหน้านี้อย่างไร</h2>
+      <ul>
+        <li><b class="tag t3">ยืนยันแล้ว</b> เซ็นเซอร์ของ กทม. วัดน้ำบนถนนได้ ≥ 5 ซม. หรือหน่วยงาน/iTIC รายงาน หรือมีรายงานจาก 2 แหล่งขึ้นไปในรัศมี 500 ม.</li>
+        <li><b class="tag t2">มีรายงาน</b> ประชาชนแจ้งผ่าน Traffy Fondue หรือข่าวระบุสถานที่ (แหล่งเดียว ยังไม่มีการยืนยัน)</li>
+        <li><b class="tag t1">เสี่ยง</b> ฝนตกหนัก &gt; 35 มม. ใน 24 ชม. หรือระดับน้ำในคลอง/แม่น้ำ ≥ 90% ของตลิ่ง แต่ยังไม่มีรายงานน้ำท่วม</li>
+        <li>ถนนสีแดงคือช่วงถนนในรัศมีประมาณ 300 ม. จากจุดที่มีรายงาน (ข้อมูลถนนจาก OpenStreetMap) ไม่ได้หมายความว่าท่วมทั้งเส้น</li>
+        <li>จุดที่ไม่มีสีแดง ≠ ไม่มีน้ำท่วม อาจยังไม่มีใครรายงาน · เว็บนี้ไม่ใช่เว็บทางราชการ โปรดติดตามประกาศจาก กทม. (สายด่วน 1555)</li>
+      </ul>
+      <p class="muted small" id="sources"></p>
+    </section>
   </main>
 
   <script src="https://cdn.jsdelivr.net/npm/leaflet@1.9.4/dist/leaflet.js"></script>
-  <script src="https://cdn.jsdelivr.net/npm/hls.js@1.5.20/dist/hls.min.js" defer></script>
-  <script src="js/app.js" defer></script>
+  <script src="js/core.js" defer></script>
+  <script src="js/summary.js" defer></script>
 </body>
 </html>

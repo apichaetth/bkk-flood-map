@@ -1,0 +1,245 @@
+/* ส่วนกลางที่ใช้ร่วมกันระหว่างหน้าสรุป (index.html) และหน้าแผนที่ (map.html)
+ * - ตัวช่วยจัดรูปแบบ/เวลา/ระยะทาง
+ * - เกณฑ์ความรุนแรง
+ * - ฟังก์ชันดึงข้อมูลแต่ละแหล่ง คืนค่า { items, newest, msg } หรือ throw เมื่อดึงไม่ได้
+ * ข้อมูลเรียลไทม์ดึงจากเบราว์เซอร์ของผู้ชมโดยตรง เพราะบางแหล่ง (เช่นเซ็นเซอร์ กทม.) เปิดให้เฉพาะ IP ในประเทศไทย
+ */
+window.Flood = (function () {
+  'use strict';
+
+  const REFRESH_MS = 15 * 60 * 1000;
+  const TZ = 'Asia/Bangkok';
+  const BBOX = { s: 13.48, n: 13.97, w: 100.32, e: 100.95 }; // กรอบ กทม.
+  const TRAFFY_WINDOW_H = 24;
+  const SENSOR_STALE_H = 3;
+  const WL_STALE_H = 6;
+  const RAIN_HEAVY_MM = 35;
+  const TW = 'https://api-v3.thaiwater.net/api/v1/thaiwater30/public/';
+  const BMA = 'https://floodbangkok.bangkok.go.th/bkk/dds/services/api/floods/v1/items/';
+  const URL = {
+    sensors: BMA + 'sensor_profile?limit=-1&fields=id,code,name,road,district,lat,long',
+    // ขอเฉพาะค่าใน 3 ชม. ล่าสุด เพื่อลดภาระเซิร์ฟเวอร์ กทม. (ล่มบ่อยช่วงฝนตกหนัก)
+    notif: BMA + 'flood_notification?limit=600&sort=-date_created&fields=sensor_profile,value,date_created&filter[date_created][_gte]=' + encodeURIComponent('$NOW(-3 hours)'),
+    notifFallback: BMA + 'flood_notification?limit=600&sort=-date_created&fields=sensor_profile,value,date_created',
+    events: 'https://event.longdo.com/feed/json',
+    traffy: 'https://publicapi.traffy.in.th/share/teamchadchart/search?limit=500',
+    rain: TW + 'rain_24h',
+    wl: TW + 'waterlevel_load',
+    cams: 'https://camera.longdo.com/feed/?command=json',
+    radar: 'https://api.rainviewer.com/public/weather-maps.json',
+    news: 'data/news.json',
+    tmd: 'data/tmd.json',
+    meta: 'data/meta.json',
+    districts: 'data/districts.geojson',
+    fbPages: 'data/facebook-pages.json',
+  };
+
+  // ---------- helpers ----------
+  const $ = (id) => document.getElementById(id);
+  const esc = (s) => String(s == null ? '' : s).replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+  const num = (v) => { const n = parseFloat(v); return Number.isFinite(n) ? n : null; };
+  const inBkk = (la, lo) => la >= BBOX.s && la <= BBOX.n && lo >= BBOX.w && lo <= BBOX.e;
+  const th = (o) => (o && typeof o === 'object' ? o.th || o.en || '' : o || '');
+  const fmt = (d, opt) => (d ? new Intl.DateTimeFormat('th-TH', { timeZone: TZ, ...opt }).format(d) : '–');
+  const fmtTime = (d) => fmt(d, { hour: '2-digit', minute: '2-digit' }) + ' น.';
+  const fmtDT = (d) => fmt(d, { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' }) + ' น.';
+  const ago = (d) => {
+    if (!d) return '';
+    const m = Math.round((Date.now() - d) / 60000);
+    if (m < 1) return 'เมื่อสักครู่';
+    if (m < 60) return m + ' นาทีที่แล้ว';
+    const h = Math.floor(m / 60);
+    return h < 48 ? h + ' ชม.ที่แล้ว' : Math.floor(h / 24) + ' วันที่แล้ว';
+  };
+  // เวลาแบบ "2026-09-26 21:30" ของ ThaiWater/Longdo เป็นเวลาไทย
+  const bkkDate = (s) => {
+    const m = String(s || '').match(/^(\d{4}-\d{2}-\d{2})[ T](\d{2}:\d{2})(:\d{2})?/);
+    if (!m) return null;
+    const d = new Date(`${m[1]}T${m[2]}${m[3] || ':00'}+07:00`);
+    return isNaN(d) ? null : d;
+  };
+  const isoDate = (s) => { if (!s) return null; const d = new Date(String(s).replace(' ', 'T').replace(/\+00$/, 'Z')); return isNaN(d) ? null : d; };
+  function distKm(a, b, c, d) {
+    const r = Math.PI / 180, x = (d - b) * r * Math.cos(((a + c) / 2) * r), y = (c - a) * r;
+    return Math.sqrt(x * x + y * y) * 6371;
+  }
+  async function getJSON(url, ms = 45000, opts = {}) {
+    const ctl = new AbortController();
+    const t = setTimeout(() => ctl.abort(), ms);
+    try {
+      const r = await fetch(url, { cache: 'no-store', ...opts, signal: ctl.signal });
+      if (!r.ok) throw new Error('HTTP ' + r.status);
+      return await r.json();
+    } catch (e) {
+      throw new Error(e.name === 'AbortError' ? 'หมดเวลาเชื่อมต่อ' : e.message || 'เชื่อมต่อไม่ได้');
+    } finally { clearTimeout(t); }
+  }
+  const cssVar = (name) => getComputedStyle(document.documentElement).getPropertyValue(name).trim();
+  const store = {
+    get(k) { try { return JSON.parse(localStorage.getItem(k) || 'null'); } catch (e) { return null; } },
+    set(k, v) { try { localStorage.setItem(k, JSON.stringify(v)); } catch (e) { /* เก็บไม่ได้ก็ไม่เป็นไร */ } },
+  };
+
+  // ---------- ระดับความรุนแรง (สีต้องมาพร้อมข้อความเสมอ) ----------
+  const LEVEL = {
+    0: { key: 'good', label: 'ปกติ', color: 'var(--good)' },
+    1: { key: 'warning', label: 'เล็กน้อย', color: 'var(--warning)', dark: true },
+    2: { key: 'serious', label: 'ท่วม', color: 'var(--serious)', dark: true },
+    3: { key: 'critical', label: 'ท่วมสูง', color: 'var(--critical)' },
+  };
+  const badge = (lv, text) => `<span class="badge${LEVEL[lv].dark ? ' dark' : ''}" style="--c:${LEVEL[lv].color}">${esc(text || LEVEL[lv].label)}</span>`;
+  const sensorLevel = (cm) => (cm >= 15 ? 3 : cm >= 10 ? 2 : cm >= 5 ? 1 : 0);
+  const wlLevel = (pct) => (pct >= 100 ? 3 : pct >= 90 ? 2 : pct >= 70 ? 1 : 0);
+  const RAIN_STEPS = [[90, 'var(--rain4)', 'หนักมาก'], [35, 'var(--rain3)', 'หนัก'], [10, 'var(--rain2)', 'ปานกลาง'], [0.1, 'var(--rain1)', 'เล็กน้อย'], [-1, 'var(--rain0)', 'ไม่มีฝน']];
+  const rainStep = (mm) => RAIN_STEPS.find((s) => mm > s[0]) || RAIN_STEPS[RAIN_STEPS.length - 1];
+  const SEV_LV = { 'สูง': 3, 'กลาง': 2, 'ต่ำ': 1 };
+
+  // ประเมินความรุนแรงจากข้อความรายงาน (iTIC / Traffy)
+  function levelFromText(text) {
+    const t = String(text || '');
+    let cm = null;
+    for (const m of t.matchAll(/(\d{1,3})(?:\s*[-–~]\s*(\d{1,3}))?\s*(?:ซ\.?\s?ม\.?|ซม|เซน(?:ติเมตร)?|cm)/gi)) {
+      const v = Math.max(+m[1], m[2] ? +m[2] : 0);
+      if (v > 0 && v < 300) cm = Math.max(cm || 0, v);
+    }
+    if (/น้ำลด(ลง)?แล้ว|ระบายแล้ว|แห้งแล้ว|กลับสู่ภาวะปกติ|ผ่านได้ตามปกติ/.test(t)) return { lv: 0, why: 'รายงานว่าน้ำลดแล้ว' };
+    if (/ผ่านไม่ได้|ไม่สามารถผ่าน|สัญจรไม่ได้|ปิดการจราจร|ปิดถนน/.test(t)) return { lv: 3, why: 'รายงานว่ารถผ่านไม่ได้' + (cm ? ` · ${cm} ซม.` : ''), cm };
+    if (cm != null) return { lv: cm >= 20 ? 3 : cm >= 10 ? 2 : 1, why: `ระดับน้ำประมาณ ${cm} ซม.`, cm };
+    if (/เข่า|เอว|ต้นขา|หน้าแข้ง/.test(t)) return { lv: 3, why: 'รายงานว่าน้ำสูงระดับเข่าขึ้นไป' };
+    if (/ข้อเท้า|ตาตุ่ม/.test(t)) return { lv: 1, why: 'รายงานว่าน้ำสูงระดับข้อเท้า' };
+    return { lv: 2, why: 'มีรายงานน้ำท่วม ไม่ระบุความสูง' };
+  }
+
+  // ---------- ตัวดึงข้อมูลแต่ละแหล่ง ----------
+  const SENSOR_CACHE = 'bkkflood.bmaSensors';
+
+  // 1) เซ็นเซอร์น้ำท่วมถนน กทม.
+  async function fetchSensors() {
+    // ตำแหน่งเซ็นเซอร์แทบไม่เปลี่ยน: เก็บไว้ในเบราว์เซอร์ 24 ชม. ลดการเรียกซ้ำ และใช้ต่อได้ตอนเซิร์ฟเวอร์ล่ม
+    let sp = null;
+    const c = store.get(SENSOR_CACHE);
+    if (c && Date.now() - c.t < 864e5) sp = c.sp;
+    if (!sp) { sp = await getJSON(URL.sensors, 30000); store.set(SENSOR_CACHE, { t: Date.now(), sp }); }
+    // บางเวอร์ชันของ API อาจไม่รองรับตัวกรองเวลา (ตอบ 4xx) ให้ลองแบบไม่กรอง
+    const nt = await getJSON(URL.notif, 30000).catch((e) => (/HTTP 4\d\d/.test(e.message) ? getJSON(URL.notifFallback, 30000) : Promise.reject(e)));
+    const latest = new Map();
+    for (const n of nt.data || []) if (!latest.has(n.sensor_profile)) latest.set(n.sensor_profile, n);
+    let newest = null;
+    const items = (sp.data || [])
+      .filter((s) => String(s.code || '').startsWith('FL.') && num(s.lat) && num(s.long))
+      .map((s) => {
+        const n = latest.get(s.id);
+        const t = n ? isoDate(n.date_created) : null;
+        const cm = n ? num(n.value) : null;
+        if (t && (!newest || t > newest)) newest = t;
+        const stale = !t || Date.now() - t > SENSOR_STALE_H * 36e5;
+        return { s, la: num(s.lat), lo: num(s.long), cm, t, stale, lv: stale || cm == null ? 0 : sensorLevel(cm) };
+      });
+    return { items, newest, msg: `${items.length} จุด` };
+  }
+
+  // 2) รายงานน้ำท่วมจากหน่วยงาน / iTIC / Longdo
+  async function fetchEvents() {
+    const d = await getJSON(URL.events);
+    if (!Array.isArray(d)) throw new Error('รูปแบบข้อมูลไม่ถูกต้อง');
+    const now = Date.now();
+    let newest = null;
+    const items = d.filter((e) => String(e.type) === '6' || e.icon === 'flood')
+      .map((e) => ({ e, la: num(e.latitude), lo: num(e.longitude), start: bkkDate(e.start), stop: bkkDate(e.stop), ...levelFromText(`${e.title} ${e.description}`) }))
+      .filter((x) => x.la && x.lo && inBkk(x.la, x.lo) && (!x.stop || x.stop >= now) && (!x.start || x.start <= now + 36e5) && x.lv > 0);
+    items.forEach((x) => { if (x.start && (!newest || x.start > newest)) newest = x.start; });
+    return { items, newest, msg: `${items.length} จุดที่ยังมีผล` };
+  }
+
+  // 3) Traffy Fondue
+  const FLOOD_RE = /ท่วม|น้ำขัง|น้ำรอระบาย|รอการระบาย/;
+  async function fetchTraffy() {
+    const d = await getJSON(URL.traffy, 90000);
+    if (!Array.isArray(d.results)) throw new Error('รูปแบบข้อมูลไม่ถูกต้อง');
+    const cutoff = Date.now() - TRAFFY_WINDOW_H * 36e5;
+    let newest = null;
+    const items = d.results
+      .map((r) => ({ r, t: isoDate(r.timestamp), lo: num(r.coords && r.coords[0]), la: num(r.coords && r.coords[1]) }))
+      .filter((x) => x.la && x.lo && x.t && x.t >= cutoff && inBkk(x.la, x.lo) && x.r.state !== 'เสร็จสิ้น'
+        // เรื่องใหม่มักยังไม่ถูกจัดประเภท จึงดูทั้งประเภท (problem_type_abdul / type) และข้อความ
+        && (/น้ำท่วม/.test(String(x.r.problem_type_abdul || '') + String(x.r.type || '')) || FLOOD_RE.test(x.r.description || '')))
+      .map((x) => ({ ...x, ...levelFromText(x.r.description) }))
+      .filter((x) => x.lv > 0);
+    items.forEach((x) => { if (!newest || x.t > newest) newest = x.t; });
+    // บอกช่วงเวลาที่ข้อมูลครอบคลุมจริง (500 เรื่องล่าสุดอาจย้อนหลังได้ไม่ถึง 24 ชม. ช่วงคนแจ้งเยอะ)
+    const oldest = d.results.length ? isoDate(d.results[d.results.length - 1].timestamp) : null;
+    const span = oldest ? ` · ครอบคลุมเรื่องที่แจ้งตั้งแต่ ${fmtDT(oldest)}` : '';
+    return { items, newest, msg: `พบเรื่องน้ำท่วม ${items.length} เรื่อง จากทั้งหมด ${d.results.length} เรื่องล่าสุด${span}` };
+  }
+
+  // 4) ThaiWater ฝน 24 ชม.
+  async function fetchRain() {
+    const d = await getJSON(URL.rain, 120000);
+    if (!Array.isArray(d.data)) throw new Error('รูปแบบข้อมูลไม่ถูกต้อง');
+    const cutoff = Date.now() - 30 * 36e5;
+    let newest = null;
+    const items = d.data.filter((x) => x.geocode && String(x.geocode.province_code) === '10')
+      .map((x) => ({ x, t: bkkDate(x.rainfall_datetime), la: num(x.station && x.station.tele_station_lat), lo: num(x.station && x.station.tele_station_long), mm: num(x.rain_24h), mm1: num(x.rain_1h) }))
+      .filter((s) => s.la && s.lo && s.t && s.t >= cutoff && s.mm != null);
+    items.forEach((s) => { if (!newest || s.t > newest) newest = s.t; });
+    return { items, newest, msg: `${items.length} สถานี` };
+  }
+
+  // 5) ThaiWater ระดับน้ำ
+  async function fetchWl() {
+    const d = await getJSON(URL.wl, 120000);
+    const arr = d && d.waterlevel_data && d.waterlevel_data.data;
+    if (!Array.isArray(arr)) throw new Error('รูปแบบข้อมูลไม่ถูกต้อง');
+    let newest = null;
+    const items = arr.filter((x) => x.geocode && String(x.geocode.province_code) === '10')
+      .map((x) => ({ x, t: bkkDate(x.waterlevel_datetime), la: num(x.station && x.station.tele_station_lat), lo: num(x.station && x.station.tele_station_long), pct: num(x.storage_percent), msl: num(x.waterlevel_msl), prev: num(x.waterlevel_msl_previous), bank: num(x.station && x.station.min_bank) }))
+      .filter((s) => s.la && s.lo && s.t)
+      .map((s) => ({ ...s, stale: Date.now() - s.t > WL_STALE_H * 36e5 }));
+    items.forEach((s) => { if (!newest || s.t > newest) newest = s.t; });
+    return { items, newest, msg: `${items.length} สถานี` };
+  }
+
+  // 6) ข่าว + คลิป (ไฟล์ที่ GitHub Actions สร้าง)
+  async function fetchNews() {
+    const [d, meta] = await Promise.all([getJSON(URL.news + '?t=' + Date.now()), getJSON(URL.meta + '?t=' + Date.now()).catch(() => null)]);
+    return { items: d.items || [], updated: new Date(d.updated), sources: (meta && meta.sources) || {} };
+  }
+
+  // 7) ประกาศกรมอุตุฯ
+  async function fetchTmd() {
+    const d = await getJSON(URL.tmd + '?t=' + Date.now());
+    return { items: d.items || [], updated: new Date(d.updated) };
+  }
+
+  // ข้อความผิดพลาดที่อ่านเข้าใจง่าย
+  function errMsg(key, e) {
+    // เซิร์ฟเวอร์ กทม. ตอบ 503 "Under pressure" โดยไม่มี CORS header เบราว์เซอร์จึงเห็นเป็น Failed to fetch
+    if (key === 'sensor' && /fetch|HTTP 5/i.test(e.message)) return 'ระบบของ กทม. ไม่ตอบสนอง (มักเกิดช่วงมีผู้ใช้มาก) จะลองใหม่ทุก 15 นาที';
+    return e.message;
+  }
+
+  // ---------- เขต ----------
+  let districtsPromise = null;
+  const loadDistricts = () => (districtsPromise ||= getJSON(URL.districts));
+  // หาเขตจากพิกัดด้วย ray casting (geojson เป็น MultiPolygon [lng, lat])
+  function inRing(lng, lat, ring) {
+    let inside = false;
+    for (let i = 0, j = ring.length - 1; i < ring.length; j = i++) {
+      const [xi, yi] = ring[i], [xj, yj] = ring[j];
+      if ((yi > lat) !== (yj > lat) && lng < ((xj - xi) * (lat - yi)) / (yj - yi) + xi) inside = !inside;
+    }
+    return inside;
+  }
+  function districtAt(geo, lat, lng) {
+    for (const f of geo.features) for (const poly of f.geometry.coordinates) if (inRing(lng, lat, poly[0])) return f.properties.name;
+    return '';
+  }
+
+  return {
+    REFRESH_MS, TZ, RAIN_HEAVY_MM, URL,
+    $, esc, num, inBkk, th, fmtTime, fmtDT, ago, bkkDate, isoDate, distKm, getJSON, cssVar, store,
+    LEVEL, badge, sensorLevel, wlLevel, rainStep, SEV_LV, levelFromText,
+    fetchSensors, fetchEvents, fetchTraffy, fetchRain, fetchWl, fetchNews, fetchTmd, errMsg,
+    loadDistricts, districtAt,
+  };
+})();
