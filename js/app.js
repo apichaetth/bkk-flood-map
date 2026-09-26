@@ -192,11 +192,13 @@
       const heavy = s.mm > RAIN_HEAVY_MM;
       // ฝนน้อย/ไม่มีฝน: จุดเล็กและจาง ไม่ให้แย่งสายตาจากจุดที่สำคัญ
       // ฝนหนัก = จุดเสี่ยงน้ำท่วม ใช้สีแดงทั้งจุด (แดงหมายถึงเสี่ยงน้ำท่วมทั้งแผนที่) ฝนหนักมาก (> 90 มม.) ใหญ่ขึ้นอีก
-      const style = heavy ? { radius: s.mm > 90 ? 11 : 9, color: '#fff', weight: 2, fillOpacity: 1, opacity: 1 }
-        : s.mm > 10 ? { radius: 6, color: '#fff', weight: 1.5, fillOpacity: 0.85, opacity: 1 }
-        : s.mm > 0 ? { radius: 4, color: '#fff', weight: 1, fillOpacity: 0.5, opacity: 0.6 }
-        : { radius: 3, color: '#fff', weight: 0.5, fillOpacity: 0.3, opacity: 0.4 };
-      s.marker = L.circleMarker([s.la, s.lo], { ...style, fillColor: heavy ? cssVar('--critical') : cssVar(st[1].slice(4, -1)) })
+      // ขนาดวงแปรตามปริมาณฝน (รากที่สอง เพื่อให้พื้นที่วงสัมพันธ์กับปริมาณ) เห็นแนวโน้มได้ทันที
+      const radius = Math.min(20, 3 + Math.sqrt(Math.max(0, s.mm)) * 1.3);
+      const style = heavy ? { radius, color: '#fff', weight: 2, fillOpacity: 1, opacity: 1 }
+        : s.mm > 10 ? { radius, color: '#fff', weight: 1.5, fillOpacity: 0.85, opacity: 1 }
+        : s.mm > 0 ? { radius, color: '#fff', weight: 1, fillOpacity: 0.5, opacity: 0.6 }
+        : { radius: 2.5, color: '#fff', weight: 0.5, fillOpacity: 0.3, opacity: 0.4 };
+      s.marker = L.circleMarker([s.la, s.lo], { ...style, fillColor: heavy ? heavyRed(s.mm) : cssVar(st[1].slice(4, -1)) })
         .bindPopup(html).addTo(layers.rain);
       if (heavy) s.marker.bringToFront();
     }
@@ -204,8 +206,15 @@
     $('kRain').textContent = top.length ? top[0].mm.toFixed(0) : '–';
     $('kRainAt').textContent = top.length ? 'มม. · ' + th(top[0].x.station.tele_station_name) : 'มม.';
     listInto('listRain', top.filter((s) => s.mm > 0).slice(0, 6), (s) => ({
-      dot: s.mm > RAIN_HEAVY_MM ? 'var(--critical)' : rainStep(s.mm)[1], title: th(s.x.station.tele_station_name), sub: `เขต${th(s.x.geocode.amphoe_name)} · ${fmtTime(s.t)}`, right: s.mm + ' มม.', go: s,
+      dot: s.mm > RAIN_HEAVY_MM ? heavyRed(s.mm) : rainStep(s.mm)[1], title: th(s.x.station.tele_station_name), sub: `เขต${th(s.x.geocode.amphoe_name)} · ${fmtTime(s.t)}`, right: s.mm + ' มม.', go: s,
     }), 'ไม่มีฝนใน 24 ชม. ที่ผ่านมา');
+  }
+
+  // ฝนหนัก: แดงอ่อน (35 มม.) → แดงเข้ม (≥ 150 มม.) ไล่ตามปริมาณฝน
+  function heavyRed(mm) {
+    const t = Math.max(0, Math.min(1, (mm - RAIN_HEAVY_MM) / (150 - RAIN_HEAVY_MM)));
+    const from = [245, 150, 146], to = [122, 14, 10];
+    return 'rgb(' + from.map((v, i) => Math.round(v + (to[i] - v) * t)).join(',') + ')';
   }
 
   // ---------- 5) ThaiWater ระดับน้ำ ----------
