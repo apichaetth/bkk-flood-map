@@ -16,28 +16,21 @@
   try { const v = JSON.parse(localStorage.getItem('bkkflood.traffyFilter') || 'null'); if (v) { fTime = v.t || fTime; fState = v.s || fState; } } catch (e) { /* ใช้ค่าเริ่มต้น */ }
 
   // ---------- ดึงข้อมูล ----------
-  let rawCount = 0, source = '';
-  async function fetchAll() {
-    // ใช้วิธีเดียวกับหน้าหลัก (ไม่ใช้พารามิเตอร์กรองที่ไม่มีเอกสารยืนยัน) ถ้า 1000 ช้า/ล้มเหลว ลด 500
-    let d = null, lastErr = null;
-    for (const lim of [1000, 500]) {
-      $('updated').textContent = `กำลังโหลดจาก Traffy Fondue (${lim} เรื่องล่าสุด)…`;
-      try {
-        d = await F.getJSON(API + '?limit=' + lim, 60000);
-        if (Array.isArray(d.results) && d.results.length) { source = `${lim} เรื่องล่าสุด`; break; }
-        lastErr = new Error('Traffy ส่งข้อมูลว่างกลับมา');
-      } catch (e) { lastErr = e; }
-      d = null;
-    }
-    if (!d) throw lastErr || new Error('ดึงข้อมูลจาก Traffy ไม่ได้');
-    rawCount = d.results.length;
+  let rawCount = 0;
+  // ดึง n เรื่องล่าสุด แล้วคัดเฉพาะเรื่องน้ำท่วม
+  async function fetchN(n, ms) {
+    const d = await F.getJSON(API + '?limit=' + n, ms);
+    if (!Array.isArray(d.results) || !d.results.length) throw new Error('Traffy ส่งข้อมูลว่างกลับมา');
     const times = d.results.map((r) => isoDate(r.timestamp)).filter(Boolean);
-    oldest = times.length ? new Date(Math.min(...times)) : null;
-    return d.results
-      .map((r) => ({ r, t: isoDate(r.timestamp), lo: num(r.coords && r.coords[0]), la: num(r.coords && r.coords[1]) }))
-      .filter((x) => x.la && x.lo && x.t && inBkk(x.la, x.lo) && F.isFloodTicket(x.r))
-      .map((x) => ({ ...x, ...F.levelFromText(x.r.description), g: stateGroup(x.r.state) }))
-      .sort((a, b) => b.t - a.t);
+    return {
+      raw: d.results.length,
+      oldest: times.length ? new Date(Math.min(...times)) : null,
+      items: d.results
+        .map((r) => ({ r, t: isoDate(r.timestamp), lo: num(r.coords && r.coords[0]), la: num(r.coords && r.coords[1]) }))
+        .filter((x) => x.la && x.lo && x.t && inBkk(x.la, x.lo) && F.isFloodTicket(x.r))
+        .map((x) => ({ ...x, ...F.levelFromText(x.r.description), g: stateGroup(x.r.state) }))
+        .sort((a, b) => b.t - a.t),
+    };
   }
   const filtered = () => {
     const cut = Date.now() - fTime * 36e5;
@@ -180,18 +173,32 @@
   }
   $('more').onclick = () => { shown += PAGE; drawList(filtered()); };
 
+  // โหลด 500 เรื่องก่อน (เร็วกว่า) แสดงผลทันที แล้วค่อยดึง 1000 เรื่องเบื้องหลังเพื่อให้ย้อนหลังได้ไกลขึ้น
+  let loading = 0;
+  const status = () => `ดึงจาก Traffy ${rawCount} เรื่องล่าสุด เป็นเรื่องน้ำท่วม ${all.length} เรื่อง`;
   async function load() {
-    $('updated').textContent = 'กำลังโหลดจาก Traffy Fondue…';
+    const my = ++loading, t0 = Date.now();
+    const tick = setInterval(() => { if (my === loading && !all.length) $('updated').textContent = `กำลังโหลดจาก Traffy Fondue… ${Math.round((Date.now() - t0) / 1000)} วินาที (Traffy อาจตอบช้าช่วงมีคนใช้มาก)`; }, 1000);
     try {
-      [geo, all] = await Promise.all([F.loadDistricts().catch(() => null), fetchAll()]);
+      geo = geo || await F.loadDistricts().catch(() => null);
+      const first = await fetchN(500, 90000);
+      if (my !== loading) return;
+      ({ items: all, raw: rawCount, oldest } = first);
       render();
-      $('updated').textContent = `อัปเดต ${fmtDT(new Date())} · ดึงจาก Traffy ${rawCount} เรื่อง เป็นเรื่องน้ำท่วม ${all.length} เรื่อง · รีเฟรชทุก 15 นาที`;
+      $('updated').textContent = `อัปเดต ${fmtDT(new Date())} · ${status()} · กำลังดึงเพิ่มเพื่อย้อนหลังให้ไกลขึ้น…`;
+      try {
+        const more = await fetchN(1000, 90000);
+        if (my === loading && more.raw > rawCount) { ({ items: all, raw: rawCount, oldest } = more); render(); }
+      } catch (e) { /* ใช้ 500 เรื่องที่ได้แล้ว */ }
+      if (my === loading) $('updated').textContent = `อัปเดต ${fmtDT(new Date())} · ${status()} · รีเฟรชทุก 15 นาที`;
     } catch (e) {
-      $('updated').textContent = 'โหลดไม่สำเร็จ: ' + e.message;
+      if (my !== loading) return;
+      $('updated').textContent = 'โหลดไม่สำเร็จ: ' + e.message + ' (กด รีเฟรช เพื่อลองใหม่)';
       $('list').innerHTML = `<p>ดึงข้อมูลจาก Traffy ไม่สำเร็จ (${esc(e.message)}) กด รีเฟรช เพื่อลองใหม่</p>`;
-    }
+    } finally { clearInterval(tick); }
   }
   $('refresh').onclick = load;
   setInterval(load, F.REFRESH_MS);
+  render(); // แสดงตัวกรองและโครงหน้าทันที ระหว่างรอข้อมูล
   load();
 })();

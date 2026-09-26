@@ -344,7 +344,9 @@
   let fitting = false;
   function fitToSpots(clusters) {
     if (userMoved) return;
-    const pts = clusters.filter((c) => c.tier >= 2).map((c) => [c.la, c.lo]);
+    // รวมพื้นที่เสี่ยงด้วยเมื่อแสดงอยู่ เพื่อให้เห็นตั้งแต่เปิดหน้า
+    const showRisk = map.hasLayer(lyr.risk);
+    const pts = clusters.filter((c) => c.tier >= 2 || (showRisk && c.tier === 1)).map((c) => [c.la, c.lo]);
     if (!pts.length) return;
     fitting = true;
     if (pts.length === 1) map.setView(pts[0], 15); else map.fitBounds(L.latLngBounds(pts).pad(0.15), { maxZoom: 15 });
