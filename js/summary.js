@@ -448,6 +448,30 @@
       ${imgs.length ? `<div class="ol-imgs">${imgs.map((i) => `<a href="${esc(i.file)}" target="_blank" rel="noopener"><img src="${esc(i.file)}?v=${encodeURIComponent(i.datetime || '')}" alt="ภาพพยากรณ์ฝนวันที่ ${i.day}" loading="lazy"><span>วันที่ ${i.day}</span></a>`).join('')}</div>` : ''}`;
     renderNorth(d.dams || []);
   }
+  // กรมอุตุฯ: ฝน 3 ชม. ข้างหน้ารายเขต + แถบฝนรายชั่วโมง 24 ชม. (ค่าสูงสุดใน กทม.)
+  async function renderTmdFcst() {
+    let d = null;
+    try { d = await F.fetchTmdFcst(); } catch (e) { /* ยังไม่มีไฟล์ */ }
+    const el = $('olTmd');
+    if (!d || !(d.areas || []).length || Date.now() - new Date(d.updated) > 6 * 36e5) { el.innerHTML = ''; return; }
+    const geo = await F.loadDistricts().catch(() => null);
+    const byD = new Map();
+    for (const a of d.areas) {
+      const name = geo && a.la ? F.districtAt(geo, a.la, a.lo) : null;
+      if (!name) continue;
+      const cur = byD.get(name);
+      if (!cur || a.r3 > cur.r3) byD.set(name, a);
+    }
+    const now3 = [...byD.entries()].filter(([, a]) => a.r3 >= 1).sort((x, y) => y[1].r3 - x[1].r3);
+    const hours = (d.areas[0].hours || []).map((h, i) => ({ t: new Date(h.t), mm: Math.max(...d.areas.map((a) => (a.hours[i] ? a.hours[i].rain || 0 : 0))) }));
+    const maxMm = Math.max(1, ...hours.map((h) => h.mm));
+    const hh = (t) => new Intl.DateTimeFormat('th-TH', { timeZone: F.TZ, hour: '2-digit' }).format(t);
+    const peak = hours.reduce((a, b) => (b.mm > a.mm ? b : a), hours[0] || { mm: 0 });
+    el.innerHTML = `<p class="ol-main">${now3.length ? `<b class="tag t2">3 ชม. ข้างหน้า</b> กรมอุตุฯ คาดว่ามีฝนใน ${now3.length} เขต` : 'กรมอุตุฯ ไม่คาดว่ามีฝนมากใน กทม. 3 ชม. ข้างหน้า'}</p>
+      ${now3.length ? `<p class="small">${now3.slice(0, 6).map(([n, a]) => `เขต${esc(n)} ~${a.r3} มม.`).join(' · ')}${now3.length > 6 ? ` และอีก ${now3.length - 6} เขต` : ''}</p>` : ''}
+      <div class="tmd-bars" role="img" aria-label="ฝนสูงสุดรายชั่วโมงใน กทม. 24 ชม. ข้างหน้า">${hours.map((h, i) => `<span title="${hh(h.t)}:00 น. สูงสุด ${h.mm.toFixed(1)} มม."><i style="height:${Math.round((h.mm / maxMm) * 100)}%"></i>${i % 6 === 0 ? `<em>${hh(h.t)}</em>` : ''}</span>`).join('')}</div>
+      <p class="muted small">ฝนสูงสุดรายชั่วโมงใน กทม. 24 ชม. ข้างหน้า${peak && peak.mm >= 0.5 ? ` · หนักสุดราว ${hh(peak.t)}:00 น. (${peak.mm.toFixed(1)} มม./ชม.)` : ''} · กรมอุตุนิยมวิทยา</p>`;
+  }
   let upstream = null, dams = null;
   function renderOutlookWl(up) { upstream = up || []; renderRiver(); renderNorth(); }
   function renderRiver() {
@@ -483,6 +507,7 @@
     $('updated').textContent = 'กำลังอัปเดต…';
     renderTmd();
     renderOutlookTw();
+    renderTmdFcst();
     loadRadar();
     if (!lyr.cam.getLayers().length) loadCams();
     const geo = await F.loadDistricts().catch(() => null);

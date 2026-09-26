@@ -431,15 +431,24 @@ table.log .thumbs img { width: 56px; height: 56px; object-fit: cover; border-rad
 .rchip:hover { border-color: var(--accent); }
 @media (max-width: 600px) { .srow .chips { display: none; } .depth { width: 50px; height: 42px; font-size: 17px; } }
 
-/* ---------- เมนูหน้าบนมือถือ (พับได้) ---------- */
-.nav-toggle, .nav-grab { display: none; }
+/* ---------- เมนูหน้าบนมือถือ: แถวเดียว ---------- */
+.mnav { display: none; }
 @media (max-width: 860px) {
-  .nav-toggle { display: inline-flex; align-items: center; gap: 6px; order: 2; margin-left: auto; border: 1px solid var(--line); background: var(--bg); color: var(--ink); border-radius: 999px; padding: 5px 12px; font: inherit; font-size: 14px; font-weight: 600; }
-  .nav-toggle .caret { color: var(--muted); }
-  .top > .btn#refresh { order: 3; }
   .pages { display: none !important; }
-  .pages.open { display: grid !important; order: 4; }
-  .pages.open .nav-grab { display: flex; grid-column: 1 / -1; justify-content: center; background: none; border: 0; padding: 6px 0 2px; }
-  .nav-grab span { width: 44px; height: 5px; border-radius: 3px; background: var(--line); }
+  .mnav { display: flex; order: 4; width: 100%; gap: 3px; position: relative; background: var(--bg); border: 1px solid var(--line); border-radius: 10px; padding: 3px; }
+  .mnav > a, .mnav > .more { flex: 1; text-align: center; text-decoration: none; color: var(--ink2); padding: 6px 2px; border-radius: 7px; font-size: 13.5px; white-space: nowrap; border: 0; background: none; font-family: inherit; }
+  .mnav > .more { flex: 0 0 38px; font-size: 18px; line-height: 1; }
+  .mnav > a[aria-current="page"], .mnav > .more.on { background: var(--accent); color: #fff; font-weight: 600; }
+  .mmore { position: absolute; right: 0; top: calc(100% + 4px); z-index: 2000; background: var(--surface); border: 1px solid var(--line); border-radius: 10px; box-shadow: var(--shadow); display: flex; flex-direction: column; min-width: 160px; overflow: hidden; }
+  .mmore[hidden] { display: none; }
+  .mmore a { padding: 10px 14px; text-decoration: none; color: var(--ink); font-size: 14.5px; }
+  .mmore a[aria-current="page"] { font-weight: 700; color: var(--accent); }
+  .mmore a + a { border-top: 1px solid var(--line); }
 }
 .tf-count.sm { transform: scale(.65); }
+
+/* แถบฝนรายชั่วโมงจากกรมอุตุฯ */
+.tmd-bars { display: flex; align-items: flex-end; gap: 2px; height: 46px; margin: 6px 0 16px; border-bottom: 1px solid var(--line); }
+.tmd-bars span { flex: 1; height: 100%; display: flex; align-items: flex-end; position: relative; }
+.tmd-bars i { display: block; width: 100%; min-height: 1px; background: var(--accent); border-radius: 2px 2px 0 0; }
+.tmd-bars em { position: absolute; top: 100%; left: 0; font-style: normal; font-size: 10px; color: var(--muted); padding-top: 2px; }

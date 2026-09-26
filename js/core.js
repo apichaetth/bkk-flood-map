@@ -295,6 +295,8 @@ window.Flood = (function () {
 
   // 7b) ThaiWater พยากรณ์ฝน + เขื่อน (GitHub Actions เตรียมไว้ใน data/thaiwater.json)
   const fetchTw = () => getJSON('data/thaiwater.json', 20000, { cache: 'no-cache' });
+  // กรมอุตุฯ พยากรณ์ฝนรายชั่วโมง 24 ชม. (จุดกริดรอบ กทม.)
+  const fetchTmdFcst = () => getJSON('data/tmd-forecast.json', 20000, { cache: 'no-cache' });
   const twBkkHeavy = (d) => (d && d.heavy || []).find((p) => p.code === '10') || null;
 
   // 8) ประชาชนแจ้งผ่านเว็บนี้ (Google Apps Script) — endpoint อยู่ใน data/report-config.json
@@ -406,32 +408,26 @@ window.Flood = (function () {
     REFRESH_MS, MS, TZ, RAIN_HEAVY_MM, URL,
     $, esc, num, inBkk, nearBkk, th, fmtTime, fmtDT, ago, bkkDate, isoDate, distKm, getJSON, cssVar, store,
     LEVEL, badge, sensorLevel, wlLevel, rainStep, SEV_LV, levelFromText,
-    fetchSensors, fetchEvents, fetchTraffy, traffyRaw, fetchCams, fetchRadar, isFloodTicket, fetchWebReports, fetchTw, twBkkHeavy, reportEndpoint, deviceId, WEB_LEVEL, fetchRain, fetchWl, fetchNews, fetchTmd, errMsg,
+    fetchSensors, fetchEvents, fetchTraffy, traffyRaw, fetchCams, fetchRadar, isFloodTicket, fetchWebReports, fetchTw, fetchTmdFcst, twBkkHeavy, reportEndpoint, deviceId, WEB_LEVEL, fetchRain, fetchWl, fetchNews, fetchTmd, errMsg,
     loadDistricts, districtAt, addLocate,
   };
 })();
 
-// ---------- เมนูหน้าบนมือถือ: พับเป็นปุ่ม "ชื่อหน้าปัจจุบัน ▾" กดเพื่อเปิด มีแถบจับด้านล่างสำหรับปิด ----------
+// ---------- เมนูหน้าบนมือถือ: แถวเดียว 4 หน้าหลัก + ⋯ (บันทึกการแจ้ง / เกี่ยวกับ) ----------
 (function () {
   const nav = document.querySelector('nav.pages');
   if (!nav) return;
-  const cur = nav.querySelector('[aria-current="page"]');
-  const btn = document.createElement('button');
-  btn.type = 'button'; btn.className = 'nav-toggle'; btn.setAttribute('aria-expanded', 'false');
-  btn.innerHTML = `<span>${cur ? cur.textContent : 'เมนู'}</span><span class="caret">▾</span>`;
-  const grab = document.createElement('button');
-  grab.type = 'button'; grab.className = 'nav-grab'; grab.setAttribute('aria-label', 'ปิดเมนู');
-  grab.innerHTML = '<span></span>';
-  nav.before(btn); nav.append(grab);
-  const set = (open) => {
-    nav.classList.toggle('open', open); btn.setAttribute('aria-expanded', String(open));
-    btn.querySelector('.caret').textContent = open ? '▴' : '▾';
-    window.dispatchEvent(new Event('resize')); // ให้แผนที่ปรับขนาดตามพื้นที่ที่เปลี่ยน
-  };
-  btn.onclick = () => set(!nav.classList.contains('open'));
-  grab.onclick = () => set(false);
-  // ปัดขึ้นที่เมนูเพื่อปิด
-  let y = null;
-  nav.addEventListener('touchstart', (e) => { y = e.touches[0].clientY; }, { passive: true });
-  nav.addEventListener('touchend', (e) => { if (y != null && e.changedTouches[0].clientY - y < -30) set(false); y = null; }, { passive: true });
+  const here = (nav.querySelector('[aria-current="page"]') || {}).getAttribute?.('href') || '';
+  const MAIN = [['./', 'ภาพรวม'], ['risk.html', 'ถนนเสี่ยง'], ['map.html', 'รายละเอียด'], ['traffy.html', 'Traffy']];
+  const MORE = [['log.html', 'บันทึกการแจ้ง'], ['about.html', 'เกี่ยวกับ']];
+  const cur = (h) => (h === here ? ' aria-current="page"' : '');
+  const bar = document.createElement('nav');
+  bar.className = 'mnav'; bar.setAttribute('aria-label', 'หน้า');
+  bar.innerHTML = MAIN.map(([h, t]) => `<a href="${h}"${cur(h)}>${t}</a>`).join('')
+    + `<button type="button" class="more${MORE.some(([h]) => h === here) ? ' on' : ''}" aria-expanded="false" aria-label="หน้าอื่น">⋯</button>`
+    + `<div class="mmore" hidden>${MORE.map(([h, t]) => `<a href="${h}"${cur(h)}>${t}</a>`).join('')}</div>`;
+  nav.after(bar);
+  const btn = bar.querySelector('.more'), menu = bar.querySelector('.mmore');
+  btn.onclick = (e) => { e.stopPropagation(); menu.hidden = !menu.hidden; btn.setAttribute('aria-expanded', String(!menu.hidden)); };
+  document.addEventListener('click', (e) => { if (!menu.hidden && !bar.contains(e.target)) { menu.hidden = true; btn.setAttribute('aria-expanded', 'false'); } });
 })();
