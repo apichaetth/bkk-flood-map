@@ -14,7 +14,7 @@
 | เรดาร์ฝน | RainViewer | เบราว์เซอร์ | ไม่ |
 | ข่าว + สรุป/ปักหมุด | Google News RSS + Gemini + OpenStreetMap Nominatim | GitHub Actions | Gemini (ฟรี) |
 | คลิป + สรุป/ปักหมุด | YouTube Data API v3 + Gemini | GitHub Actions (ทุก 30 นาที) | YouTube (ฟรี) |
-| โพสต์เพจทางการ (Facebook) | Facebook Page Plugin: ศูนย์ป้องกันน้ำท่วม กทม., สนน., กทม., กรมอุตุฯ, ปภ., จส.100 | เบราว์เซอร์ (โหลดเมื่อเปิดแท็บ) | ไม่ |
+| โพสต์เพจทางการ (Facebook) | Facebook Page Plugin: ศูนย์ป้องกันน้ำท่วม กทม., สนน., กทม., กรมอุตุฯ, ปภ., จส.100, The Reporters, THE STANDARD | เบราว์เซอร์ (โหลดเมื่อเปิดแท็บ) | ไม่ |
 | ประกาศเตือนภัย | กรมอุตุนิยมวิทยา `data.tmd.go.th` | GitHub Actions | ใช้ demo ได้ |
 | ขอบเขต 50 เขต | [OpenGISData-Thailand](https://github.com/chingchai/OpenGISData-Thailand) | ไฟล์ในโปรเจกต์ | – |
 
