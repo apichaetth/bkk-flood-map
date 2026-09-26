@@ -179,6 +179,9 @@ h2 { font-size: 14px; font-weight: 600; margin: 18px 0 6px; color: var(--ink2); 
   .layout { flex-direction: column; }
   .panel { position: absolute; left: 0; right: 0; bottom: 0; width: auto; height: 42%; border-left: 0; border-top: 1px solid var(--line); border-radius: 14px 14px 0 0; box-shadow: var(--shadow); z-index: 1000; transition: height .2s; }
   .panel.min { height: 92px; }
+  /* ปุ่มแจ้ง/แถบปักหมุดบนแผนที่ละเอียด: ยกให้อยู่เหนือแผงด้านล่าง ไม่ให้ถูกบัง */
+  .layout .report-fab { bottom: calc(42% + 10px); transition: bottom .2s; }
+  .layout:has(.panel.min) .report-fab { bottom: 102px; }
   .grab { display: flex; justify-content: center; background: none; border: 0; padding: 8px 0 2px; flex: none; }
   .grab span { width: 44px; height: 5px; border-radius: 3px; background: var(--line); }
 }

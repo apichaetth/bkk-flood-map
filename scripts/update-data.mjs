@@ -330,7 +330,7 @@ function isFloodTicket(r) {
   return T_FLOOD_RE.test(d) && !T_NOT_FLOOD_RE.test(d);
 }
 async function updateTraffy(meta) {
-  const prev = await readJSON('traffy.json', { items: [] });
+  const prev = await readJSON('traffy.json', { results: [] });
   let d = null, lastErr = null;
   // 1000 เรื่องมักหมดเวลา (~90 วินาที) ใช้ 500 ต่อรอบก็พอ เพราะสะสมข้ามรอบอยู่แล้ว
   for (const lim of [500, 300]) {
@@ -344,7 +344,7 @@ async function updateTraffy(meta) {
     problem_type_abdul: r.problem_type_abdul || [],
   }));
   // รวมกับรอบก่อน: เรื่องเดิมใช้ข้อมูลใหม่ (สถานะอาจเปลี่ยน) และตัดที่เก่ากว่า 7 วัน
-  const byId = new Map((prev.items || []).map((x) => [x.ticket_id, x]));
+  const byId = new Map((prev.results || prev.items || []).map((x) => [x.ticket_id, x]));
   for (const x of fresh) byId.set(x.ticket_id, x);
   const cutoff = now - TRAFFY_KEEP_D * 864e5;
   const ts = (x) => new Date(String(x.timestamp).replace(' ', 'T').replace(/\+00$/, 'Z')).getTime();
@@ -359,8 +359,10 @@ async function updateTraffy(meta) {
   await writeJSON('traffy-archive.json', { updated: now.toISOString(), since: isFinite(aSince) ? new Date(Math.max(aSince, aCut)).toISOString() : null, results: aItems });
   const times = d.results.map(ts).filter((t) => !isNaN(t));
   const oldestFetched = times.length ? Math.min(...times) : null;
-  const since = Math.min(...[oldestFetched, prev.since ? new Date(prev.since).getTime() : Infinity].filter((v) => v != null && isFinite(v)));
-  await writeJSON('traffy.json', { updated: now.toISOString(), fetched: d.results.length, since: isFinite(since) ? new Date(Math.max(since, cutoff)).toISOString() : null, results: items });
+  // prev.since เชื่อได้เฉพาะไฟล์ที่สะสมถูกต้องแล้ว (acc: 2) — ไฟล์รุ่นก่อนหน้าไม่ได้สะสมจริง
+  const prevSince = prev.acc === 2 && prev.since ? new Date(prev.since).getTime() : Infinity;
+  const since = Math.min(...[oldestFetched, prevSince].filter((v) => v != null && isFinite(v)));
+  await writeJSON('traffy.json', { acc: 2, updated: now.toISOString(), fetched: d.results.length, since: isFinite(since) ? new Date(Math.max(since, cutoff)).toISOString() : null, results: items });
   meta.sources.traffy = { ok: true, fetched: d.results.length, flood: fresh.length, kept: items.length };
 }
 
@@ -443,9 +445,10 @@ const utcTime = (s) => new Date(String(s || '').replace(' ', 'T').replace(/\+00$
 const WEB_LV = { 'ข้อเท้า': 1, 'ครึ่งแข้ง': 2, 'เข่า': 3, 'เอว': 3, 'สูงกว่าเอว': 3, 'ไม่ระบุ': 2 };
 async function updateRisk(meta) {
   const src = {};
-  let roads;
+  // ถ้าโหลดเครือข่ายถนนไม่ได้ ยังเก็บข้อมูลฝน/ระดับน้ำ (tw-rain/tw-wl) ต่อ แค่ข้ามการคำนวณ
+  let roads = null;
   try { roads = await loadRoads(DATA, fetchText, log); }
-  catch (e) { log('roads failed:', e.message); meta.sources.risk = { ok: false, error: 'roads: ' + e.message }; return; }
+  catch (e) { log('roads failed:', e.message); }
   const inBkk = (la, lo) => la >= 13.4 && la <= 14.05 && lo >= 100.25 && lo <= 101.0;
   const reports = [], history = [], rain = [], wl = [];
   // Traffy (สะสมไว้แล้วใน traffy.json)
@@ -513,6 +516,7 @@ async function updateRisk(meta) {
     src.wl = wl.length;
   } catch (e) { src.wl = 'error: ' + e.message; }
 
+  if (!roads) { meta.sources.risk = { ok: false, error: 'roads unavailable' }; return; }
   const segs = scoreRoads(roads, { reports, history, rain, wl }, now.getTime());
   // เก็บผลรอบนี้ไว้วัดความแม่นภายหลัง
   const hist = (await readJSON('risk-history.json', [])).filter((h) => now - h.t <= RISK_PARAMS.historyKeepH * 36e5);

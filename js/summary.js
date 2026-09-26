@@ -9,7 +9,7 @@
   const CLUSTER_KM = 0.5;
   const ROAD_MATCH_M = 40; // ถนนที่อยู่ห่างจากจุดรายงานไม่เกินนี้ถือว่าเป็นถนนของจุดนั้น
   const ROAD_SPAN_M = 300; // ระบายสีถนนยาวออกไปจากจุดรายงานไม่เกินนี้
-  const OVERPASS = ['https://overpass-api.de/api/interpreter', 'https://overpass.kumi.systems/api/interpreter'];
+  const OVERPASS = ['https://overpass-api.de/api/interpreter', 'https://overpass.kumi.systems/api/interpreter', 'https://maps.mail.ru/osm/tools/overpass/api/interpreter'];
   const ROAD_CACHE = 'bkkflood.roads';
 
   // ระดับของจุด: 3 = ยืนยันแล้ว, 2 = มีรายงาน, 1 = เสี่ยง
@@ -237,7 +237,8 @@
         break;
       } catch (e) { lastErr = e; }
     }
-    if (!data) throw lastErr;
+    // เซิร์ฟเวอร์ถนนล่มทุกแห่ง: ใช้เส้นถนนชุดล่าสุดที่เคยวาดไว้ (ไม่เกิน 6 ชม.) ดีกว่าไม่มีเลย
+    if (!data) { if (cached && Date.now() - cached.t < 6 * 36e5) return cached.lines; throw lastErr; }
     const lines = [];
     for (const w of data.elements || []) {
       if (!w.geometry || w.geometry.length < 2) continue;
@@ -254,13 +255,15 @@
     store.set(ROAD_CACHE, { key, t: Date.now(), lines });
     return lines;
   }
-  async function drawRoads(clusters) {
+  async function drawRoads(clusters, my) {
     lyr.roads.clearLayers();
     const spots = clusters.filter((c) => c.tier >= 2).slice(0, 60);
     if (!spots.length) { $('roadNote').textContent = ''; return; }
     $('roadNote').textContent = 'กำลังโหลดเส้นถนนบริเวณจุดน้ำท่วม…';
     try {
       const lines = await fetchRoads(spots);
+      if (my !== undefined && my !== gen) return; // มีรอบรีเฟรชใหม่แล้ว ไม่วาดซ้อน
+      lyr.roads.clearLayers();
       const red = RED();
       // วาดระดับต่ำก่อน ให้ถนนที่ยืนยันแล้วอยู่ด้านบน
       for (const l of lines.sort((a, b) => a.tier - b.tier)) {
@@ -316,7 +319,7 @@
     const show = topOpen ? top : top.slice(0, 3);
     $('top10').innerHTML = show.length ? show.map((c) => `<li><a href="${mapLink(c)}">
         <div class="t-row">${tag(c.tier)}<b>${esc(c.name)}</b></div>
-        <div class="muted small">เขต${esc(c.district || '–')} · ${esc(c.members[0].detail).slice(0, 80)}${c.sources.length > 1 ? ` · ยืนยัน ${c.sources.length} แหล่ง` : ''} · ${c.t ? ago(c.t) : ''}</div>
+        <div class="muted small">เขต${esc(c.district || '–')} · ${esc(String(c.members[0].detail || '').slice(0, 80))}${c.sources.length > 1 ? ` · ยืนยัน ${c.sources.length} แหล่ง` : ''} · ${c.t ? ago(c.t) : ''}</div>
       </a></li>`).join('') : '<li class="empty">ยังไม่มีจุดที่มีรายงานน้ำท่วม</li>';
     $('topNote').textContent = top.length ? `${show.length} จาก ${top.length} จุด` : '';
     $('topMore').hidden = top.length <= 3;
@@ -327,7 +330,7 @@
     $('districtList').innerHTML = dists.length ? dists.map((d) => `<details class="dist l${d.level}">
         <summary><span class="dname">เขต${esc(d.name)}</span>
           <span class="dcount">${d[3] ? `<span class="tag t3">ยืนยัน ${d[3]}</span>` : ''}${d[2] + d.news ? `<span class="tag t2">มีรายงาน ${d[2] + d.news}</span>` : ''}${d[1] ? `<span class="tag t1">เสี่ยง ${d[1]}</span>` : ''}</span></summary>
-        <ul>${d.clusters.map((c) => `<li>${tag(c.tier)} <a href="${mapLink(c)}">${esc(c.name)}</a> <span class="muted small">${esc(c.members[0].detail).slice(0, 70)}</span></li>`).join('')}
+        <ul>${d.clusters.map((c) => `<li>${tag(c.tier)} <a href="${mapLink(c)}">${esc(c.name)}</a> <span class="muted small">${esc(String(c.members[0].detail || '').slice(0, 70))}</span></li>`).join('')}
         ${d.news ? `<li class="muted small">มีข่าวน้ำท่วมในเขตนี้ ${d.news} ข่าว (ไม่ระบุจุด) – ดูในแท็บข่าวของหน้าแผนที่ละเอียด</li>` : ''}</ul>
       </details>`).join('') : '<p class="muted">ยังไม่มีเขตที่มีรายงานน้ำท่วมหรือพื้นที่เสี่ยง</p>';
   }
@@ -336,7 +339,7 @@
       <div class="t-row">${tag(c.tier)}<span class="muted small">${c.t ? fmtTime(c.t) + ' · ' + ago(c.t) : ''}</span></div>
       <h3>${esc(c.name)}</h3>
       <p class="muted small">เขต${esc(c.district || '–')}${c.cm ? ` · น้ำสูงประมาณ ${Math.round(c.cm)} ซม.` : ''}</p>
-      <p class="small">${esc(c.members[0].detail).slice(0, 140)}</p>
+      <p class="small">${esc(String(c.members[0].detail || '').slice(0, 140))}</p>
       <div class="chips">${sourceChips(c)}</div>
       <a class="go" href="${mapLink(c)}">ดูบนแผนที่ →</a>
     </article>`;
@@ -429,7 +432,7 @@
         const waiting = feeds.filter((f) => f.pending).map((f) => f.name);
         $('asof').textContent = `ข้อมูล ณ ${fmtDT(new Date(last))}`;
         $('updated').textContent = waiting.length ? `กำลังโหลด: ${waiting.join(', ')}…` : `อัปเดต ${fmtTime(new Date(last))} · รีเฟรชอัตโนมัติทุก 15 นาที`;
-        if (final) drawRoads(clusters);
+        if (final) drawRoads(clusters, my);
       } catch (e) {
         console.error(e);
         $('headline').textContent = 'แสดงผลไม่สำเร็จ: ' + e.message;

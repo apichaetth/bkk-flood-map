@@ -187,6 +187,8 @@
     </form>`;
     const f = dlg.querySelector('form');
     const msg = f.querySelector('.rp-msg');
+    // ปิดด้วย Esc ก็เอาหมุด ? ชั่วคราวออก
+    dlg.addEventListener('close', () => { if (tempMarker && !dlg.dataset.sent) tempMarker.remove(); }, { once: true });
     f.querySelector('[value=cancel]').onclick = () => { dlg.close(); if (tempMarker) tempMarker.remove(); };
     f.querySelector('#rpRepick').onclick = (e) => { e.preventDefault(); dlg.close(); if (tempMarker) tempMarker.remove(); startPick(); };
     f.onsubmit = async (e) => {

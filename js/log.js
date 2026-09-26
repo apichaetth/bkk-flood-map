@@ -14,7 +14,7 @@
       const a = ACT[r.action] || [r.action, ''];
       const media = [...(r.photos || []).map((u) => `<a href="${esc(u)}" target="_blank" rel="noopener"><img loading="lazy" src="${esc(u)}" alt="รูป" referrerpolicy="no-referrer"></a>`),
         r.video ? `<a href="${esc(r.video)}" target="_blank" rel="noopener">▶ วิดีโอ</a>` : '', r.video_link ? `<a href="${esc(r.video_link)}" target="_blank" rel="noopener">▶ ลิงก์</a>` : ''].join(' ');
-      return `<tr><td data-l="เวลา">${fmtDT(new Date(r.timestamp))}</td><td data-l="การกระทำ"><span class="tag ${a[1]}">${a[0]}</span></td>
+      return `<tr><td data-l="เวลา">${fmtDT(new Date(r.timestamp))}</td><td data-l="การกระทำ"><span class="tag ${esc(a[1])}">${esc(a[0])}</span></td>
         <td data-l="หมุด"><a href="log.html?report=${encodeURIComponent(r.report_id)}">${esc(r.report_id)}</a></td><td data-l="ผู้ทำ">${esc(r.actor)}</td>
         <td data-l="ข้อความ">${r.level && r.action === 'create' ? `<b>น้ำระดับ${esc(r.level)}</b> ` : ''}${esc(r.message)}</td><td data-l="รูป/วิดีโอ" class="thumbs">${media}</td><td data-l="hash"><code>${esc(r.hash)}</code></td></tr>`;
     }).join('') : '<tr><td colspan="7" class="muted">ยังไม่มีบันทึก</td></tr>';

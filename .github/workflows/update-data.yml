@@ -45,6 +45,11 @@ jobs:
             data/yt-state.json
             data/traffy.json
             data/traffy-archive.json
+            data/thaiwater.json
+            data/tw
+            data/tw-rain.json
+            data/tw-wl.json
+            data/risk-roads.json
             data/cams.json
             data/radar.json
             data/roads.json
@@ -73,6 +78,11 @@ jobs:
             data/yt-state.json
             data/traffy.json
             data/traffy-archive.json
+            data/thaiwater.json
+            data/tw
+            data/tw-rain.json
+            data/tw-wl.json
+            data/risk-roads.json
             data/cams.json
             data/radar.json
             data/roads.json

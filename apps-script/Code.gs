@@ -24,6 +24,8 @@ const CFG = {
   PHOTO_TYPES: ['image/jpeg', 'image/png', 'image/webp'],
   VIDEO_TYPES: ['video/mp4', 'video/quicktime', 'video/webm', 'video/3gpp'],
   RATE_LIMIT: 6, // ต่ออุปกรณ์ ต่อ 10 นาที
+  GLOBAL_LIMIT: 150, // รวมทุกคน ต่อ 10 นาที
+  FEEDBACK_GLOBAL_LIMIT: 30, // ข้อความจากหน้าเกี่ยวกับ รวมทุกคน ต่อชั่วโมง (กันโควตาอีเมลหมด)
   CLOSED_VISIBLE_H: 24,
 };
 const LEVELS = ['ข้อเท้า', 'ครึ่งแข้ง', 'เข่า', 'เอว', 'สูงกว่าเอว', 'ไม่ระบุ'];
@@ -97,7 +99,8 @@ function doPost(e) {
 function json_(o) { return ContentService.createTextOutput(JSON.stringify(o)).setMimeType(ContentService.MimeType.JSON); }
 
 // ---------- การตรวจข้อมูล ----------
-function clean_(s, max) { return String(s == null ? '' : s).replace(/[\u0000-\u001f\u007f]/g, ' ').replace(/^[=+\-@]+/, '').trim().slice(0, max); }
+// ตัดช่องว่างก่อนแล้วค่อยตัดอักขระนำหน้าที่ทำให้ชีตตีความเป็นสูตร (= + - @)
+function clean_(s, max) { return String(s == null ? '' : s).replace(/[\u0000-\u001f\u007f]/g, ' ').trim().replace(/^[=+\-@\s]+/, '').slice(0, max); }
 function requireName_(s) {
   const n = clean_(s, 60);
   if (n.length < 2) throw new Error('กรุณากรอกชื่อ (อย่างน้อย 2 ตัวอักษร)');
@@ -109,7 +112,11 @@ function rateLimit_(device) {
   const k = 'rl_' + device;
   const n = Number(c.get(k) || 0);
   if (n >= CFG.RATE_LIMIT) throw new Error('แจ้งถี่เกินไป กรุณารอสักครู่แล้วลองใหม่');
+  // จำกัดรวมทั้งระบบด้วย (รหัสอุปกรณ์มาจากฝั่งผู้ใช้ ปลอมได้) กันการยิงอัปโหลดเข้า Drive ไม่จำกัด
+  const g = Number(c.get('rl_all') || 0);
+  if (g >= CFG.GLOBAL_LIMIT) throw new Error('ขณะนี้มีการแจ้งเข้ามามาก กรุณารอสักครู่แล้วลองใหม่');
   c.put(k, String(n + 1), 600);
+  c.put('rl_all', String(g + 1), 600);
 }
 function saveFile_(f, allowed, maxBytes, prefix) {
   if (!f || !f.data) return '';
@@ -185,12 +192,15 @@ function feedback_(b) {
   const c = CacheService.getScriptCache();
   const k = 'fb_' + device;
   if (Number(c.get(k) || 0) >= 3) throw new Error('ส่งถี่เกินไป กรุณารอสักครู่แล้วลองใหม่');
+  const g = Number(c.get('fb_all') || 0);
+  if (g >= CFG.FEEDBACK_GLOBAL_LIMIT) throw new Error('ขณะนี้มีข้อความเข้ามามาก กรุณาลองใหม่ภายหลัง');
   const name = requireName_(b.name);
   // ข้อความยาวเก็บบรรทัดใหม่ไว้ แต่ตัดอักขระควบคุมอื่นและกันสูตรในชีต
-  const message = String(b.message == null ? '' : b.message).replace(/[\u0000-\u0009\u000b-\u001f\u007f]/g, ' ').replace(/^[=+\-@]+/, '').trim().slice(0, 3000);
+  const message = String(b.message == null ? '' : b.message).replace(/[\u0000-\u0009\u000b-\u001f\u007f]/g, ' ').trim().replace(/^[=+\-@\s]+/, '').slice(0, 3000);
   if (message.length < 5) throw new Error('กรุณาพิมพ์ข้อความ');
   const contact = clean_(b.contact, 120), topic = clean_(b.topic, 60) || 'ทั่วไป';
   c.put(k, String(Number(c.get(k) || 0) + 1), 3600);
+  c.put('fb_all', String(g + 1), 3600);
   const ss = SpreadsheetApp.getActiveSpreadsheet();
   const sh = ensureSheet_(ss, 'Feedback', FEEDBACK_HEADERS);
   const now = new Date().toISOString();

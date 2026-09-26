@@ -206,11 +206,13 @@ window.Flood = (function () {
   // 4) ThaiWater ฝน 24 ชม.
   // ThaiWater: ใช้สำเนาย่อที่ GitHub Actions เก็บไว้ก่อน (เล็กกว่าหลายเท่า) ถ้าเก่าเกิน 40 นาทีหรือไม่มี ค่อยดึงตรง
   async function twJSON(local, live) {
+    let d = null;
     try {
-      const d = await getJSON(local, 20000, { cache: 'no-cache' });
+      d = await getJSON(local, 20000, { cache: 'no-cache' });
       if (d.updated && Date.now() - new Date(d.updated) < 40 * 60000) return d;
     } catch (e) { /* ไม่มีสำเนา */ }
-    return getJSON(live, 120000);
+    // สำเนาเก่า: ลองดึงตรง ถ้าไม่ได้ใช้สำเนาเก่าไปก่อน (ดีกว่าไม่มีข้อมูล)
+    try { return await getJSON(live, 120000); } catch (e) { if (d && (d.data || d.waterlevel_data)) return d; throw e; }
   }
   async function fetchRain() {
     const d = await twJSON('data/tw-rain.json', URL.rain);

@@ -63,9 +63,10 @@ function near(g, la, lo, radiusM) {
 // ---------- เครือข่ายถนน (ดึงจาก Overpass ครั้งเดียว เก็บไว้ 30 วัน) ----------
 export async function loadRoads(DATA, fetchText, log) {
   const file = path.join(DATA, 'roads.json');
+  let old = null;
   try {
-    const r = JSON.parse(await readFile(file, 'utf8'));
-    if (Date.now() - new Date(r.built) < 30 * 864e5 && r.segments.length) return r;
+    old = JSON.parse(await readFile(file, 'utf8'));
+    if (Date.now() - new Date(old.built) < 30 * 864e5 && old.segments.length) return old;
   } catch { /* ยังไม่มี */ }
   log('building road segments from Overpass…');
   const q = `[out:json][timeout:120];way["highway"~"${HW}"](${BBOX.join(',')});out geom tags;`;
@@ -74,7 +75,8 @@ export async function loadRoads(DATA, fetchText, log) {
     try { data = JSON.parse(await fetchText(url, { method: 'POST', body: 'data=' + encodeURIComponent(q), headers: { 'Content-Type': 'application/x-www-form-urlencoded' } }, 180000)); break; }
     catch (e) { lastErr = e; }
   }
-  if (!data) throw lastErr || new Error('overpass failed');
+  // สร้างใหม่ไม่สำเร็จ: ใช้ชุดเก่าไปก่อน (ถนนแทบไม่เปลี่ยน) แล้วลองใหม่รอบถัดไป
+  if (!data) { if (old && old.segments && old.segments.length) { log('roads rebuild failed, using old file'); return old; } throw lastErr || new Error('overpass failed'); }
   const geo = JSON.parse(await readFile(path.join(DATA, 'districts.geojson'), 'utf8'));
   const segments = [];
   for (const w of data.elements || []) {
