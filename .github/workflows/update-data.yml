@@ -42,6 +42,7 @@ jobs:
             data/geocache.json
             data/tmd.json
             data/yt-state.json
+            data/traffy.json
           key: data-${{ github.run_id }}
           restore-keys: data-
 
@@ -64,6 +65,7 @@ jobs:
             data/geocache.json
             data/tmd.json
             data/yt-state.json
+            data/traffy.json
           key: data-${{ github.run_id }}
 
       - name: Prepare site

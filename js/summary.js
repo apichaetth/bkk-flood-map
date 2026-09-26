@@ -109,6 +109,56 @@
   // พื้นที่เสี่ยงแสดงเป็นค่าเริ่มต้น ยกเลิกติ๊กเพื่อซ่อน
   $('showRisk').onchange = (e) => { if (e.target.checked) map.addLayer(lyr.risk); else map.removeLayer(lyr.risk); };
 
+  // ---------- เรดาร์ฝน (RainViewer) + กล้อง CCTV สาธารณะ ----------
+  lyr.radar = L.layerGroup().addTo(map);
+  lyr.cam = L.layerGroup().addTo(map);
+  $('showRadar').onchange = (e) => (e.target.checked ? map.addLayer(lyr.radar) : map.removeLayer(lyr.radar));
+  $('showCam').onchange = (e) => (e.target.checked ? map.addLayer(lyr.cam) : map.removeLayer(lyr.cam));
+  async function loadRadar() {
+    try {
+      const d = await F.getJSON(F.URL.radar, 20000);
+      const f = d.radar && d.radar.past && d.radar.past[d.radar.past.length - 1];
+      if (!f) return;
+      lyr.radar.clearLayers();
+      L.tileLayer(d.host + f.path + '/256/{z}/{x}/{y}/2/1_1.png', { opacity: 0.45, maxNativeZoom: 7, maxZoom: 19, zIndex: 5, attribution: 'เรดาร์ © RainViewer' }).addTo(lyr.radar);
+      $('showRadar').parentElement.title = 'ภาพเรดาร์เวลา ' + fmtTime(new Date(f.time * 1000));
+    } catch (e) { /* ไม่มีเรดาร์ก็ยังใช้งานได้ */ }
+  }
+  let hls = null;
+  const stopStream = () => { if (hls) { try { hls.destroy(); } catch (e) { /* ignore */ } hls = null; } };
+  function startStream(el, c) {
+    stopStream();
+    const v = el.querySelector('video'), st = el.querySelector('.camst');
+    const fail = (why) => { v.remove(); st.textContent = 'ภาพสดใช้ไม่ได้ขณะนี้ (' + why + ')'; };
+    if (window.Hls && Hls.isSupported()) {
+      hls = new Hls({ manifestLoadingMaxRetry: 1, levelLoadingMaxRetry: 1, fragLoadingMaxRetry: 1 });
+      hls.on(Hls.Events.ERROR, (_, d) => { if (d.fatal) { stopStream(); fail(d.details || 'error'); } });
+      hls.on(Hls.Events.FRAG_BUFFERED, () => { st.textContent = '● ภาพสด'; });
+      hls.loadSource(c.hls_url); hls.attachMedia(v); v.play().catch(() => {});
+    } else if (v.canPlayType('application/vnd.apple.mpegurl')) {
+      v.src = c.hls_url; v.onplaying = () => { st.textContent = '● ภาพสด'; }; v.onerror = () => fail('error'); v.play().catch(() => {});
+    } else fail('เบราว์เซอร์ไม่รองรับ');
+  }
+  async function loadCams() {
+    try {
+      const d = await F.getJSON(F.URL.cams, 45000);
+      if (!Array.isArray(d)) return;
+      lyr.cam.clearLayers();
+      // เฉพาะกล้องที่เผยแพร่สาธารณะผ่าน HTTPS และยังไม่ถูกระงับ
+      for (const c of d) {
+        const la = F.num(c.latitude), lo = F.num(c.longitude);
+        if (!la || !lo || !F.inBkk(la, lo) || !/^https:\/\//.test(c.hls_url || '') || /tempsus/.test(c.hls_url)) continue;
+        L.marker([la, lo], { icon: mkIcon('cam', '#1d2330', '▶', 12), zIndexOffset: -100 })
+          .bindPopup(() => `<div class="pp" style="width:290px;max-width:100%"><div class="m">${esc(c.organization || '')} · ${esc(c.camid)}</div><h3>${esc(c.title)}</h3>
+            <video muted autoplay playsinline controls></video><div class="m camst">กำลังเชื่อมต่อ…</div>
+            <div class="m">ภาพจาก ${esc(c.sponsertext || c.organization || 'iTIC')} ผ่าน iTIC / Longdo</div></div>`, { maxWidth: 310, minWidth: 250 })
+          .on('popupopen', (e) => startStream(e.popup.getElement(), c))
+          .on('popupclose', stopStream)
+          .addTo(lyr.cam);
+      }
+    } catch (e) { /* ไม่มีกล้องก็ยังใช้งานได้ */ }
+  }
+
   // ให้ js/report.js ใช้แผนที่หน้านี้สำหรับปักหมุดแจ้งน้ำท่วม/น้ำลด (ไม่ต้องไปหน้าแผนที่ละเอียด)
   const mkIcon = (cls, color, text = '', size = 18, extra = '') => L.divIcon({
     className: '', iconSize: [size, size], iconAnchor: [size / 2, size / 2], popupAnchor: [0, -size / 2],
@@ -305,6 +355,8 @@
     last = Date.now();
     $('updated').textContent = 'กำลังอัปเดต…';
     renderTmd();
+    loadRadar();
+    if (!lyr.cam.getLayers().length) loadCams();
     const geo = await F.loadDistricts().catch(() => null);
     drawDistricts(geo, []);
     const D = {};

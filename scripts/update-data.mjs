@@ -311,6 +311,45 @@ async function updateTmd(meta) {
   }
 }
 
+// ---------- Traffy Fondue: เรื่องแจ้งน้ำท่วม (เบราว์เซอร์ดึงตรงไม่ได้เพราะติด CORS จึงดึงที่นี่แล้วเก็บเป็นไฟล์) ----------
+// สะสมข้ามรอบได้สูงสุด 7 วัน (API ให้ครั้งละไม่เกิน ~1000 เรื่องล่าสุด)
+const TRAFFY_API = 'https://publicapi.traffy.in.th/share/teamchadchart/search';
+const TRAFFY_KEEP_D = 7;
+const T_FLOOD_RE = /น้ำท่วม|ท่วมขัง|ท่วมถนน|น้ำขัง|น้ำรอระบาย|รอการระบาย|น้ำเจิ่ง/;
+const T_NOT_FLOOD_RE = /ประปา|น้ำไม่ไหล|ท่อแตก|ท่อรั่ว|น้ำรั่ว|น้ำเสีย|กลิ่น|ยุง/;
+function isFloodTicket(r) {
+  const types = [].concat(r.problem_type_abdul || [], r.type ? String(r.type).replace(/[{}]/g, '').split(',') : [])
+    .map((t) => String(t).trim()).filter(Boolean);
+  if (types.length) return types.includes('น้ำท่วม');
+  const d = String(r.description || '');
+  return T_FLOOD_RE.test(d) && !T_NOT_FLOOD_RE.test(d);
+}
+async function updateTraffy(meta) {
+  const prev = await readJSON('traffy.json', { items: [] });
+  let d = null, lastErr = null;
+  for (const lim of [1000, 500]) {
+    try { d = JSON.parse(await fetchText(`${TRAFFY_API}?limit=${lim}`, {}, 90000)); if (Array.isArray(d.results) && d.results.length) break; d = null; }
+    catch (e) { lastErr = e; d = null; }
+  }
+  if (!d) { log('traffy failed:', lastErr && lastErr.message); meta.sources.traffy = { ok: false, error: lastErr ? lastErr.message : 'empty' }; return; }
+  const fresh = d.results.filter((r) => r.ticket_id && r.coords && isFloodTicket(r)).map((r) => ({
+    ticket_id: r.ticket_id, timestamp: r.timestamp, coords: r.coords, state: r.state,
+    description: String(r.description || '').slice(0, 500), address: r.address || '', photo_url: r.photo_url || '',
+    problem_type_abdul: r.problem_type_abdul || [],
+  }));
+  // รวมกับรอบก่อน: เรื่องเดิมใช้ข้อมูลใหม่ (สถานะอาจเปลี่ยน) และตัดที่เก่ากว่า 7 วัน
+  const byId = new Map((prev.items || []).map((x) => [x.ticket_id, x]));
+  for (const x of fresh) byId.set(x.ticket_id, x);
+  const cutoff = now - TRAFFY_KEEP_D * 864e5;
+  const ts = (x) => new Date(String(x.timestamp).replace(' ', 'T').replace(/\+00$/, 'Z')).getTime();
+  const items = [...byId.values()].filter((x) => ts(x) >= cutoff).sort((a, b) => ts(b) - ts(a));
+  const times = d.results.map(ts).filter((t) => !isNaN(t));
+  const oldestFetched = times.length ? Math.min(...times) : null;
+  const since = Math.min(...[oldestFetched, prev.since ? new Date(prev.since).getTime() : Infinity].filter((v) => v != null && isFinite(v)));
+  await writeJSON('traffy.json', { updated: now.toISOString(), fetched: d.results.length, since: isFinite(since) ? new Date(Math.max(since, cutoff)).toISOString() : null, results: items });
+  meta.sources.traffy = { ok: true, fetched: d.results.length, flood: fresh.length, kept: items.length };
+}
+
 // ---------- ตรวจระบบรับแจ้งจากประชาชน (Google Apps Script) ว่ายังตอบได้ ----------
 async function checkReports(meta) {
   let ep = '';
@@ -332,5 +371,6 @@ const meta = { updated: now.toISOString(), sources: {} };
 await updateNews(meta).catch((e) => { log('news failed:', e); meta.sources.news = { ok: false, error: e.message }; meta.sources.youtube ??= { ok: false, error: e.message }; });
 await updateTmd(meta);
 await checkReports(meta);
+await updateTraffy(meta);
 await writeJSON('meta.json', meta);
 log('done', JSON.stringify(meta));

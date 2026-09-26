@@ -17,14 +17,15 @@
 
   // ---------- ดึงข้อมูล ----------
   let rawCount = 0;
-  // ดึง n เรื่องล่าสุด แล้วคัดเฉพาะเรื่องน้ำท่วม
-  async function fetchN(n, ms) {
-    const d = await F.getJSON(API + '?limit=' + n, ms);
-    if (!Array.isArray(d.results) || !d.results.length) throw new Error('Traffy ส่งข้อมูลว่างกลับมา');
+  // ดึงจากไฟล์ที่ระบบดึงไว้ทุก 15 นาที (สะสมได้ถึง 7 วัน) ถ้าไม่มีค่อยดึงตรงจาก Traffy
+  let via = '';
+  async function fetchN() {
+    const d = await F.traffyRaw();
+    via = d.via === 'file' ? `ข้อมูลที่ระบบดึงไว้เมื่อ ${fmtDT(d.updated)}` : 'ดึงตรงจาก Traffy';
     const times = d.results.map((r) => isoDate(r.timestamp)).filter(Boolean);
     return {
       raw: d.results.length,
-      oldest: times.length ? new Date(Math.min(...times)) : null,
+      oldest: d.since || (times.length ? new Date(Math.min(...times)) : null),
       items: d.results
         .map((r) => ({ r, t: isoDate(r.timestamp), lo: num(r.coords && r.coords[0]), la: num(r.coords && r.coords[1]) }))
         .filter((x) => x.la && x.lo && x.t && inBkk(x.la, x.lo) && F.isFloodTicket(x.r))
@@ -135,7 +136,7 @@
           <p class="muted small">${esc(r.address || '')}${x.district ? ` · เขต${esc(x.district)}` : ''}</p>
           <div class="small"><a href="#" data-go="${x.la},${x.lo}">ดูบนแผนที่</a> · <a href="https://share.traffy.in.th/teamchadchart/${encodeURIComponent(r.ticket_id)}" target="_blank" rel="noopener">เปิดใน Traffy</a></div>
         </div></article>`;
-    }).join('') : `<p class="muted">ไม่มีเรื่องแจ้งน้ำท่วมในช่วงเวลาและสถานะที่เลือก${all.length ? ` (ทั้งหมดที่ดึงได้มี ${all.length} เรื่อง ลองเลือกช่วงเวลาให้ยาวขึ้น)` : rawCount ? ` (จาก ${rawCount} เรื่องล่าสุดใน Traffy ยังไม่มีเรื่องน้ำท่วม)` : ''}</p>`;
+    }).join('') : `<p class="muted">ไม่มีเรื่องแจ้งน้ำท่วมในช่วงเวลาและสถานะที่เลือก${all.length ? ` (ทั้งหมดที่ดึงได้มี ${all.length} เรื่อง ลองเลือกช่วงเวลาให้ยาวขึ้น)` : rawCount ? ` (ยังไม่มีเรื่องน้ำท่วมในข้อมูลที่ดึงได้)` : ''}</p>`;
     $('more').hidden = list.length <= shown;
     $('list').querySelectorAll('[data-go]').forEach((a) => a.onclick = (e) => {
       e.preventDefault();
@@ -173,7 +174,7 @@
   }
   $('more').onclick = () => { shown += PAGE; drawList(filtered()); };
 
-  // โหลด 500 เรื่องก่อน (เร็วกว่า) แสดงผลทันที แล้วค่อยดึง 1000 เรื่องเบื้องหลังเพื่อให้ย้อนหลังได้ไกลขึ้น
+  // โหลดจากไฟล์ที่ระบบดึงไว้ (เร็ว) ถ้าไม่มีค่อยดึงตรงจาก Traffy
   // เก็บผลล่าสุดไว้ในเบราว์เซอร์ ครั้งหน้าเปิดแล้วแสดงได้ทันที (เก็บเฉพาะเรื่องน้ำท่วม + ฟิลด์ที่ใช้ เพื่อไม่ให้ใหญ่)
   const CACHE = 'bkkflood.traffyCache';
   const CACHE_MAX_H = 72;
@@ -194,7 +195,7 @@
   let cachedAt = null;
 
   let loading = 0;
-  const status = () => `ดึงจาก Traffy ${rawCount} เรื่องล่าสุด เป็นเรื่องน้ำท่วม ${all.length} เรื่อง`;
+  const status = () => `เรื่องน้ำท่วม ${all.length} เรื่อง · ${via}`;
   async function load() {
     const my = ++loading, t0 = Date.now();
     const tick = setInterval(() => {
@@ -206,17 +207,12 @@
     }, 1000);
     try {
       geo = geo || await F.loadDistricts().catch(() => null);
-      const first = await fetchN(500, 90000);
+      const first = await fetchN();
       if (my !== loading) return;
       ({ items: all, raw: rawCount, oldest } = first);
       cachedAt = null;
       clearInterval(tick); // ได้ข้อมูลแล้ว หยุดตัวนับเวลารอ
       render(); saveCache();
-      $('updated').textContent = `อัปเดต ${fmtDT(new Date())} · ${status()} · กำลังดึงเพิ่มเพื่อย้อนหลังให้ไกลขึ้น…`;
-      try {
-        const more = await fetchN(1000, 90000);
-        if (my === loading && more.raw > rawCount) { ({ items: all, raw: rawCount, oldest } = more); render(); saveCache(); }
-      } catch (e) { /* ใช้ 500 เรื่องที่ได้แล้ว */ }
       if (my === loading) $('updated').textContent = `อัปเดต ${fmtDT(new Date())} · ${status()} · รีเฟรชทุก 15 นาที`;
     } catch (e) {
       if (my !== loading) return;

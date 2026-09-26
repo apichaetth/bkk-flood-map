@@ -164,8 +164,25 @@ window.Flood = (function () {
     const d = String(r.description || '');
     return FLOOD_RE.test(d) && !NOT_FLOOD_RE.test(d);
   }
+  // เบราว์เซอร์ดึงจาก Traffy ตรง ๆ มักไม่ได้ (CORS) จึงใช้ไฟล์ data/traffy.json ที่ GitHub Actions ดึงไว้ทุก 15 นาทีเป็นหลัก
+  // ถ้าไฟล์ไม่มี/เก่าเกิน 2 ชม. ค่อยลองดึงตรง
+  async function traffyRaw() {
+    let file = null;
+    try { file = await getJSON('data/traffy.json?t=' + Date.now(), 30000); } catch (e) { /* ยังไม่มีไฟล์ */ }
+    if (file && Array.isArray(file.results) && Date.now() - new Date(file.updated) < 2 * 36e5) {
+      return { results: file.results, updated: new Date(file.updated), since: file.since ? new Date(file.since) : null, via: 'file' };
+    }
+    try {
+      const d = await getJSON(URL.traffy, 60000);
+      if (Array.isArray(d.results)) return { results: d.results, updated: new Date(), since: null, via: 'direct' };
+    } catch (e) {
+      if (file && Array.isArray(file.results)) return { results: file.results, updated: new Date(file.updated), since: file.since ? new Date(file.since) : null, via: 'file' };
+      throw e;
+    }
+    throw new Error('ไม่มีข้อมูล Traffy');
+  }
   async function fetchTraffy() {
-    const d = await getJSON(URL.traffy, 90000);
+    const d = await traffyRaw();
     if (!Array.isArray(d.results)) throw new Error('รูปแบบข้อมูลไม่ถูกต้อง');
     const cutoff = Date.now() - TRAFFY_WINDOW_H * 36e5;
     let newest = null;
@@ -177,9 +194,8 @@ window.Flood = (function () {
       .filter((x) => x.lv > 0);
     items.forEach((x) => { if (!newest || x.t > newest) newest = x.t; });
     // บอกช่วงเวลาที่ข้อมูลครอบคลุมจริง (500 เรื่องล่าสุดอาจย้อนหลังได้ไม่ถึง 24 ชม. ช่วงคนแจ้งเยอะ)
-    const oldest = d.results.length ? isoDate(d.results[d.results.length - 1].timestamp) : null;
-    const span = oldest ? ` · ครอบคลุมเรื่องที่แจ้งตั้งแต่ ${fmtDT(oldest)}` : '';
-    return { items, newest, msg: `พบเรื่องน้ำท่วม ${items.length} เรื่อง จากทั้งหมด ${d.results.length} เรื่องล่าสุด${span}` };
+    const via = d.via === 'file' ? `ข้อมูลที่ระบบดึงไว้เมื่อ ${fmtDT(d.updated)}` : 'ดึงตรงจาก Traffy';
+    return { items, newest, msg: `พบเรื่องน้ำท่วม ${items.length} เรื่องใน 24 ชม. · ${via}` };
   }
 
   // 4) ThaiWater ฝน 24 ชม.
@@ -275,7 +291,7 @@ window.Flood = (function () {
     REFRESH_MS, TZ, RAIN_HEAVY_MM, URL,
     $, esc, num, inBkk, th, fmtTime, fmtDT, ago, bkkDate, isoDate, distKm, getJSON, cssVar, store,
     LEVEL, badge, sensorLevel, wlLevel, rainStep, SEV_LV, levelFromText,
-    fetchSensors, fetchEvents, fetchTraffy, isFloodTicket, fetchWebReports, reportEndpoint, deviceId, WEB_LEVEL, fetchRain, fetchWl, fetchNews, fetchTmd, errMsg,
+    fetchSensors, fetchEvents, fetchTraffy, traffyRaw, isFloodTicket, fetchWebReports, reportEndpoint, deviceId, WEB_LEVEL, fetchRain, fetchWl, fetchNews, fetchTmd, errMsg,
     loadDistricts, districtAt,
   };
 })();

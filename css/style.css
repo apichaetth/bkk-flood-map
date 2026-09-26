@@ -290,6 +290,8 @@ body.summary { overflow: auto; display: block; height: auto; }
 .closing .leaflet-marker-icon .mk.web { animation: pulse 1s ease-in-out infinite; cursor: pointer; }
 @keyframes pulse { 50% { transform: scale(1.35); } }
 .pick-bar .ring { display: inline-flex; width: 18px; height: 18px; border-radius: 50%; background: var(--critical); color: #fff; align-items: center; justify-content: center; font-size: 12px; }
+.lg-radar { display: inline-block; width: 16px; height: 12px; border-radius: 3px; background: linear-gradient(90deg, #6fd0ff, #3a7bd5, #f4d03f, #e74c3c); opacity: .8; }
+.lg-cam { display: inline-flex; width: 12px; height: 12px; border-radius: 3px; background: #1d2330; color: #fff; font-size: 6.5px; align-items: center; justify-content: center; font-style: normal; }
 .lg-toggle { display: inline-flex; align-items: center; gap: 6px; cursor: pointer; }
 .lg-web { display: inline-flex; width: 14px; height: 14px; border-radius: 50%; background: var(--critical); color: #fff; font-size: 10px; font-weight: 800; align-items: center; justify-content: center; font-style: normal; box-shadow: 0 0 0 2px var(--critical); border: 1.5px solid #fff; }
 .risk-box { margin-top: 18px; }
