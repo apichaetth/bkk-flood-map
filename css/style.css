@@ -147,7 +147,7 @@ h2 { font-size: 14px; font-weight: 600; margin: 18px 0 6px; color: var(--ink2); 
 .mk.wl { transform: rotate(45deg); border-radius: 3px; }
 .mk.news { border-radius: 50% 50% 50% 0; transform: rotate(-45deg); }
 .mk.news.yt { transform: none; border-radius: 1.5px; border-width: 1px; }
-.mk.cam { border-radius: 5px; background: #1d2330; font-size: 9px; }
+.mk.cam { border-radius: 3px; background: #1d2330; font-size: 6.5px; border-width: 1px; opacity: .85; }
 .mk.stale { background: var(--stale); }
 .basemap { filter: saturate(.55) contrast(.95); }
 @media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) .basemap { filter: invert(1) hue-rotate(180deg) brightness(.85) saturate(.4); } }

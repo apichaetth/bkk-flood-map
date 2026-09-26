@@ -33,14 +33,14 @@
 
   const layers = {
     districts: L.layerGroup().addTo(map),
-    radar: L.layerGroup(),
+    radar: L.layerGroup().addTo(map),
     rain: L.layerGroup().addTo(map),
     wl: L.layerGroup().addTo(map),
     news: L.layerGroup().addTo(map),
     traffy: L.layerGroup().addTo(map),
     event: L.layerGroup().addTo(map),
     sensor: L.layerGroup().addTo(map),
-    cam: L.layerGroup(),
+    cam: L.layerGroup().addTo(map),
     web: L.layerGroup().addTo(map),
   };
   L.control.layers(null, {
@@ -420,7 +420,7 @@
     layers.cam.clearLayers();
     if (!S.cam) return;
     for (const x of S.cam) {
-      x.marker = L.marker([x.la, x.lo], { icon: icon('cam', '#1d2330', '▶', 18), zIndexOffset: -100 })
+      x.marker = L.marker([x.la, x.lo], { icon: icon('cam', '#1d2330', '▶', 12), zIndexOffset: -100 })
         .bindPopup(() => `<div class="pp" style="width:290px;max-width:100%"><div class="m">${esc(x.c.organization || '')} · ${esc(x.c.camid)}</div><h3>${esc(x.c.title)}</h3>
           <video muted autoplay playsinline controls></video><div class="m camst">กำลังเชื่อมต่อ…</div>
           <div class="m">ภาพจาก ${esc(x.c.sponsertext || x.c.organization || 'iTIC')} ผ่าน iTIC / Longdo</div></div>`, { maxWidth: 310, minWidth: 250 })
@@ -442,7 +442,7 @@
       if (best && !seen.has(best.cm.c.camid)) { seen.add(best.cm.c.camid); pairs.push({ sp, ...best }); }
     }
     listInto('listCam', pairs.slice(0, 20), (p) => ({ dot: LEVEL[p.sp.lv].color, title: p.cm.c.title, sub: `ห่าง ${(p.d * 1000).toFixed(0)} ม. จาก ${p.sp.name}`, right: '▶', go: p.cm, cam: true }),
-      'ไม่มีกล้องสาธารณะใกล้จุดน้ำท่วมในขณะนี้ (เปิดชั้น "กล้อง CCTV สาธารณะ" ที่มุมขวาบนของแผนที่เพื่อดูทั้งหมด)');
+      'ไม่มีกล้องสาธารณะใกล้จุดน้ำท่วมในขณะนี้ (กล้องทั้งหมดแสดงบนแผนที่เป็นสี่เหลี่ยมสีดำ ▶ กดเพื่อดูภาพสด)');
   }
 
   // ---------- 9) เรดาร์ฝน ----------
