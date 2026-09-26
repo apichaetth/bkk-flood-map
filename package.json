@@ -6,5 +6,5 @@
     "update": "node scripts/update-data.mjs",
     "serve": "npx --yes http-server -p 8080 -c-1 ."
   },
-  "engines": { "node": ">=20" }
+  "engines": { "node": ">=22" }
 }

@@ -30,7 +30,7 @@ jobs:
 
       - uses: actions/setup-node@v4
         with:
-          node-version: 20
+          node-version: 22
 
       # เก็บผลวิเคราะห์ข่าว/geocode ข้ามรอบ เพื่อไม่เรียก AI และ Nominatim ซ้ำ
       - name: Restore data cache

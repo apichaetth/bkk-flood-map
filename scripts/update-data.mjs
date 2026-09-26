@@ -1,6 +1,6 @@
 // ดึงข่าวน้ำท่วม กทม. + ประกาศเตือนภัยกรมอุตุฯ แล้วเขียนไฟล์ JSON ลง data/
 // รันโดย GitHub Actions ทุก 15 นาที (ดู .github/workflows/update-data.yml)
-// ใช้ Node 20+ ไม่มี dependency ภายนอก
+// ใช้ Node 22+ ไม่มี dependency ภายนอก
 //
 // env ที่ใช้ได้ (ตั้งเป็น GitHub Secrets):
 //   GEMINI_API_KEY  – key ฟรีจาก https://aistudio.google.com/apikey (ไม่มีก็ทำงานได้ แต่ไม่มีสรุปด้วย AI)
@@ -26,6 +26,7 @@ const NEWS_QUERIES = [
 ];
 const NEWS_WINDOW_H = 48;
 const MAX_AI_ITEMS_PER_RUN = 40;
+const MAX_OUTPUT_ITEMS = 80; // จำกัดจำนวนที่แสดง ไม่ให้แผนที่รก
 // YouTube search.list ใช้ 100 หน่วยต่อครั้ง โควต้าฟรี 10,000 หน่วย/วัน
 // ค้นทุก 30 นาที = 48 ครั้ง/วัน ≈ 4,800 หน่วย เหลือเผื่อการกดรันเอง
 const YT_QUERY = 'น้ำท่วม กรุงเทพ|น้ำท่วม กทม|น้ำท่วมขัง กทม|ฝนตกหนัก กรุงเทพ';
@@ -170,12 +171,14 @@ ${batch.map((n) => JSON.stringify({ id: n.id, title: n.title, snippet: n.snippet
 const FLOOD_RE = /ท่วม|น้ำขัง|น้ำรอระบาย|ฝนตกหนัก|ระดับน้ำ|ล้นตลิ่ง/;
 const BKK_RE = /กรุงเทพ|กทม|กรุงเทพฯ|bangkok/i;
 function analyzeByKeywords(n, districts) {
-  const text = n.title + ' ' + n.snippet;
-  const hits = districts.filter((d) => text.includes(d.name) || text.includes('เขต' + d.name));
-  const relevant = FLOOD_RE.test(text) && (BKK_RE.test(text) || hits.length > 0);
+  // ไม่มี AI: ใช้เฉพาะ "หัวข้อ" เพื่อลดข่าวที่ไม่เกี่ยว (ข้อความย่อมักมีคำกว้าง ๆ ปนมา)
+  const title = n.title;
+  const hits = districts.filter((d) => title.includes('เขต' + d.name) || (d.name.length >= 4 && title.includes(d.name)));
+  const relevant = /ท่วม|น้ำขัง|น้ำรอระบาย/.test(title) && (BKK_RE.test(title) || hits.length > 0)
+    && !/จ\.\s?\S+|จังหวัด(?!กรุงเทพ)/.test(title.replace(/กรุงเทพมหานคร/g, ''));
   let severity = 'กลาง';
-  if (/ผ่านไม่ได้|สัญจรไม่ได้|ปิดถนน|เข้าบ้าน|อพยพ|วิกฤต|หนักสุด/.test(text)) severity = 'สูง';
-  else if (/เตือน|เฝ้าระวัง|คลี่คลาย|น้ำลด|ระบายแล้ว/.test(text)) severity = 'ต่ำ';
+  if (/ผ่านไม่ได้|สัญจรไม่ได้|ปิดถนน|เข้าบ้าน|อพยพ|วิกฤต|หนักสุด/.test(title)) severity = 'สูง';
+  else if (/เตือน|เฝ้าระวัง|คลี่คลาย|น้ำลด|ระบายแล้ว/.test(title)) severity = 'ต่ำ';
   return { id: n.id, relevant, summary: '', severity, places: hits.map((d) => ({ name: '', district: d.name })), ai: false };
 }
 
@@ -237,10 +240,11 @@ async function updateNews(meta) {
       }
     } catch (e) { aiStatus = 'error: ' + e.message; log('gemini failed:', e.message); }
   }
-  for (const n of items) if (!cache[n.id]) cache[n.id] = { ...analyzeByKeywords(n, districts), at: now.toISOString() };
+  for (const n of items) if (!cache[n.id] || !cache[n.id].ai) cache[n.id] = { ...analyzeByKeywords(n, districts), at: cache[n.id]?.at || now.toISOString() };
 
   const out = [];
   for (const n of items) {
+    if (out.length >= MAX_OUTPUT_ITEMS) break;
     const a = cache[n.id];
     if (!a.relevant) continue;
     for (const p of a.places || []) if (p.name) await geocode(p.name, geo);
