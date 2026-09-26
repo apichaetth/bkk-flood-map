@@ -248,12 +248,19 @@
     $('warn').textContent = bad.length ? `ดึงข้อมูลไม่สำเร็จ ${bad.length} แหล่ง (${bad.map((f) => f.name).join(', ')}) ตัวเลขอาจน้อยกว่าความจริง` : '';
     $('sources').textContent = `แหล่งข้อมูลที่ใช้ได้รอบนี้ ${ok.length}/${feeds.filter((f) => !f.off).length}: ${ok.map((f) => f.name).join(', ')} · รายละเอียดดูที่หน้าแผนที่ละเอียด แท็บ "แหล่งข้อมูล"`;
   }
+  // แสดง 3 จุดแรกก่อน กด "ดูทั้ง 10 จุด" เพื่อขยาย
+  let topOpen = false;
   function renderTop(clusters) {
     const top = clusters.filter((c) => c.tier >= 2).slice(0, 10);
-    $('top10').innerHTML = top.length ? top.map((c) => `<li><a href="${mapLink(c)}">
+    const show = topOpen ? top : top.slice(0, 3);
+    $('top10').innerHTML = show.length ? show.map((c) => `<li><a href="${mapLink(c)}">
         <div class="t-row">${tag(c.tier)}<b>${esc(c.name)}</b></div>
         <div class="muted small">เขต${esc(c.district || '–')} · ${esc(c.members[0].detail).slice(0, 80)}${c.sources.length > 1 ? ` · ยืนยัน ${c.sources.length} แหล่ง` : ''} · ${c.t ? ago(c.t) : ''}</div>
       </a></li>`).join('') : '<li class="empty">ยังไม่มีจุดที่มีรายงานน้ำท่วม</li>';
+    $('topNote').textContent = top.length ? `${show.length} จาก ${top.length} จุด` : '';
+    $('topMore').hidden = top.length <= 3;
+    $('topMore').textContent = topOpen ? 'ย่อเหลือ 3 จุด ▴' : `ดูทั้ง ${top.length} จุด ▾`;
+    $('topMore').onclick = () => { topOpen = !topOpen; renderTop(clusters); };
   }
   function renderDistricts(dists) {
     $('districtList').innerHTML = dists.length ? dists.map((d) => `<details class="dist l${d.level}">

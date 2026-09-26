@@ -45,7 +45,7 @@
 
     <div id="warn" class="warn" hidden></div>
 
-    <section class="grid2">
+    <section class="mapwide">
       <div class="card mapcard">
         <div class="card-h"><h2>แผนที่จุดน้ำท่วม</h2><a class="more" href="map.html">แผนที่ละเอียด →</a></div>
         <div class="actions-big">
@@ -63,10 +63,12 @@
         <p class="muted small" id="roadNote"></p>
       </div>
 
-      <div class="card">
-        <div class="card-h"><h2>10 จุดที่น่าห่วงที่สุด</h2></div>
-        <ol id="top10" class="top10"></ol>
-      </div>
+    </section>
+
+    <section class="card">
+      <div class="card-h"><h2>จุดที่น่าห่วงที่สุด</h2><span class="muted small" id="topNote"></span></div>
+      <ol id="top10" class="top10"></ol>
+      <button type="button" class="btn" id="topMore" hidden>ดูทั้ง 10 จุด ▾</button>
     </section>
 
     <!-- 2) แยกตามเขต -->

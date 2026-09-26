@@ -218,7 +218,9 @@ body.summary { overflow: auto; display: block; height: auto; }
 .tile.t1 { border-style: dashed; border-color: var(--flood2); }
 
 .grid2 { display: grid; grid-template-columns: 2.3fr 1fr; gap: 16px; }
-#smap { height: 640px; border-radius: 10px; background: var(--bg); position: relative; }
+#smap { height: max(600px, 74vh); border-radius: 10px; background: var(--bg); position: relative; }
+.mapwide > .card { width: 100%; }
+#topMore { margin-top: 10px; }
 .legend-row { display: flex; flex-wrap: wrap; gap: 6px 16px; font-size: 12.5px; color: var(--ink2); margin-top: 8px; align-items: center; }
 .legend-row span { display: inline-flex; align-items: center; gap: 6px; }
 .lg-line { display: inline-block; width: 26px; height: 0; border-top: 6px solid var(--flood3); border-radius: 3px; }
@@ -268,7 +270,7 @@ body.summary { overflow: auto; display: block; height: auto; }
   .hero h2 { font-size: 21px; } .hero h2 em { font-size: 26px; }
   .tile .tv { font-size: 26px; }
   .grid2 { grid-template-columns: 1fr; }
-  #smap { height: 460px; }
+  #smap { height: 62vh; min-height: 420px; }
   .sum { padding: 12px 16px; gap: 12px; }
 }
 
