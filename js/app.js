@@ -22,6 +22,7 @@
     attribution: '© <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors',
   }).addTo(map);
   L.control.scale({ imperial: false, position: 'bottomleft' }).addTo(map);
+  Flood.addLocate(map);
   // เปิดจากหน้าสรุปด้วย map.html?lat=..&lng=..&z=.. ให้ซูมไปที่จุดนั้นและวงไว้
   (function focusFromUrl() {
     const q = new URLSearchParams(location.search);

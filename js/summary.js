@@ -105,6 +105,7 @@
     maxZoom: 19, className: 'basemap', attribution: '© <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors',
   }).addTo(map);
   map.createPane('roads').style.zIndex = 450;
+  F.addLocate(map, () => { userMoved = true; }); // ผู้ใช้ไปดูตำแหน่งตัวเองแล้ว ไม่ต้องซูมอัตโนมัติทับ
   const lyr = { districts: L.layerGroup().addTo(map), risk: L.layerGroup().addTo(map), areas: L.layerGroup().addTo(map), roads: L.layerGroup().addTo(map), spots: L.layerGroup().addTo(map), web: L.layerGroup().addTo(map) };
   // พื้นที่เสี่ยงแสดงเป็นค่าเริ่มต้น ยกเลิกติ๊กเพื่อซ่อน
   $('showRisk').onchange = (e) => { if (e.target.checked) map.addLayer(lyr.risk); else map.removeLayer(lyr.risk); };

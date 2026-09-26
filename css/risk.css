@@ -1,0 +1,20 @@
+/* หน้าประมาณการถนนเสี่ยงน้ำท่วม (ทดลอง) */
+:root { --rk3: #b3261e; --rk2: #ec7a3a; --rk1: #e6b422; }
+.beta { font-size: 11px; font-weight: 600; background: var(--warning); color: #1b2430; border-radius: 999px; padding: 1px 8px; vertical-align: middle; }
+.rk-kpis { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 10px; }
+.tile.rk3 { border-color: var(--rk3); } .tile.rk3 .tv { color: var(--rk3); }
+.tile.rk2 .tv { color: var(--rk2); } .tile.rk1 .tv { color: #a47c00; }
+#rmap { height: max(560px, 70vh); border-radius: 10px; background: var(--bg); }
+.rk-filter { display: flex; gap: 12px; font-size: 14px; }
+.rk-filter label { display: inline-flex; gap: 4px; align-items: center; cursor: pointer; }
+.rk-line { display: inline-block; width: 26px; height: 0; border-top: 6px solid var(--rk3); border-radius: 3px; }
+.rk-line.t2 { border-top-color: var(--rk2); border-top-width: 5px; }
+.rk-line.t1 { border-top: 4px dashed var(--rk1); }
+.rk-roads { margin: 0; padding-left: 22px; display: flex; flex-direction: column; gap: 6px; font-size: 14px; }
+.rk-roads a { color: var(--ink); text-decoration: none; }
+.rk-roads a:hover { text-decoration: underline; }
+.rk-roads .tagx { display: inline-block; font-size: 11.5px; font-weight: 600; color: #fff; border-radius: 999px; padding: 0 7px; margin-right: 6px; }
+.rk-eval table { width: 100%; border-collapse: collapse; font-size: 14px; }
+.rk-eval th, .rk-eval td { text-align: left; padding: 6px 4px; border-bottom: 1px solid var(--line); }
+.rk-eval td.n { text-align: right; font-variant-numeric: tabular-nums; }
+@media (max-width: 860px) { .rk-kpis { grid-template-columns: repeat(2, 1fr); } #rmap { height: 62vh; } }

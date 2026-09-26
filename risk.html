@@ -1,0 +1,75 @@
+<!doctype html>
+<html lang="th">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <title>ถนนเสี่ยงน้ำท่วม (ประมาณการ)</title>
+  <meta name="description" content="ประมาณการถนนหลักและรองในกรุงเทพฯ ที่มีแนวโน้มน้ำท่วมตอนนี้ จากรายงานน้ำท่วม ฝน ประวัติการท่วมซ้ำ และระดับน้ำในคลอง (หน้าทดลอง)">
+  <meta name="theme-color" content="#0f5ea8">
+  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Cpath d='M16 3C11 11 7 15.5 7 20a9 9 0 0 0 18 0c0-4.5-4-9-9-17z' fill='%230f5ea8'/%3E%3C/svg%3E">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+Thai:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/leaflet@1.9.4/dist/leaflet.css">
+  <link rel="stylesheet" href="css/style.css">
+  <link rel="stylesheet" href="css/risk.css">
+</head>
+<body class="summary">
+  <header class="top">
+    <div class="brand">
+      <svg viewBox="0 0 32 32" aria-hidden="true"><path d="M16 3C11 11 7 15.5 7 20a9 9 0 0 0 18 0c0-4.5-4-9-9-17z"/></svg>
+      <div>
+        <h1>ถนนเสี่ยงน้ำท่วม · ประมาณการ <span class="beta">ทดลอง</span></h1>
+        <p id="updated" class="sub">กำลังโหลด…</p>
+      </div>
+    </div>
+    <nav class="pages" aria-label="หน้า"><a href="./">← กลับหน้าสรุป</a></nav>
+    <button id="refresh" class="btn" type="button">↻ รีเฟรช</button>
+  </header>
+  <main class="sum">
+    <section class="rk-kpis" aria-label="สรุป">
+      <div class="tile rk3"><span class="tv" id="n3">–</span><span class="tl">ช่วงถนน<br><b>แนวโน้มสูง</b></span></div>
+      <div class="tile rk2"><span class="tv" id="n2">–</span><span class="tl">ช่วงถนน<br><b>แนวโน้มกลาง</b></span></div>
+      <div class="tile rk1"><span class="tv" id="n1">–</span><span class="tl">ช่วงถนน<br><b>เฝ้าระวัง</b></span></div>
+      <div class="tile"><span class="tv" id="acc">–</span><span class="tl">ความแม่นยำ<br><b>ระดับสูง</b> <span class="muted" id="accSub"></span></span></div>
+    </section>
+
+    <section class="card">
+      <div class="card-h"><h2>แผนที่ถนนที่มีแนวโน้มน้ำท่วม</h2>
+        <span class="rk-filter"><label><input type="checkbox" data-t="3" checked> สูง</label><label><input type="checkbox" data-t="2" checked> กลาง</label><label><input type="checkbox" data-t="1" checked> เฝ้าระวัง</label></span></div>
+      <div id="rmap" role="region" aria-label="แผนที่ถนนเสี่ยงน้ำท่วม"></div>
+      <div class="legend-row">
+        <span><i class="rk-line t3"></i>แนวโน้มสูง</span><span><i class="rk-line t2"></i>แนวโน้มกลาง</span><span><i class="rk-line t1"></i>เฝ้าระวัง</span>
+        <span class="muted">กดเส้นถนนเพื่อดูเหตุผล</span>
+      </div>
+    </section>
+
+    <section class="grid2">
+      <div class="card">
+        <div class="card-h"><h2>ถนนที่น่าห่วงที่สุด</h2></div>
+        <ol id="roads" class="rk-roads"></ol>
+      </div>
+      <div class="card">
+        <div class="card-h"><h2>วัดผล: ทายถูกแค่ไหน</h2></div>
+        <div id="evalBox"></div>
+      </div>
+    </section>
+
+    <section class="card how">
+      <h2>ประมาณการอย่างไร</h2>
+      <ul>
+        <li>แบ่งถนนสายหลักและสายรองของ กทม. (OpenStreetMap) เป็นช่วงละประมาณ 150 ม. แล้วให้คะแนนทุก 15 นาทีจาก 4 ปัจจัย:</li>
+        <li><b>รายงานน้ำท่วมใกล้เคียง</b> (หน่วยงาน/iTIC, Traffy, ประชาชนปักหมุด, ข่าว) ยิ่งใกล้และยิ่งใหม่ คะแนนยิ่งสูง</li>
+        <li><b>ฝน</b> ประมาณจากสถานีวัดฝนรอบ ๆ ทั้งชั่วโมงล่าสุดและ 24 ชม.</li>
+        <li><b>ท่วมซ้ำบ่อย</b> จำนวนเรื่องน้ำท่วมที่เคยมีคนแจ้งบริเวณนั้น (ช่วยขยายผลของฝน)</li>
+        <li><b>น้ำในคลอง/แม่น้ำใกล้ล้นตลิ่ง</b> ในรัศมี 1 กม.</li>
+        <li>เป็นการประมาณจากหลักฐานรอบข้าง <b>ไม่ใช่การยืนยัน</b> และไม่ใช่แบบจำลองการไหลของน้ำ (ไม่มีข้อมูลท่อระบายน้ำ สถานีสูบ หรือระดับถนนที่ละเอียด) ความแม่นจะดีขึ้นเมื่อมีข้อมูลย้อนหลังมากขึ้นและปรับค่าน้ำหนัก</li>
+        <li><b>วัดผล:</b> เก็บผลการทายทุกรอบ แล้วดูว่าช่วงถนนที่ทายไว้ มีรายงานน้ำท่วมใหม่ในรัศมี 150 ม. ภายใน 3 ชม. หรือไม่</li>
+      </ul>
+    </section>
+  </main>
+  <script src="https://cdn.jsdelivr.net/npm/leaflet@1.9.4/dist/leaflet.js"></script>
+  <script src="js/core.js" defer></script>
+  <script src="js/risk.js" defer></script>
+</body>
+</html>

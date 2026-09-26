@@ -284,6 +284,40 @@ window.Flood = (function () {
     }
   }
 
+  // ปุ่ม "ตำแหน่งของฉัน" ใต้ปุ่มซูม: ซูมไปตำแหน่งปัจจุบัน แสดงจุดสีน้ำเงินและวงความแม่นยำ
+  function addLocate(map, onLocated) {
+    let marker = null, ring = null;
+    const Ctl = L.Control.extend({
+      options: { position: 'topleft' },
+      onAdd() {
+        const box = L.DomUtil.create('div', 'leaflet-bar locate-ctl');
+        const a = L.DomUtil.create('a', '', box);
+        a.href = '#'; a.title = 'ไปที่ตำแหน่งปัจจุบันของฉัน'; a.setAttribute('role', 'button'); a.setAttribute('aria-label', 'ตำแหน่งปัจจุบัน');
+        a.innerHTML = '<svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true"><circle cx="12" cy="12" r="4" fill="currentColor"/><path d="M12 2v3M12 19v3M2 12h3M19 12h3" stroke="currentColor" stroke-width="2" fill="none"/><circle cx="12" cy="12" r="7.5" stroke="currentColor" stroke-width="2" fill="none"/></svg>';
+        L.DomEvent.disableClickPropagation(box);
+        L.DomEvent.on(a, 'click', (e) => {
+          L.DomEvent.preventDefault(e);
+          if (!navigator.geolocation) { alert('อุปกรณ์นี้ไม่รองรับการหาตำแหน่ง'); return; }
+          box.classList.add('busy');
+          navigator.geolocation.getCurrentPosition((p) => {
+            box.classList.remove('busy');
+            const ll = [p.coords.latitude, p.coords.longitude];
+            if (marker) { marker.remove(); ring.remove(); }
+            ring = L.circle(ll, { radius: Math.min(p.coords.accuracy || 50, 1000), color: '#1a73e8', weight: 1, fillColor: '#1a73e8', fillOpacity: 0.12, interactive: false }).addTo(map);
+            marker = L.circleMarker(ll, { radius: 7, color: '#fff', weight: 2.5, fillColor: '#1a73e8', fillOpacity: 1 }).bindTooltip('ตำแหน่งของฉัน').addTo(map);
+            map.setView(ll, Math.max(map.getZoom(), 16));
+            if (onLocated) onLocated(ll);
+          }, (err) => {
+            box.classList.remove('busy');
+            alert(err.code === 1 ? 'ไม่ได้รับอนุญาตให้ใช้ตำแหน่ง กรุณาอนุญาตในการตั้งค่าเบราว์เซอร์' : 'หาตำแหน่งไม่ได้ ลองใหม่อีกครั้ง');
+          }, { enableHighAccuracy: true, timeout: 15000, maximumAge: 30000 });
+        });
+        return box;
+      },
+    });
+    return new Ctl().addTo(map);
+  }
+
   // ข้อความผิดพลาดที่อ่านเข้าใจง่าย
   function errMsg(key, e) {
     // เซิร์ฟเวอร์ กทม. ตอบ 503 "Under pressure" โดยไม่มี CORS header เบราว์เซอร์จึงเห็นเป็น Failed to fetch
@@ -313,6 +347,6 @@ window.Flood = (function () {
     $, esc, num, inBkk, th, fmtTime, fmtDT, ago, bkkDate, isoDate, distKm, getJSON, cssVar, store,
     LEVEL, badge, sensorLevel, wlLevel, rainStep, SEV_LV, levelFromText,
     fetchSensors, fetchEvents, fetchTraffy, traffyRaw, fetchCams, fetchRadar, isFloodTicket, fetchWebReports, reportEndpoint, deviceId, WEB_LEVEL, fetchRain, fetchWl, fetchNews, fetchTmd, errMsg,
-    loadDistricts, districtAt,
+    loadDistricts, districtAt, addLocate,
   };
 })();

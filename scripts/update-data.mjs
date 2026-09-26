@@ -11,6 +11,7 @@
 import { readFile, writeFile, mkdir } from 'node:fs/promises';
 import { createHash } from 'node:crypto';
 import path from 'node:path';
+import { loadRoads, scoreRoads, evaluate, PARAMS as RISK_PARAMS } from './risk.mjs';
 import { fileURLToPath } from 'node:url';
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
@@ -369,6 +370,88 @@ async function updateCamsRadar(meta) {
   } catch (e) { log('radar failed:', e.message); meta.sources.radar = { ok: false, error: e.message }; }
 }
 
+// ---------- ประมาณการถนนที่มีแนวโน้มน้ำท่วม (ทดลอง) ดู scripts/risk.mjs ----------
+const bkkTime = (s) => { const m = String(s || '').match(/^(\d{4}-\d{2}-\d{2})[ T](\d{2}:\d{2})/); return m ? new Date(`${m[1]}T${m[2]}:00+07:00`).getTime() : NaN; };
+const utcTime = (s) => new Date(String(s || '').replace(' ', 'T').replace(/\+00$/, 'Z')).getTime();
+const WEB_LV = { 'ข้อเท้า': 1, 'ครึ่งแข้ง': 2, 'เข่า': 3, 'เอว': 3, 'สูงกว่าเอว': 3, 'ไม่ระบุ': 2 };
+async function updateRisk(meta) {
+  const src = {};
+  let roads;
+  try { roads = await loadRoads(DATA, fetchText, log); }
+  catch (e) { log('roads failed:', e.message); meta.sources.risk = { ok: false, error: 'roads: ' + e.message }; return; }
+  const inBkk = (la, lo) => la >= 13.4 && la <= 14.05 && lo >= 100.25 && lo <= 101.0;
+  const reports = [], history = [], rain = [], wl = [];
+  // Traffy (สะสมไว้แล้วใน traffy.json)
+  const tf = await readJSON('traffy.json', { results: [] });
+  for (const r of tf.results || []) {
+    const la = +r.coords[1], lo = +r.coords[0], t = utcTime(r.timestamp);
+    if (!inBkk(la, lo) || isNaN(t)) continue;
+    history.push({ la, lo, t });
+    if (r.state !== 'เสร็จสิ้น') reports.push({ la, lo, t, src: 'traffy' });
+  }
+  src.traffy = tf.results ? tf.results.length : 0;
+  // iTIC / Longdo
+  try {
+    const ev = JSON.parse(await fetchText('https://event.longdo.com/feed/json', {}, 45000));
+    for (const e of ev) {
+      if (!(String(e.type) === '6' || e.icon === 'flood')) continue;
+      const la = +e.latitude, lo = +e.longitude, t = bkkTime(e.start), stop = bkkTime(e.stop);
+      if (inBkk(la, lo) && !isNaN(t) && (isNaN(stop) || stop >= now.getTime())) reports.push({ la, lo, t, src: 'itic' });
+    }
+    src.itic = true;
+  } catch (e) { src.itic = 'error: ' + e.message; }
+  // หมุดประชาชน
+  try {
+    const ep = JSON.parse(await readFile(path.join(DATA, 'report-config.json'), 'utf8')).endpoint;
+    if (ep) {
+      const d = JSON.parse(await fetchText(ep + '?action=list', {}, 30000));
+      for (const r of d.reports || []) if (r.status === 'open') reports.push({ la: r.lat, lo: r.lng, t: Date.parse(r.created_at), src: 'web', lv: WEB_LV[r.level] || 2 });
+      src.web = true;
+    }
+  } catch (e) { src.web = 'error: ' + e.message; }
+  // ข่าวที่ระบุตำแหน่งได้และรายงานว่ามีน้ำท่วม
+  const news = await readJSON('news.json', { items: [] });
+  for (const n of news.items || []) {
+    if (n.severity !== 'สูง' && n.severity !== 'กลาง') continue;
+    for (const p of n.pins || []) if (p.precision === 'place') reports.push({ la: p.lat, lo: p.lng, t: Date.parse(n.published), src: 'news' });
+  }
+  // ThaiWater ฝน + ระดับน้ำ (กทม. และจังหวัดรอบ ๆ ช่วยประมาณฝนบริเวณขอบเมือง)
+  const PROV = new Set(['10', '11', '12', '13']);
+  const TW = 'https://api-v3.thaiwater.net/api/v1/thaiwater30/public/';
+  try {
+    const d = JSON.parse(await fetchText(TW + 'rain_24h', { headers: { Referer: 'https://www.thaiwater.net/' } }, 90000));
+    for (const x of d.data || []) {
+      if (!x.geocode || !PROV.has(String(x.geocode.province_code))) continue;
+      const t = bkkTime(x.rainfall_datetime);
+      if (isNaN(t) || now - t > 6 * 36e5) continue;
+      rain.push({ la: +x.station.tele_station_lat, lo: +x.station.tele_station_long, mm1: +x.rain_1h || 0, mm24: +x.rain_24h || 0 });
+    }
+    src.rain = rain.length;
+  } catch (e) { src.rain = 'error: ' + e.message; }
+  try {
+    const d = JSON.parse(await fetchText(TW + 'waterlevel_load', { headers: { Referer: 'https://www.thaiwater.net/' } }, 90000));
+    for (const x of (d.waterlevel_data && d.waterlevel_data.data) || []) {
+      if (!x.geocode || String(x.geocode.province_code) !== '10') continue;
+      const t = bkkTime(x.waterlevel_datetime);
+      if (isNaN(t) || now - t > 6 * 36e5 || x.storage_percent == null) continue;
+      wl.push({ la: +x.station.tele_station_lat, lo: +x.station.tele_station_long, pct: +x.storage_percent, name: (x.station.tele_station_name && x.station.tele_station_name.th) || '' });
+    }
+    src.wl = wl.length;
+  } catch (e) { src.wl = 'error: ' + e.message; }
+
+  const segs = scoreRoads(roads, { reports, history, rain, wl }, now.getTime());
+  // เก็บผลรอบนี้ไว้วัดความแม่นภายหลัง
+  const hist = (await readJSON('risk-history.json', [])).filter((h) => now - h.t <= RISK_PARAMS.historyKeepH * 36e5);
+  hist.push({ t: now.getTime(), segs: segs.map((s) => [s.id, s.tier]) });
+  await writeJSON('risk-history.json', hist);
+  const evalReports = [...reports.filter((r) => r.src !== 'news'), ...history.map((h) => ({ ...h, src: 'traffy' }))];
+  const accuracy = evaluate(hist, roads, evalReports, now.getTime());
+  const counts = { 3: 0, 2: 0, 1: 0 };
+  segs.forEach((s) => counts[s.tier]++);
+  await writeJSON('risk-roads.json', { updated: now.toISOString(), roadSegments: roads.segments.length, sources: src, counts, accuracy, params: RISK_PARAMS, segments: segs.slice(0, 2500) });
+  meta.sources.risk = { ok: true, segments: segs.length, counts, sources: src };
+}
+
 // ---------- ตรวจระบบรับแจ้งจากประชาชน (Google Apps Script) ว่ายังตอบได้ ----------
 async function checkReports(meta) {
   let ep = '';
@@ -392,5 +475,6 @@ await updateTmd(meta);
 await checkReports(meta);
 await updateTraffy(meta);
 await updateCamsRadar(meta);
+await updateRisk(meta).catch((e) => { log('risk failed:', e); meta.sources.risk = { ok: false, error: e.message }; });
 await writeJSON('meta.json', meta);
 log('done', JSON.stringify(meta));

@@ -346,3 +346,7 @@ table.log .thumbs img { width: 56px; height: 56px; object-fit: cover; border-rad
   table.log td { display: flex; gap: 8px; border: 0; padding: 3px 0; }
   table.log td::before { content: attr(data-l); min-width: 72px; color: var(--muted); font-size: 12.5px; }
 }
+
+/* ปุ่มตำแหน่งปัจจุบัน */
+.locate-ctl a { display: flex !important; align-items: center; justify-content: center; color: #1a73e8; }
+.locate-ctl.busy a { animation: pulse 1s ease-in-out infinite; }

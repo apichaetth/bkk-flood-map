@@ -21,7 +21,7 @@ concurrency:
 jobs:
   build-deploy:
     runs-on: ubuntu-latest
-    timeout-minutes: 10
+    timeout-minutes: 15
     environment:
       name: github-pages
       url: ${{ steps.deploy.outputs.page_url }}
@@ -45,6 +45,8 @@ jobs:
             data/traffy.json
             data/cams.json
             data/radar.json
+            data/roads.json
+            data/risk-history.json
           key: data-${{ github.run_id }}
           restore-keys: data-
 
@@ -70,13 +72,15 @@ jobs:
             data/traffy.json
             data/cams.json
             data/radar.json
+            data/roads.json
+            data/risk-history.json
           key: data-${{ github.run_id }}
 
       - name: Prepare site
         run: |
           mkdir -p _site
-          cp -r index.html map.html log.html traffy.html css js data _site/
-          rm -f _site/data/news-cache.json _site/data/yt-state.json _site/data/geocache.json
+          cp -r index.html map.html log.html traffy.html risk.html css js data _site/
+          rm -f _site/data/news-cache.json _site/data/yt-state.json _site/data/geocache.json _site/data/roads.json _site/data/risk-history.json
           touch _site/.nojekyll
 
       - uses: actions/upload-pages-artifact@v3
