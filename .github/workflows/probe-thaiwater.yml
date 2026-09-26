@@ -1,5 +1,8 @@
 name: probe-thaiwater
 on:
+  push:
+    branches: [main]
+    paths: ['scripts/probe-thaiwater.mjs', '.github/workflows/probe-thaiwater.yml']
   workflow_dispatch:
     inputs:
       endpoints:
