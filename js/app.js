@@ -56,11 +56,14 @@
     'ขอบเขตเขต': layers.districts,
   }, { collapsed: true, position: 'topright' }).addTo(map);
 
-  const icon = (cls, color, text = '', size = 18, extra = '') =>
-    L.divIcon({
-      className: '', iconSize: [size, size], iconAnchor: [size / 2, size / 2], popupAnchor: [0, -size / 2],
-      html: `<div class="mk ${cls} ${extra}" style="--c:${color};width:${size}px;height:${size}px">${text}</div>`,
+  // พื้นที่กดอย่างน้อย 22 px รอบจุด (จุดเล็กก็ยังกดง่ายบนมือถือ) โดยขนาดที่มองเห็นเท่าเดิม
+  const icon = (cls, color, text = '', size = 18, extra = '') => {
+    const hit = Math.max(size, 22);
+    return L.divIcon({
+      className: '', iconSize: [hit, hit], iconAnchor: [hit / 2, hit / 2], popupAnchor: [0, -size / 2],
+      html: `<div class="mkhit" style="width:${hit}px;height:${hit}px"><div class="mk ${cls} ${extra}" style="--c:${color};width:${size}px;height:${size}px">${text}</div></div>`,
     });
+  };
 
   // ---------- สถานะแหล่งข้อมูล ----------
   const FEEDS = {
@@ -140,7 +143,7 @@
       const html = `<div class="pp">${badge(x.lv)} <span class="m">รายงานจาก ${esc(e.contributor || 'iTIC / Longdo')}</span>
         <h3>${esc(e.title)}</h3><div>${esc(e.description || '').slice(0, 500)}</div>
         <div class="m" style="margin-top:6px">${esc(x.why)}<br>เริ่ม ${fmtDT(x.start)}${x.stop ? ' · ถึง ' + fmtDT(x.stop) : ''}</div></div>`;
-      x.marker = L.marker([x.la, x.lo], { icon: icon('event', LEVEL[x.lv].color, '', 6, LEVEL[x.lv].dark ? 'dark' : ''), zIndexOffset: 800 }).bindPopup(html, { maxWidth: 320 }).addTo(layers.event);
+      x.marker = L.marker([x.la, x.lo], { icon: icon('event', LEVEL[x.lv].color, '', 9, LEVEL[x.lv].dark ? 'dark' : ''), zIndexOffset: 800 }).bindPopup(html, { maxWidth: 320 }).addTo(layers.event);
     }
     $('kEvent').textContent = S.event.length;
     renderFloodList(); renderCams();
