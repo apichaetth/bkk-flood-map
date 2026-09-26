@@ -110,6 +110,15 @@
   // พื้นที่เสี่ยงแสดงเป็นค่าเริ่มต้น ยกเลิกติ๊กเพื่อซ่อน
   $('showRisk').onchange = (e) => { if (e.target.checked) map.addLayer(lyr.risk); else map.removeLayer(lyr.risk); };
   // ยกเลิกติ๊กเพื่อดูเฉพาะถนนที่ไฮไลท์สีแดง (ซ่อนจุด วงบริเวณ และหมุดประชาชน)
+  // ซ่อนจุดที่มาจาก Traffy แหล่งเดียว (จำค่าที่เลือกไว้ในเครื่อง) — จุดที่ยืนยันจากแหล่งอื่นด้วยยังแสดง
+  let hideTraffy = F.store.get('bkkflood.hideTraffy') === true;
+  $('showTraffy').checked = !hideTraffy;
+  const traffyOnly = (c) => hideTraffy && c.tier >= 2 && c.sources.length === 1 && c.sources[0] === 'traffy';
+  let lastDrawn = null;
+  $('showTraffy').onchange = (e) => {
+    hideTraffy = !e.target.checked; F.store.set('bkkflood.hideTraffy', hideTraffy);
+    if (lastDrawn) { drawSpots(lastDrawn); drawRoads(lastDrawn, gen); }
+  };
   $('showSpots').onchange = (e) => ['spots', 'areas', 'web'].forEach((k) => (e.target.checked ? map.addLayer(lyr[k]) : map.removeLayer(lyr[k])));
 
   // ---------- เรดาร์ฝน (RainViewer) + กล้อง CCTV สาธารณะ ----------
@@ -197,7 +206,9 @@
       },
     }).addTo(lyr.districts);
   }
-  function drawSpots(clusters) {
+  function drawSpots(all) {
+    lastDrawn = all;
+    const clusters = all.filter((c) => !traffyOnly(c));
     lyr.spots.clearLayers(); lyr.areas.clearLayers(); lyr.risk.clearLayers();
     const red = RED();
     for (const c of clusters) {
@@ -265,7 +276,7 @@
   }
   async function drawRoads(clusters, my) {
     lyr.roads.clearLayers();
-    const spots = clusters.filter((c) => c.tier >= 2).slice(0, 60);
+    const spots = clusters.filter((c) => c.tier >= 2 && !traffyOnly(c)).slice(0, 60);
     if (!spots.length) { $('roadNote').textContent = ''; return; }
     $('roadNote').textContent = 'กำลังโหลดเส้นถนนบริเวณจุดน้ำท่วม…';
     try {
