@@ -1,0 +1,84 @@
+<!doctype html>
+<html lang="th">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <title>น้ำท่วมจาก Traffy Fondue</title>
+  <meta name="description" content="เรื่องแจ้งน้ำท่วมจากประชาชนผ่าน Traffy Fondue ในกรุงเทพฯ แผนที่จุดที่แจ้งหนาแน่น สถิติรายชั่วโมง และรายเขต">
+  <meta name="theme-color" content="#0f5ea8">
+  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Cpath d='M16 3C11 11 7 15.5 7 20a9 9 0 0 0 18 0c0-4.5-4-9-9-17z' fill='%230f5ea8'/%3E%3C/svg%3E">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+Thai:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/leaflet@1.9.4/dist/leaflet.css">
+  <link rel="stylesheet" href="css/style.css">
+  <link rel="stylesheet" href="css/traffy.css">
+</head>
+<body class="summary">
+  <header class="top">
+    <div class="brand">
+      <svg viewBox="0 0 32 32" aria-hidden="true"><path d="M16 3C11 11 7 15.5 7 20a9 9 0 0 0 18 0c0-4.5-4-9-9-17z"/></svg>
+      <div>
+        <h1>น้ำท่วมจากประชาชน · Traffy Fondue</h1>
+        <p id="updated" class="sub">กำลังโหลด…</p>
+      </div>
+    </div>
+    <nav class="pages" aria-label="หน้า"><a href="./">← กลับหน้าสรุป</a></nav>
+    <button id="refresh" class="btn" type="button">↻ รีเฟรช</button>
+  </header>
+
+  <main class="sum">
+    <section class="card tf-controls" aria-label="ตัวกรอง">
+      <div class="tf-row"><span class="tf-lbl">ช่วงเวลา</span><div class="chips" id="fTime" role="group" aria-label="ช่วงเวลา"></div></div>
+      <div class="tf-row"><span class="tf-lbl">สถานะ</span><div class="chips" id="fState" role="group" aria-label="สถานะ"></div></div>
+      <p class="muted small" id="coverage"></p>
+    </section>
+
+    <section class="tf-kpis" aria-label="สรุปตัวเลข">
+      <div class="tile t3"><span class="tv" id="kAll">–</span><span class="tl">เรื่องน้ำท่วม<br><b>ทั้งหมด</b></span></div>
+      <div class="tile"><span class="tv" id="kWait">–</span><span class="tl">รอรับเรื่อง</span></div>
+      <div class="tile"><span class="tv" id="kWork">–</span><span class="tl">กำลังดำเนินการ</span></div>
+      <div class="tile"><span class="tv" id="kDone">–</span><span class="tl">เสร็จสิ้น</span></div>
+      <div class="tile"><span class="tv" id="kHot">–</span><span class="tl">จุดที่แจ้ง<br><b>หนาแน่น</b></span></div>
+    </section>
+
+    <section class="grid2">
+      <div class="card">
+        <div class="card-h"><h2>แผนที่เรื่องแจ้งน้ำท่วม</h2>
+          <label class="lg-toggle small"><input type="checkbox" id="showPts" checked> แสดงทุกเรื่อง</label></div>
+        <div id="tmap" role="region" aria-label="แผนที่เรื่องแจ้งน้ำท่วมจาก Traffy"></div>
+        <div class="legend-row">
+          <span><i class="tf-hot"></i>บริเวณที่มีคนแจ้งตั้งแต่ 2 เรื่องขึ้นไป (ตัวเลข = จำนวนเรื่อง)</span>
+          <span><i class="tf-pt" style="--c:var(--critical)"></i>ท่วมสูง</span>
+          <span><i class="tf-pt" style="--c:var(--serious)"></i>ท่วม</span>
+          <span><i class="tf-pt" style="--c:var(--warning)"></i>เล็กน้อย</span>
+          <span><i class="tf-pt done"></i>เสร็จสิ้นแล้ว</span>
+        </div>
+      </div>
+      <div class="card">
+        <div class="card-h"><h2>เขตที่แจ้งมากที่สุด</h2></div>
+        <ol id="dRank" class="tf-rank"></ol>
+      </div>
+    </section>
+
+    <section class="card">
+      <div class="card-h"><h2>จำนวนเรื่องแจ้งรายชั่วโมง</h2><span class="muted small" id="chartNote"></span></div>
+      <div id="chart" class="tf-chart" role="img" aria-label="กราฟจำนวนเรื่องแจ้งน้ำท่วมรายชั่วโมง"></div>
+    </section>
+
+    <section class="card">
+      <div class="card-h"><h2>เรื่องแจ้งล่าสุด</h2><span class="muted small" id="listCount"></span></div>
+      <div id="list" class="tf-list"></div>
+      <button type="button" class="btn" id="more" hidden>แสดงเพิ่ม</button>
+    </section>
+
+    <p class="muted small">ข้อมูลจาก <a href="https://fondue.traffy.in.th/teamchadchart" target="_blank" rel="noopener">Traffy Fondue (NECTEC × กทม.)</a>
+      คัดเฉพาะเรื่องประเภทน้ำท่วม หรือเรื่องที่ยังไม่จัดประเภทแต่ข้อความระบุน้ำท่วม/น้ำขังชัดเจน เป็นข้อมูลที่ประชาชนแจ้ง ยังไม่ได้รับการยืนยัน
+      ดึงจาก API สาธารณะครั้งละไม่เกิน 1,000 เรื่องล่าสุด ช่วงที่มีคนแจ้งมาก ข้อมูลอาจย้อนหลังได้ไม่ครบช่วงเวลาที่เลือก</p>
+  </main>
+
+  <script src="https://cdn.jsdelivr.net/npm/leaflet@1.9.4/dist/leaflet.js"></script>
+  <script src="js/core.js" defer></script>
+  <script src="js/traffy.js" defer></script>
+</body>
+</html>

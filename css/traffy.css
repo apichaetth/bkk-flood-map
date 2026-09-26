@@ -1,0 +1,43 @@
+/* หน้าเรื่องแจ้งน้ำท่วมจาก Traffy Fondue (ใช้ตัวแปรสีจาก style.css) */
+.tf-controls { display: flex; flex-direction: column; gap: 8px; }
+.tf-row { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+.tf-lbl { font-size: 14px; color: var(--ink2); min-width: 64px; }
+.tf-controls p { margin: 0; }
+.tf-kpis { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 10px; }
+#tmap { height: 560px; border-radius: 10px; background: var(--bg); }
+.tf-hot { display: inline-block; width: 16px; height: 16px; border-radius: 50%; border: 1.5px solid var(--critical); background: color-mix(in srgb, var(--critical) 30%, transparent); }
+.tf-pt { display: inline-block; width: 11px; height: 11px; border-radius: 50%; background: var(--c); border: 1.5px solid #fff; box-shadow: 0 0 0 1px rgba(0,0,0,.2); }
+.tf-pt.done { background: var(--stale); }
+.tf-count { width: 28px; height: 28px; border-radius: 50%; background: var(--critical); color: #fff; font-weight: 700; font-size: 13px; display: flex; align-items: center; justify-content: center; border: 2px solid #fff; box-shadow: 0 1px 5px rgba(0,0,0,.35); }
+
+.tf-rank { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 6px; }
+.tf-rank li { display: grid; grid-template-columns: 110px 1fr 36px; gap: 8px; align-items: center; font-size: 14px; }
+.tf-rank .dn { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.tf-rank .bar-wrap { height: 12px; background: var(--bg); border-radius: 0 4px 4px 0; }
+.tf-rank .bar-in { display: block; height: 100%; background: var(--critical); border-radius: 0 4px 4px 0; min-width: 3px; }
+.tf-rank .dv { text-align: right; font-weight: 600; font-variant-numeric: tabular-nums; }
+
+.tf-chart svg { width: 100%; height: 190px; display: block; }
+.tf-chart .grid { stroke: var(--line); stroke-width: 1; vector-effect: non-scaling-stroke; }
+.tf-chart .ax { fill: var(--muted); font-size: 11px; }
+.tf-chart .bar { fill: var(--critical); }
+.tf-chart .hit { fill: transparent; }
+.tf-chart g:hover .hit { fill: color-mix(in srgb, var(--critical) 10%, transparent); }
+
+.tf-list { display: grid; grid-template-columns: repeat(auto-fill, minmax(340px, 1fr)); gap: 10px; margin-bottom: 10px; }
+.tf-item { display: grid; grid-template-columns: 96px 1fr; gap: 10px; border: 1px solid var(--line); border-left: 4px solid var(--critical); border-radius: 10px; padding: 8px; }
+.tf-item.done { border-left-color: var(--stale); opacity: .8; }
+.tf-item img, .tf-item .noimg { width: 96px; height: 96px; object-fit: cover; border-radius: 6px; background: var(--bg); }
+.tf-item .noimg { display: flex; align-items: center; justify-content: center; font-size: 12px; color: var(--muted); }
+.tf-body p { margin: 4px 0; font-size: 14px; }
+.st { font-size: 12px; padding: 1px 8px; border-radius: 999px; border: 1px solid var(--line); }
+.st-done { color: var(--good); border-color: var(--good); }
+.st-wait { color: var(--critical); border-color: var(--critical); }
+
+@media (max-width: 860px) {
+  .tf-kpis { grid-template-columns: repeat(2, 1fr); }
+  #tmap { height: 420px; }
+  .tf-list { grid-template-columns: 1fr; }
+  .tf-item { grid-template-columns: 72px 1fr; }
+  .tf-item img, .tf-item .noimg { width: 72px; height: 72px; }
+}
