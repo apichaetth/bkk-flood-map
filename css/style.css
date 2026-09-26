@@ -187,8 +187,8 @@ h2 { font-size: 14px; font-weight: 600; margin: 18px 0 6px; color: var(--ink2); 
 .pages a[aria-current="page"] { background: var(--accent); color: #fff; font-weight: 600; }
 @media (max-width: 860px) {
   .top { flex-wrap: wrap; row-gap: 6px; }
-  .pages { order: 3; width: 100%; margin-left: 0; }
-  .pages a { flex: 1; text-align: center; padding: 4px 4px; font-size: 13px; }
+  .pages { order: 3; width: 100%; margin-left: 0; display: grid; grid-template-columns: repeat(3, 1fr); }
+  .pages a { text-align: center; padding: 5px 4px; font-size: 13px; overflow: hidden; text-overflow: ellipsis; }
 }
 
 /* ---------- หน้าสรุป ---------- */
