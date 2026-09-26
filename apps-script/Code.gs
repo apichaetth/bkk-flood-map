@@ -11,6 +11,7 @@
  *   GET  ?action=log&limit=200 log ล่าสุด (ชื่อแบบย่อ)
  *   POST {action:'create', ...} แจ้งน้ำท่วม
  *   POST {action:'close', ...}  แจ้งว่าน้ำลดแล้ว (เอาหมุดออก)
+ *   POST {action:'feedback', ...} ข้อความจากหน้าเกี่ยวกับ → ชีต Feedback + ส่งอีเมลถึงเจ้าของสคริปต์
  * POST ส่งเป็น Content-Type: text/plain เพื่อไม่ให้เบราว์เซอร์ต้องทำ CORS preflight
  */
 
@@ -31,12 +32,14 @@ const REPORT_HEADERS = ['id', 'created_at', 'reporter_name', 'reporter_device', 
   'photo_ids', 'video_id', 'video_link', 'status', 'closed_at', 'closed_by', 'closed_device', 'close_reason', 'close_photo_ids', 'updated_at'];
 const LOG_HEADERS = ['log_id', 'timestamp', 'action', 'report_id', 'actor_name', 'actor_device', 'user_agent', 'lat', 'lng',
   'level', 'message', 'photo_ids', 'video_id', 'video_link', 'prev_hash', 'hash'];
+const FEEDBACK_HEADERS = ['timestamp', 'name', 'contact', 'topic', 'message', 'device', 'page', 'user_agent', 'mailed'];
 
 // ---------- ติดตั้งครั้งแรก (กด Run ฟังก์ชันนี้ 1 ครั้ง) ----------
 function setup() {
   const ss = SpreadsheetApp.getActiveSpreadsheet();
   ensureSheet_(ss, 'Reports', REPORT_HEADERS);
   ensureSheet_(ss, 'Log', LOG_HEADERS);
+  ensureSheet_(ss, 'Feedback', FEEDBACK_HEADERS);
   folder_();
   // ป้องกันการแก้ไขชีต Log ด้วยมือโดยไม่ตั้งใจ (เจ้าของยังแก้ได้ แต่จะมีคำเตือน และ hash จะไม่ตรง)
   const log = ss.getSheetByName('Log');
@@ -84,6 +87,7 @@ function doPost(e) {
     lock.waitLock(20000);
     if (body.action === 'create') return json_(create_(body));
     if (body.action === 'close') return json_(close_(body));
+    if (body.action === 'feedback') return json_(feedback_(body));
     return json_({ ok: false, error: 'ไม่รู้จักคำสั่ง' });
   } catch (err) {
     return json_({ ok: false, error: String(err.message || err) });
@@ -175,6 +179,37 @@ function close_(b) {
 }
 
 // ---------- เมนูแอดมินในชีต (ซ่อน/กู้คืนหมุด โดยมีบันทึกใน Log) ----------
+// ---------- ข้อเสนอแนะจากหน้าเกี่ยวกับ ----------
+function feedback_(b) {
+  const device = device_(b.device);
+  const c = CacheService.getScriptCache();
+  const k = 'fb_' + device;
+  if (Number(c.get(k) || 0) >= 3) throw new Error('ส่งถี่เกินไป กรุณารอสักครู่แล้วลองใหม่');
+  const name = requireName_(b.name);
+  // ข้อความยาวเก็บบรรทัดใหม่ไว้ แต่ตัดอักขระควบคุมอื่นและกันสูตรในชีต
+  const message = String(b.message == null ? '' : b.message).replace(/[\u0000-\u0009\u000b-\u001f\u007f]/g, ' ').replace(/^[=+\-@]+/, '').trim().slice(0, 3000);
+  if (message.length < 5) throw new Error('กรุณาพิมพ์ข้อความ');
+  const contact = clean_(b.contact, 120), topic = clean_(b.topic, 60) || 'ทั่วไป';
+  c.put(k, String(Number(c.get(k) || 0) + 1), 3600);
+  const ss = SpreadsheetApp.getActiveSpreadsheet();
+  const sh = ensureSheet_(ss, 'Feedback', FEEDBACK_HEADERS);
+  const now = new Date().toISOString();
+  let mailed = 'no';
+  try {
+    const mail = {
+      to: Session.getEffectiveUser().getEmail(),
+      subject: '[เว็บน้ำท่วม กทม.] ' + topic + ' — ' + name,
+      body: 'ชื่อ: ' + name + '\nติดต่อกลับ: ' + (contact || '-') + '\nเรื่อง: ' + topic + '\nเวลา: ' + now + '\n\n' + message +
+        '\n\n---\nส่งจาก ' + clean_(b.page, 200) + '\nบันทึกไว้ในชีต Feedback แล้ว',
+    };
+    if (/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(contact)) mail.replyTo = contact;
+    MailApp.sendEmail(mail);
+    mailed = 'yes';
+  } catch (err) { mailed = 'error: ' + String(err.message || err).slice(0, 200); }
+  sh.appendRow([now, name, contact, topic, message, device, clean_(b.page, 200), clean_(b.ua, 200), mailed]);
+  return { ok: true };
+}
+
 function onOpen() {
   SpreadsheetApp.getUi().createMenu('น้ำท่วม (แอดมิน)')
     .addItem('ซ่อนรายงานในแถวที่เลือก', 'adminHide')
