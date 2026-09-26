@@ -221,6 +221,32 @@ window.Flood = (function () {
     return { items: d.items || [], updated: new Date(d.updated) };
   }
 
+  // 8) ประชาชนแจ้งผ่านเว็บนี้ (Google Apps Script) — endpoint อยู่ใน data/report-config.json
+  let reportCfg = null;
+  async function reportEndpoint() {
+    if (!reportCfg) reportCfg = getJSON('data/report-config.json?t=' + Date.now()).catch(() => ({}));
+    const c = await reportCfg;
+    return /^https:\/\/script\.google(usercontent)?\.com\//.test(c.endpoint || '') ? c.endpoint : '';
+  }
+  async function fetchWebReports() {
+    const ep = await reportEndpoint();
+    if (!ep) throw new Error('ยังไม่ได้เปิดระบบแจ้ง');
+    const d = await getJSON(ep + '?action=list&t=' + Date.now(), 30000);
+    if (!d.ok) throw new Error(d.error || 'อ่านรายงานไม่ได้');
+    const items = (d.reports || []).filter((r) => r.status === 'open' && inBkk(r.lat, r.lng))
+      .map((r) => ({ r, la: r.lat, lo: r.lng, t: new Date(r.created_at), lv: WEB_LEVEL[r.level] || 2 }));
+    let newest = null;
+    items.forEach((x) => { if (!newest || x.t > newest) newest = x.t; });
+    return { items, newest, msg: `${items.length} จุดที่ยังไม่มีคนแจ้งว่าน้ำลด` };
+  }
+  // ระดับน้ำที่ผู้แจ้งเลือก -> ระดับความรุนแรง
+  const WEB_LEVEL = { 'ข้อเท้า': 1, 'ครึ่งแข้ง': 2, 'เข่า': 3, 'เอว': 3, 'สูงกว่าเอว': 3, 'ไม่ระบุ': 2 };
+  function deviceId() {
+    let id = store.get('bkkflood.device');
+    if (!id) { id = (crypto.randomUUID ? crypto.randomUUID() : String(Date.now()) + Math.random().toString(16).slice(2)); store.set('bkkflood.device', id); }
+    return id;
+  }
+
   // ข้อความผิดพลาดที่อ่านเข้าใจง่าย
   function errMsg(key, e) {
     // เซิร์ฟเวอร์ กทม. ตอบ 503 "Under pressure" โดยไม่มี CORS header เบราว์เซอร์จึงเห็นเป็น Failed to fetch
@@ -249,7 +275,7 @@ window.Flood = (function () {
     REFRESH_MS, TZ, RAIN_HEAVY_MM, URL,
     $, esc, num, inBkk, th, fmtTime, fmtDT, ago, bkkDate, isoDate, distKm, getJSON, cssVar, store,
     LEVEL, badge, sensorLevel, wlLevel, rainStep, SEV_LV, levelFromText,
-    fetchSensors, fetchEvents, fetchTraffy, isFloodTicket, fetchRain, fetchWl, fetchNews, fetchTmd, errMsg,
+    fetchSensors, fetchEvents, fetchTraffy, isFloodTicket, fetchWebReports, reportEndpoint, deviceId, WEB_LEVEL, fetchRain, fetchWl, fetchNews, fetchTmd, errMsg,
     loadDistricts, districtAt,
   };
 })();

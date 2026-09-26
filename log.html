@@ -1,0 +1,45 @@
+<!doctype html>
+<html lang="th">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <title>บันทึกการแจ้งน้ำท่วม</title>
+  <meta name="description" content="บันทึกการแจ้งน้ำท่วมและการแจ้งว่าน้ำลดแล้วจากประชาชน พร้อมเวลา ข้อความ และรูป">
+  <meta name="theme-color" content="#0f5ea8">
+  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Cpath d='M16 3C11 11 7 15.5 7 20a9 9 0 0 0 18 0c0-4.5-4-9-9-17z' fill='%230f5ea8'/%3E%3C/svg%3E">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+Thai:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="css/style.css">
+</head>
+<body class="summary">
+  <header class="top">
+    <div class="brand">
+      <svg viewBox="0 0 32 32" aria-hidden="true"><path d="M16 3C11 11 7 15.5 7 20a9 9 0 0 0 18 0c0-4.5-4-9-9-17z"/></svg>
+      <div>
+        <h1>บันทึกการแจ้งน้ำท่วม</h1>
+        <p id="updated" class="sub">กำลังโหลด…</p>
+      </div>
+    </div>
+    <nav class="pages" aria-label="หน้า"><a href="./">สรุป</a><a href="map.html">แผนที่ละเอียด</a><a href="log.html" aria-current="page">บันทึกการแจ้ง</a></nav>
+    <button id="refresh" class="btn" type="button">↻ รีเฟรช</button>
+  </header>
+  <main class="sum">
+    <section class="card">
+      <div class="card-h"><h2 id="title">ทุกการกระทำล่าสุด</h2><a class="more" href="map.html?report=1">📍 แจ้งน้ำท่วม →</a></div>
+      <p class="muted small">ทุกครั้งที่มีคนแจ้งน้ำท่วม แจ้งว่าน้ำลดแล้ว หรือผู้ดูแลซ่อน/กู้คืนหมุด จะถูกบันทึกที่นี่และลบไม่ได้
+        ชื่อแสดงแบบย่อเพื่อคุ้มครองข้อมูลส่วนบุคคล ชื่อเต็มและรหัสอุปกรณ์ผู้ดูแลเห็นได้ใน Google Sheet
+        รหัสท้ายแต่ละแถว (hash) ใช้ตรวจว่าไม่มีใครแก้ไขบันทึกย้อนหลัง</p>
+      <div class="log-filter"><label>ค้นหา <input id="q" type="search" placeholder="ชื่อ รหัสหมุด หรือข้อความ"></label>
+        <select id="act"><option value="">ทุกประเภท</option><option value="create">แจ้งน้ำท่วม</option><option value="close">น้ำลดแล้ว</option><option value="hide">ผู้ดูแลซ่อน</option><option value="restore">ผู้ดูแลกู้คืน</option></select>
+        <a id="all" href="log.html" hidden>ดูทั้งหมด</a></div>
+      <div class="table-wrap"><table class="log">
+        <thead><tr><th>เวลา</th><th>การกระทำ</th><th>หมุด</th><th>ผู้ทำ</th><th>ข้อความ</th><th>รูป/วิดีโอ</th><th>hash</th></tr></thead>
+        <tbody id="rows"><tr><td colspan="7" class="muted">กำลังโหลด…</td></tr></tbody>
+      </table></div>
+    </section>
+  </main>
+  <script src="js/core.js" defer></script>
+  <script src="js/log.js" defer></script>
+</body>
+</html>

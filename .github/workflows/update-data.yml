@@ -69,7 +69,7 @@ jobs:
       - name: Prepare site
         run: |
           mkdir -p _site
-          cp -r index.html map.html css js data _site/
+          cp -r index.html map.html log.html css js data _site/
           rm -f _site/data/news-cache.json _site/data/yt-state.json _site/data/geocache.json
           touch _site/.nojekyll
 

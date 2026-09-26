@@ -41,10 +41,12 @@
     event: L.layerGroup().addTo(map),
     sensor: L.layerGroup().addTo(map),
     cam: L.layerGroup(),
+    web: L.layerGroup().addTo(map),
   };
   L.control.layers(null, {
     'เซ็นเซอร์น้ำท่วมถนน กทม.': layers.sensor,
     'รายงานน้ำท่วม (หน่วยงาน/iTIC)': layers.event,
+    'ประชาชนแจ้งผ่านเว็บนี้': layers.web,
     'ประชาชนแจ้ง (Traffy 24 ชม.)': layers.traffy,
     'ตำแหน่งจากข่าว / YouTube': layers.news,
     'ระดับน้ำคลอง/แม่น้ำ': layers.wl,
@@ -65,6 +67,7 @@
     sensor: { name: 'เซ็นเซอร์น้ำท่วมถนน – สำนักการระบายน้ำ กทม.', link: 'https://weather.bangkok.go.th/flood/', note: 'เปิดได้เฉพาะเครือข่ายในประเทศไทย' },
     event: { name: 'รายงานน้ำท่วมถนน – iTIC / Longdo Traffic (กทม., ทล., ผู้ใช้)', link: 'https://traffic.longdo.com' },
     traffy: { name: 'เรื่องแจ้งจากประชาชน – Traffy Fondue', link: 'https://fondue.traffy.in.th/teamchadchart' },
+    web: { name: 'ประชาชนแจ้งผ่านเว็บนี้ (ปักหมุด)', link: 'log.html' },
     wl: { name: 'ระดับน้ำ – ThaiWater (สสน.)', link: 'https://www.thaiwater.net' },
     rain: { name: 'ปริมาณฝน – ThaiWater (สสน.)', link: 'https://www.thaiwater.net' },
     news: { name: 'ข่าว – Google News RSS + สรุปโดย Gemini', link: 'https://news.google.com' },
@@ -81,7 +84,7 @@
         : st === 'loading' ? 'กำลังโหลด…' : 'ใช้งานไม่ได้ขณะนี้ – ' + esc(f.msg || '');
       return `<div class="feed ${st}"><span class="st"></span><div><a href="${f.link}" target="_blank" rel="noopener">${esc(f.name)}</a><div class="fs">${s}${f.note ? ' · ' + esc(f.note) : ''}</div></div></div>`;
     }).join('');
-    const failed = Object.entries(FEEDS).filter(([k, f]) => f.status === 'fail' && k !== 'radar' && k !== 'cam').map(([, f]) => f);
+    const failed = Object.entries(FEEDS).filter(([k, f]) => f.status === 'fail' && k !== 'radar' && k !== 'cam' && !(k === 'web' && /ยังไม่ได้เปิด/.test(f.msg || ''))).map(([, f]) => f);
     $('warn').hidden = !failed.length;
     $('warn').textContent = failed.length ? `ดึงข้อมูลไม่สำเร็จ ${failed.length} แหล่ง (${failed.map((f) => f.name.split(' – ')[0]).join(', ')}) ตัวเลขอาจไม่ครบ – ดูแท็บ "แหล่งข้อมูล"` : '';
   }
@@ -522,4 +525,6 @@
   setInterval(refresh, REFRESH_MS);
   loadDistricts();
   refresh();
+  // ให้ js/report.js (ระบบปักหมุดแจ้งน้ำท่วม) ใช้แผนที่และชั้นข้อมูลเดียวกัน
+  window.FloodMap = { map, layers, setFeed, icon, minimizePanel, isMobile };
 })();

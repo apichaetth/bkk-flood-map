@@ -22,7 +22,7 @@
         <p id="updated" class="sub">กำลังโหลดข้อมูล…</p>
       </div>
     </div>
-    <nav class="pages" aria-label="หน้า"><a href="./">สรุป</a><a href="map.html" aria-current="page">แผนที่ละเอียด</a></nav>
+    <nav class="pages" aria-label="หน้า"><a href="./">สรุป</a><a href="map.html" aria-current="page">แผนที่ละเอียด</a><a href="log.html">บันทึกการแจ้ง</a></nav>
     <button id="refresh" class="btn" type="button" title="โหลดข้อมูลใหม่">↻ รีเฟรช</button>
   </header>
 
@@ -61,6 +61,7 @@
         <div class="legend">
           <div><i class="sym sensor" style="--c:var(--critical)"></i>เซ็นเซอร์น้ำท่วมถนน กทม. (ตัวเลข = ซม.)</div>
           <div><i class="sym event" style="--c:var(--serious)"></i>รายงานน้ำท่วมจากหน่วยงาน / iTIC</div>
+          <div><i class="sym web" style="--c:var(--critical)"></i>ประชาชนปักหมุดแจ้งผ่านเว็บนี้ (ยังไม่ยืนยัน)</div>
           <div><i class="sym traffy" style="--c:var(--warning)"></i>ประชาชนแจ้งผ่าน Traffy Fondue (ยังไม่ยืนยัน)</div>
           <div><i class="sym wl" style="--c:var(--good)"></i>สถานีวัดระดับน้ำคลอง/แม่น้ำ</div>
           <div><i class="sym rain" style="--c:var(--rain2)"></i>สถานีวัดฝน (ขนาดวงตามปริมาณฝน ยิ่งใหญ่/เข้ม = ฝนยิ่งมาก)</div>
@@ -105,5 +106,6 @@
   <script src="https://cdn.jsdelivr.net/npm/hls.js@1.5.20/dist/hls.min.js" defer></script>
   <script src="js/core.js" defer></script>
   <script src="js/app.js" defer></script>
+  <script src="js/report.js" defer></script>
 </body>
 </html>

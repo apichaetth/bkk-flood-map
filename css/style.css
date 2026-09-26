@@ -271,3 +271,58 @@ body.summary { overflow: auto; display: block; height: auto; }
   #smap { height: 360px; }
   .sum { padding: 12px 16px; gap: 12px; }
 }
+
+/* ---------- ระบบปักหมุดแจ้งน้ำท่วม ---------- */
+.btn.primary { background: var(--critical); border-color: var(--critical); color: #fff; font-weight: 600; }
+.btn.primary:hover { filter: brightness(1.08); }
+.btn.primary:disabled { opacity: .6; cursor: progress; }
+.btn.sm { padding: 3px 10px; font-size: 13.5px; text-decoration: none; display: inline-block; }
+.report-fab { position: absolute; left: 12px; bottom: 34px; z-index: 900; }
+.report-fab .btn { box-shadow: var(--shadow); padding: 9px 16px; font-size: 15px; }
+.report-fab.off .btn { background: var(--stale); border-color: var(--stale); }
+.pick-bar { position: absolute; top: 10px; left: 50%; transform: translateX(-50%); z-index: 950; display: flex; gap: 8px; align-items: center; flex-wrap: wrap; justify-content: center;
+  background: var(--surface); border: 2px solid var(--critical); border-radius: 12px; padding: 8px 12px; box-shadow: var(--shadow); max-width: calc(100% - 32px); font-size: 14px; }
+.pick-bar[hidden], .report-fab[hidden] { display: none; }
+.picking { cursor: crosshair !important; }
+.mk.web { border-radius: 50%; font-size: 12px; font-weight: 800; box-shadow: 0 0 0 2px var(--c), 0 2px 6px rgba(0,0,0,.4); }
+.sym.web { border-radius: 50%; box-shadow: 0 0 0 2px var(--c); }
+.close-btn { margin-top: 8px; width: 100%; background: var(--good); border-color: var(--good); color: #fff; font-weight: 600; }
+.ph3 { display: grid; grid-template-columns: repeat(3, 1fr); gap: 4px; margin-top: 6px; }
+.ph3 img { width: 100%; aspect-ratio: 1; object-fit: cover; margin: 0; }
+.pp iframe.drv { width: 100%; aspect-ratio: 16 / 9; border: 0; border-radius: 6px; margin-top: 6px; }
+.rp-dialog { border: 0; border-radius: 14px; padding: 0; width: min(520px, calc(100% - 24px)); max-height: calc(100% - 24px); background: var(--surface); color: var(--ink); box-shadow: 0 10px 40px rgba(0,0,0,.35); }
+.rp-dialog::backdrop { background: rgba(10, 20, 30, .45); }
+.rp-form { display: flex; flex-direction: column; gap: 10px; padding: 18px; }
+.rp-form h2 { margin: 0; font-size: 19px; }
+.rp-form label { display: flex; flex-direction: column; gap: 4px; font-size: 14px; color: var(--ink2); }
+.rp-form input:not([type=radio]):not([type=checkbox]), .rp-form textarea { font: inherit; font-size: 15px; padding: 8px 10px; border: 1px solid var(--line); border-radius: 8px; background: var(--bg); color: var(--ink); }
+.rp-form fieldset { border: 0; padding: 0; margin: 0; }
+.rp-form legend { font-size: 14px; color: var(--ink2); margin-bottom: 4px; }
+.rp-form .lv { display: flex; flex-wrap: wrap; gap: 6px; }
+.rp-form .lv label { flex-direction: row; }
+.rp-form .lv input { position: absolute; opacity: 0; }
+.rp-form .lv span { border: 1px solid var(--line); border-radius: 999px; padding: 4px 12px; cursor: pointer; }
+.rp-form .lv input:checked + span { background: var(--critical); border-color: var(--critical); color: #fff; }
+.rp-form .lv input:focus-visible + span { outline: 2px solid var(--accent); }
+.rp-form .consent { flex-direction: row; align-items: flex-start; gap: 8px; font-size: 13px; }
+.rp-form .req { color: var(--critical); }
+.rp-form .hp { position: absolute; left: -9999px; width: 1px; height: 1px; }
+.rp-msg { margin: 0; min-height: 1.4em; font-size: 14px; color: var(--critical); }
+.rp-actions { display: flex; justify-content: flex-end; gap: 8px; }
+
+/* ---------- หน้า log ---------- */
+.log-filter { display: flex; flex-wrap: wrap; gap: 8px 12px; align-items: center; margin: 8px 0 12px; font-size: 14px; }
+.log-filter input, .log-filter select { font: inherit; padding: 5px 8px; border: 1px solid var(--line); border-radius: 8px; background: var(--bg); color: var(--ink); }
+.table-wrap { overflow-x: auto; }
+table.log { width: 100%; border-collapse: collapse; font-size: 14px; }
+table.log th, table.log td { text-align: left; padding: 8px 6px; border-bottom: 1px solid var(--line); vertical-align: top; }
+table.log th { font-size: 12.5px; color: var(--muted); font-weight: 600; }
+table.log code { font-size: 11.5px; color: var(--muted); }
+table.log .thumbs img { width: 56px; height: 56px; object-fit: cover; border-radius: 6px; margin: 0 4px 4px 0; }
+.tag.ok { background: var(--good); }
+@media (max-width: 700px) {
+  table.log thead { display: none; }
+  table.log tr { display: block; border-bottom: 1px solid var(--line); padding: 6px 0; }
+  table.log td { display: flex; gap: 8px; border: 0; padding: 3px 0; }
+  table.log td::before { content: attr(data-l); min-width: 72px; color: var(--muted); font-size: 12.5px; }
+}

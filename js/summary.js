@@ -19,7 +19,7 @@
     1: { label: 'เสี่ยง', long: 'เสี่ยงน้ำท่วม' },
   };
   const SRC = {
-    sensor: 'เซ็นเซอร์ กทม.', itic: 'หน่วยงาน/iTIC', traffy: 'ประชาชนแจ้ง (Traffy)',
+    sensor: 'เซ็นเซอร์ กทม.', itic: 'หน่วยงาน/iTIC', web: 'ประชาชนปักหมุด', traffy: 'ประชาชนแจ้ง (Traffy)',
     news: 'ข่าว', youtube: 'คลิป YouTube', rain: 'ฝนหนัก', wl: 'ระดับน้ำสูง',
   };
   const tag = (tier) => `<span class="tag t${tier}">${TIER[tier].label}</span>`;
@@ -38,6 +38,10 @@
       out.push({ la: x.la, lo: x.lo, src: 'traffy', tier: 2, name: String(x.r.address || 'จุดที่ประชาชนแจ้ง').split(/\s+(?:แขวง|เขต)/)[0], detail: x.why, cm: x.cm || 0, t: x.t,
         link: `https://share.traffy.in.th/teamchadchart/${encodeURIComponent(x.r.ticket_id)}` });
     }
+    for (const x of D.web || []) {
+      out.push({ la: x.la, lo: x.lo, src: 'web', tier: 2, name: x.r.place || 'จุดที่ประชาชนปักหมุด', detail: `น้ำระดับ${x.r.level}${x.r.message ? ' · ' + x.r.message : ''}`, cm: 0, t: x.t,
+        link: 'log.html?report=' + encodeURIComponent(x.r.id) });
+    }
     for (const n of D.news || []) {
       if ((F.SEV_LV[n.severity] || 2) < 2) continue; // ข่าวเตือนภัย/น้ำลดแล้ว ไม่นับเป็นจุดน้ำท่วม
       for (const p of n.pins || []) if (p.precision === 'place') {
@@ -54,7 +58,7 @@
   }
 
   // ---------- 2) รวมสัญญาณที่อยู่ใกล้กันเป็นจุดเดียว ----------
-  const NAME_RANK = { sensor: 0, itic: 1, news: 2, youtube: 3, traffy: 4, wl: 5, rain: 6 };
+  const NAME_RANK = { sensor: 0, itic: 1, news: 2, youtube: 3, web: 4, traffy: 5, wl: 6, rain: 7 };
   function cluster(sig, geo) {
     const sorted = [...sig].sort((a, b) => b.tier - a.tier || (b.t || 0) - (a.t || 0));
     const cl = [];
@@ -220,10 +224,10 @@
       $('headline').innerHTML = `พบจุดน้ำท่วม <em>${n3 + n2}</em> จุด ใน <em>${flooded.length}</em> เขต`;
       $('subline').textContent = 'เขตที่น่าห่วง: ' + flooded.slice(0, 5).map((d) => 'เขต' + d.name).join(', ') + (flooded.length > 5 ? ` และอีก ${flooded.length - 5} เขต` : '');
     }
-    const ok = feeds.filter((f) => f.ok), bad = feeds.filter((f) => !f.ok);
+    const ok = feeds.filter((f) => f.ok), bad = feeds.filter((f) => !f.ok && !f.off);
     $('warn').hidden = !bad.length;
     $('warn').textContent = bad.length ? `ดึงข้อมูลไม่สำเร็จ ${bad.length} แหล่ง (${bad.map((f) => f.name).join(', ')}) ตัวเลขอาจน้อยกว่าความจริง` : '';
-    $('sources').textContent = `แหล่งข้อมูลที่ใช้ได้รอบนี้ ${ok.length}/${feeds.length}: ${ok.map((f) => f.name).join(', ')} · รายละเอียดดูที่หน้าแผนที่ละเอียด แท็บ "แหล่งข้อมูล"`;
+    $('sources').textContent = `แหล่งข้อมูลที่ใช้ได้รอบนี้ ${ok.length}/${feeds.filter((f) => !f.off).length}: ${ok.map((f) => f.name).join(', ')} · รายละเอียดดูที่หน้าแผนที่ละเอียด แท็บ "แหล่งข้อมูล"`;
   }
   function renderTop(clusters) {
     const top = clusters.filter((c) => c.tier >= 2).slice(0, 10);
@@ -266,7 +270,7 @@
 
   // ---------- โหลดทั้งหมด ----------
   const FEEDS = [['sensor', 'เซ็นเซอร์ กทม.', 'fetchSensors'], ['event', 'หน่วยงาน/iTIC', 'fetchEvents'], ['traffy', 'Traffy', 'fetchTraffy'],
-    ['rain', 'ฝน ThaiWater', 'fetchRain'], ['wl', 'ระดับน้ำ ThaiWater', 'fetchWl'], ['news', 'ข่าว', 'fetchNews']];
+    ['rain', 'ฝน ThaiWater', 'fetchRain'], ['wl', 'ระดับน้ำ ThaiWater', 'fetchWl'], ['news', 'ข่าว', 'fetchNews'], ['web', 'ประชาชนปักหมุด', 'fetchWebReports']];
   let last = 0;
   async function refresh() {
     last = Date.now();
@@ -274,7 +278,8 @@
     renderTmd();
     const [geo, ...res] = await Promise.all([F.loadDistricts().catch(() => null), ...FEEDS.map(([, , fn]) => F[fn]().catch((e) => ({ error: e })))]);
     const D = {}, feeds = [];
-    FEEDS.forEach(([k, name], i) => { const r = res[i]; D[k] = r.error ? null : r.items; feeds.push({ name, ok: !r.error }); });
+    // ระบบปักหมุดที่ยังไม่เปิดใช้ ไม่นับเป็นแหล่งที่ล้มเหลว
+    FEEDS.forEach(([k, name], i) => { const r = res[i]; D[k] = r.error ? null : r.items; feeds.push({ name, ok: !r.error, off: !!r.error && /ยังไม่ได้เปิด/.test(r.error.message) }); });
     const clusters = cluster(signals(D), geo);
     const dists = byDistrict(clusters, D.news);
     renderHeadline(clusters, dists, feeds);
