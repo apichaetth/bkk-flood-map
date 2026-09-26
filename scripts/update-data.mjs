@@ -308,10 +308,26 @@ async function updateTmd(meta) {
   }
 }
 
+// ---------- ตรวจระบบรับแจ้งจากประชาชน (Google Apps Script) ว่ายังตอบได้ ----------
+async function checkReports(meta) {
+  let ep = '';
+  try { ep = JSON.parse(await readFile(path.join(DATA, 'report-config.json'), 'utf8')).endpoint || ''; } catch { /* ไม่มีไฟล์ */ }
+  if (!ep) { meta.sources.reports = { ok: false, status: 'not-configured' }; return; }
+  try {
+    const d = JSON.parse(await fetchText(ep + '?action=list', {}, 30000));
+    if (!d.ok) throw new Error(d.error || 'ตอบกลับไม่ถูกต้อง');
+    meta.sources.reports = { ok: true, open: (d.reports || []).filter((r) => r.status === 'open').length };
+  } catch (e) {
+    log('reports endpoint failed:', e.message);
+    meta.sources.reports = { ok: false, error: e.message };
+  }
+}
+
 // ---------- main ----------
 await mkdir(DATA, { recursive: true });
 const meta = { updated: now.toISOString(), sources: {} };
 await updateNews(meta).catch((e) => { log('news failed:', e); meta.sources.news = { ok: false, error: e.message }; meta.sources.youtube ??= { ok: false, error: e.message }; });
 await updateTmd(meta);
+await checkReports(meta);
 await writeJSON('meta.json', meta);
 log('done', JSON.stringify(meta));
