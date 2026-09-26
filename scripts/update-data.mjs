@@ -373,19 +373,6 @@ async function updateCamsRadar(meta) {
   } catch (e) { log('radar failed:', e.message); meta.sources.radar = { ok: false, error: e.message }; }
 }
 
-// ---------- เซ็นเซอร์น้ำท่วมถนน กทม.: เบราว์เซอร์เรียกตรงไม่ได้ (เซิร์ฟเวอร์ไม่ส่ง CORS header) จึงดึงเก็บไว้ที่นี่ ----------
-async function updateBma(meta) {
-  const BMA = 'https://floodbangkok.bangkok.go.th/bkk/dds/services/api/floods/v1/items/';
-  try {
-    const sp = JSON.parse(await fetchText(BMA + 'sensor_profile?limit=-1&fields=id,code,name,road,district,lat,long', {}, 60000));
-    let nt;
-    try { nt = JSON.parse(await fetchText(BMA + 'flood_notification?limit=600&sort=-date_created&fields=sensor_profile,value,date_created&filter[date_created][_gte]=' + encodeURIComponent('$NOW(-3 hours)'), {}, 60000)); }
-    catch (e) { nt = JSON.parse(await fetchText(BMA + 'flood_notification?limit=600&sort=-date_created&fields=sensor_profile,value,date_created', {}, 60000)); }
-    await writeJSON('bma.json', { updated: now.toISOString(), sp: { data: sp.data || [] }, nt: { data: nt.data || [] } });
-    meta.sources.bma = { ok: true, sensors: (sp.data || []).length, readings: (nt.data || []).length };
-  } catch (e) { log('bma failed:', e.message); meta.sources.bma = { ok: false, error: e.message }; }
-}
-
 // ---------- ThaiWater: เขื่อนลุ่มเจ้าพระยา + พยากรณ์ฝน (thailand_main ไฟล์ใหญ่ ~8 MB จึงดึงที่นี่ ไม่ให้เบราว์เซอร์โหลด) ----------
 const CPY_DAMS = ['ภูมิพล', 'สิริกิติ์', 'แควน้อยบำรุงแดน', 'ป่าสักชลสิทธิ์', 'ทับเสลา', 'กระเสียว'];
 async function updateThaiwater(meta) {
@@ -536,7 +523,6 @@ await checkReports(meta);
 await updateTraffy(meta);
 await updateCamsRadar(meta);
 await updateThaiwater(meta);
-await updateBma(meta);
 await updateRisk(meta).catch((e) => { log('risk failed:', e); meta.sources.risk = { ok: false, error: e.message }; });
 await writeJSON('meta.json', meta);
 log('done', JSON.stringify(meta));

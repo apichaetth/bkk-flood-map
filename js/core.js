@@ -115,12 +115,8 @@ window.Flood = (function () {
 
   // 1) เซ็นเซอร์น้ำท่วมถนน กทม.
   async function fetchSensors() {
-    // เซิร์ฟเวอร์ กทม. ไม่อนุญาตให้เว็บอื่นเรียกตรง (CORS) จึงใช้ไฟล์ที่ GitHub Actions ดึงไว้ทุก 15 นาทีก่อน
+    // เรียกตรงจากเบราว์เซอร์ (เซิร์ฟเวอร์ กทม. ปฏิเสธเครื่องนอกประเทศ จึงสำรองผ่าน GitHub Actions ไม่ได้)
     let sp = null, nt = null;
-    try {
-      const f = await getJSON('data/bma.json', 20000, { cache: 'no-cache' });
-      if (f.updated && Date.now() - new Date(f.updated) < 40 * 60000) { sp = f.sp; nt = f.nt; }
-    } catch (e) { /* ไม่มีไฟล์ */ }
     if (!sp) {
       // ตำแหน่งเซ็นเซอร์แทบไม่เปลี่ยน: เก็บไว้ในเบราว์เซอร์ 24 ชม. ลดการเรียกซ้ำ
       const c = store.get(SENSOR_CACHE);

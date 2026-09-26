@@ -88,9 +88,15 @@
         : st === 'loading' ? 'กำลังโหลด…' : st === 'off' ? 'ยังไม่เปิดใช้ – ' + esc(f.msg || '') : 'ใช้งานไม่ได้ขณะนี้ – ' + esc(f.msg || '');
       return `<div class="feed ${st}"><span class="st"></span><div><a href="${f.link}" target="_blank" rel="noopener">${esc(f.name)}</a><div class="fs">${s}${f.note ? ' · ' + esc(f.note) : ''}</div></div></div>`;
     }).join('');
-    const failed = Object.entries(FEEDS).filter(([k, f]) => f.status === 'fail' && k !== 'radar' && k !== 'cam' && !(k === 'web' && /ยังไม่ได้เปิด/.test(f.msg || ''))).map(([, f]) => f);
-    $('warn').hidden = !failed.length;
-    $('warn').textContent = failed.length ? `ดึงข้อมูลไม่สำเร็จ ${failed.length} แหล่ง (${failed.map((f) => f.name.split(' – ')[0]).join(', ')}) ตัวเลขอาจไม่ครบ – ดูแท็บ "แหล่งข้อมูล"` : '';
+    const failed = Object.entries(FEEDS).filter(([k, f]) => f.status === 'fail' && k !== 'radar' && k !== 'cam' && k !== 'sensor' && !(k === 'web' && /ยังไม่ได้เปิด/.test(f.msg || ''))).map(([, f]) => f);
+    // เซ็นเซอร์ กทม. ล่มบ่อยช่วงฝนหนัก (ปัญหาที่เซิร์ฟเวอร์ต้นทาง) แจ้งแยกแบบไม่ตกใจ
+    const bmaDown = FEEDS.sensor.status === 'fail';
+    const lines = [];
+    if (failed.length) lines.push(`ดึงข้อมูลไม่สำเร็จ ${failed.length} แหล่ง (${failed.map((f) => f.name.split(' – ')[0]).join(', ')}) ตัวเลขอาจไม่ครบ – ดูแท็บ "แหล่งข้อมูล"`);
+    if (bmaDown) lines.push('ระบบเซ็นเซอร์ของ กทม. ไม่ตอบสนองขณะนี้ (ปัญหาที่ต้นทาง) ใช้ข้อมูลแหล่งอื่นแทน');
+    $('warn').hidden = !lines.length;
+    $('warn').classList.toggle('soft', !failed.length);
+    $('warn').textContent = lines.join(' · ');
   }
 
   const S = {};

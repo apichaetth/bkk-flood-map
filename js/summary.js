@@ -298,9 +298,15 @@
       $('headline').innerHTML = `พบจุดน้ำท่วม <em>${n3 + n2}</em> จุด ใน <em>${flooded.length}</em> เขต`;
       $('subline').textContent = 'เขตที่น่าห่วง: ' + flooded.slice(0, 5).map((d) => 'เขต' + d.name).join(', ') + (flooded.length > 5 ? ` และอีก ${flooded.length - 5} เขต` : '');
     }
-    const ok = feeds.filter((f) => f.ok), bad = feeds.filter((f) => !f.ok && !f.off && !f.pending);
-    $('warn').hidden = !bad.length;
-    $('warn').textContent = bad.length ? `ดึงข้อมูลไม่สำเร็จ ${bad.length} แหล่ง (${bad.map((f) => f.name).join(', ')}) ตัวเลขอาจน้อยกว่าความจริง` : '';
+    const ok = feeds.filter((f) => f.ok), down = feeds.filter((f) => !f.ok && !f.off && !f.pending);
+    // เซ็นเซอร์ กทม. ล่มบ่อยช่วงฝนหนัก (ปัญหาที่เซิร์ฟเวอร์ต้นทาง) แจ้งแยกแบบไม่ตกใจ
+    const bma = down.find((f) => f.key === 'sensor'), bad = down.filter((f) => f.key !== 'sensor');
+    const msg = [];
+    if (bad.length) msg.push(`ดึงข้อมูลไม่สำเร็จ ${bad.length} แหล่ง (${bad.map((f) => f.name).join(', ')}) ตัวเลขอาจน้อยกว่าความจริง`);
+    if (bma) msg.push('ระบบเซ็นเซอร์ของ กทม. ไม่ตอบสนองขณะนี้ (ปัญหาที่ต้นทาง มักเกิดช่วงฝนหนัก) ใช้ข้อมูลจากแหล่งอื่นแทน จะลองใหม่ทุก 15 นาที');
+    $('warn').hidden = !msg.length;
+    $('warn').classList.toggle('soft', !bad.length);
+    $('warn').textContent = msg.join(' · ');
     $('sources').textContent = `แหล่งข้อมูลที่ใช้ได้รอบนี้ ${ok.length}/${feeds.filter((f) => !f.off).length}: ${ok.map((f) => f.name).join(', ')} · รายละเอียดดูที่หน้าแผนที่ละเอียด แท็บ "แหล่งข้อมูล"`;
   }
   // แสดง 3 จุดแรกก่อน กด "ดูทั้ง 10 จุด" เพื่อขยาย
@@ -407,7 +413,7 @@
     const geo = await F.loadDistricts().catch(() => null);
     drawDistricts(geo, []);
     const D = {};
-    const feeds = FEEDS.map(([, name]) => ({ name, ok: false, pending: true }));
+    const feeds = FEEDS.map(([key, name]) => ({ key, name, ok: false, pending: true }));
     let timer = null;
     const render = (final) => {
       if (my !== gen) return; // มีรอบใหม่เริ่มแล้ว
