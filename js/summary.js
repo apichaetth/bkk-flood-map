@@ -206,12 +206,13 @@
         <a href="${mapLink(c)}">ดูบนแผนที่ละเอียด →</a></div>`;
       if (c.tier === 1) {
         const r = Math.max(...c.members.map((m) => m.radius || 250));
-        L.circle([c.la, c.lo], { radius: r, color: red[3], weight: 1.5, dashArray: '5 5', fillColor: red[3], fillOpacity: 0.1 }).bindPopup(popup).addTo(lyr.risk);
+        // มือถือเห็นทั้งเมืองในจอเล็ก วงรัศมีเป็นเมตรจึงดูใหญ่ ย่อครึ่งหนึ่ง
+        L.circle([c.la, c.lo], { radius: r * F.MS, color: red[3], weight: F.MS < 1 ? 1 : 1.5, dashArray: F.MS < 1 ? '3 3' : '5 5', fillColor: red[3], fillOpacity: 0.1 }).bindPopup(popup).addTo(lyr.risk);
       } else {
         // หมุดที่ประชาชนปักอย่างเดียว วาดโดย report.js (มีปุ่มน้ำลดแล้ว) ไม่ต้องวาดซ้ำ
         if (c.sources.length === 1 && c.sources[0] === 'web' && c.members.every((m) => m.src === 'web' || m.tier === 1)) continue;
         // บริเวณรอบจุด (เผื่อไม่มีข้อมูลถนน) + จุด
-        L.circle([c.la, c.lo], { radius: 120, stroke: false, fillColor: red[3], fillOpacity: c.tier === 3 ? 0.18 : 0.12, interactive: false }).addTo(lyr.areas);
+        L.circle([c.la, c.lo], { radius: 120 * F.MS, stroke: false, fillColor: red[3], fillOpacity: c.tier === 3 ? 0.18 : 0.12, interactive: false }).addTo(lyr.areas);
         L.circleMarker([c.la, c.lo], { radius: c.tier === 3 ? 9 : 7, color: '#fff', weight: 2, fillColor: red[c.tier], fillOpacity: 1 }).bindPopup(popup).addTo(lyr.spots);
       }
     }

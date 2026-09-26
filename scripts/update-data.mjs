@@ -390,14 +390,16 @@ async function updateCamsRadar(meta) {
 
 // ---------- กรมอุตุฯ พยากรณ์ฝนรายชั่วโมงรายเขต (NWP API ใช้ token ใน secret TMD_TOKEN) ----------
 async function updateTmdForecast(meta) {
-  const token = process.env.TMD_TOKEN;
+  const token = (process.env.TMD_TOKEN || '').trim();
   if (!token) { meta.sources.tmdFcst = { ok: false, status: 'no-key' }; return; }
   const API = 'https://data.tmd.go.th/nwpapi/v1/forecast/';
   const hdr = { accept: 'application/json', authorization: 'Bearer ' + token };
   // เวลาเริ่ม = ชั่วโมงปัจจุบันตามเวลาไทย
   const bkk = new Date(now.getTime() + 7 * 36e5);
   const start = bkk.toISOString().slice(0, 13) + ':00:00';
+  const end = new Date(bkk.getTime() + 23 * 36e5).toISOString().slice(0, 13) + ':00:00';
   const tries = [
+    `area/place?domain=2&province=${encodeURIComponent('กรุงเทพมหานคร')}&fields=rain,cond,tc&starttime=${start}&endtime=${end}`,
     `area/place?domain=2&province=${encodeURIComponent('กรุงเทพมหานคร')}&fields=rain,cond,tc&starttime=${start}&duration=24`,
     `area/place?domain=2&province=${encodeURIComponent('กรุงเทพมหานคร')}&fields=rain,cond,tc&starttime=${start}`,
     `location/hourly/at?lat=13.75&lon=100.5&fields=rain,cond,tc&duration=24`,
