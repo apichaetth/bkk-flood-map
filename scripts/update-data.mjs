@@ -155,10 +155,10 @@ ${batch.map((n) => JSON.stringify({ id: n.id, title: n.title, snippet: n.snippet
     generationConfig: { temperature: 0.1, responseMimeType: 'application/json' },
   });
   // free tier มักตอบ 503 (โมเดลคนใช้เยอะ) หรือ 429 (เกินโควต้าต่อนาที): ลองซ้ำ แล้วสลับไปรุ่นสำรอง
-  const models = [...new Set([model, 'gemini-2.5-flash', 'gemini-flash-lite-latest'])];
+  const models = [...new Set([model, 'gemini-flash-lite-latest'])];
   let text = null, lastErr = null;
   for (const m of models) {
-    for (let attempt = 0; attempt < 3 && !text; attempt++) {
+    for (let attempt = 0; attempt < 2 && !text; attempt++) {
       try {
         text = await fetchText(`https://generativelanguage.googleapis.com/v1beta/models/${m}:generateContent`, {
           method: 'POST', headers: { 'Content-Type': 'application/json', 'x-goog-api-key': key }, body,
