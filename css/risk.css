@@ -18,3 +18,8 @@
 .rk-eval th, .rk-eval td { text-align: left; padding: 6px 4px; border-bottom: 1px solid var(--line); }
 .rk-eval td.n { text-align: right; font-variant-numeric: tabular-nums; }
 @media (max-width: 860px) { .rk-kpis { grid-template-columns: repeat(2, 1fr); } #rmap { height: 62vh; } }
+
+.rk-mapwrap { position: relative; }
+.rk-status { position: absolute; left: 50%; top: 10px; transform: translateX(-50%); z-index: 500; margin: 0; max-width: calc(100% - 90px);
+  background: var(--surface); color: var(--ink); border: 1px solid var(--line); border-radius: 999px; padding: 5px 14px; font-size: 13px; box-shadow: 0 2px 8px rgba(0,0,0,.15); }
+.rk-status[hidden] { display: none; }

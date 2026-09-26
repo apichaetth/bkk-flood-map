@@ -63,17 +63,38 @@
       <p class="small" style="margin-top:8px">รายงานน้ำท่วมใหม่ที่เกิดขึ้น <b>${a.recall.newReports}</b> ครั้ง อยู่บนถนนที่ทายไว้ล่วงหน้า <b>${a.recall.caught}</b> ครั้ง (${a.recall.pct != null ? a.recall.pct + '%' : '–'})</p></div>`
       : '<p class="muted">ต้องรอผลการทายอย่างน้อย 3 ชม. แรกก่อน จึงจะเริ่มวัดความแม่นได้</p>';
   }
+  // แสดงผลทันที: (1) ผลรอบก่อนที่เก็บในเครื่อง (2) ไฟล์เล็กเฉพาะระดับกลาง/สูง (3) ไฟล์เต็ม
+  const CACHE = 'risk-lite-cache';
+  const status = $('rkStatus');
+  const note = (t) => { status.textContent = t; status.hidden = !t; };
+  function show1(d, label) {
+    data = d; draw(); renderSide();
+    const src = d.sources || {};
+    const bad = Object.entries(src).filter(([, v]) => typeof v === 'string' && v.startsWith('error')).map(([k]) => k);
+    $('updated').textContent = `คำนวณเมื่อ ${fmtDT(new Date(d.updated))} · จากถนน ${d.roadSegments.toLocaleString()} ช่วง${bad.length ? ` · ข้อมูลบางแหล่งใช้ไม่ได้รอบนี้: ${bad.join(', ')}` : ''} · อัปเดตทุก 15 นาที`;
+    note(label);
+  }
+  let loading = false;
   async function load() {
-    $('updated').textContent = 'กำลังโหลด…';
-    try {
-      data = await F.getJSON('data/risk-roads.json?t=' + Date.now(), 45000);
-      draw(); renderSide();
-      const src = data.sources || {};
-      const bad = Object.entries(src).filter(([, v]) => typeof v === 'string' && v.startsWith('error')).map(([k]) => k);
-      $('updated').textContent = `คำนวณเมื่อ ${fmtDT(new Date(data.updated))} · จากถนน ${data.roadSegments.toLocaleString()} ช่วง${bad.length ? ` · ข้อมูลบางแหล่งใช้ไม่ได้รอบนี้: ${bad.join(', ')}` : ''} · อัปเดตทุก 15 นาที`;
-    } catch (e) {
-      $('updated').textContent = 'ยังไม่มีผลการคำนวณ (' + e.message + ') ระบบจะคำนวณในรอบอัปเดตถัดไป';
+    if (loading) return;
+    loading = true;
+    if (!data) {
+      const c = F.store.get(CACHE);
+      if (c && c.segments) show1(c, `แสดงผลรอบก่อน (${fmtDT(new Date(c.updated))}) ระหว่างโหลดข้อมูลล่าสุด…`);
+      else note('กำลังโหลดข้อมูลถนนเสี่ยง…');
     }
+    try {
+      const lite = await F.getJSON('data/risk-lite.json?t=' + Date.now(), 45000).catch(() => null);
+      if (lite && (!data || new Date(lite.updated) >= new Date(data.updated))) {
+        show1(lite, 'แสดงระดับกลาง/สูงแล้ว กำลังโหลดระดับเฝ้าระวัง…');
+        F.store.set(CACHE, lite);
+      }
+      const full = await F.getJSON('data/risk-roads.json?t=' + Date.now(), 60000);
+      show1(full, '');
+    } catch (e) {
+      if (data) note('โหลดข้อมูลล่าสุดไม่สำเร็จ (' + e.message + ') กำลังแสดงผลรอบก่อน จะลองใหม่อัตโนมัติ');
+      else { note(''); $('updated').textContent = 'ยังไม่มีผลการคำนวณ (' + e.message + ') ระบบจะคำนวณในรอบอัปเดตถัดไป'; }
+    } finally { loading = false; }
   }
   document.querySelectorAll('.rk-filter input').forEach((i) => i.onchange = () => { show[i.dataset.t] = i.checked; draw(); });
   $('refresh').onclick = load;
