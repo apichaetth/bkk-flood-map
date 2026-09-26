@@ -1,4 +1,4 @@
 {
   "note": "ใส่ URL ของ Google Apps Script Web App (ลงท้ายด้วย /exec) ที่ endpoint เพื่อเปิดระบบให้ประชาชนแจ้งน้ำท่วม ดูวิธีใน apps-script/README.md",
-  "endpoint": "https://script.google.com/macros/s/AKfycbw5ET3mN2UAUOgVbAxB6Wsy6L-pjZmPkVKhN1yvnx7FWA1gNPXB9e2g2iB4MY7Xn2V-ig/exec"
+  "endpoint": "https://script.google.com/macros/s/AKfycbwXWLyd70tEb7OruFxJKMX6FfHq1BDse64eByx62w48BypIUKwCvQi6btakSFVqtopk/exec"
 }
