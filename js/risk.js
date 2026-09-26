@@ -8,7 +8,8 @@
   const show = { 1: true, 2: true, 3: true };
   let data = null, fitted = false;
 
-  const map = L.map('rmap', { scrollWheelZoom: false, minZoom: 9, maxZoom: 18 }).setView([13.75, 100.56], 11);
+  // วาดด้วย canvas: ถนนหลายพันช่วง SVG จะช้ามาก
+  const map = L.map('rmap', { scrollWheelZoom: false, minZoom: 9, maxZoom: 18, preferCanvas: true, renderer: L.canvas({ tolerance: 6 }) }).setView([13.75, 100.56], 11);
   L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png', { maxZoom: 19, className: 'basemap', attribution: '© <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors' }).addTo(map);
   F.addLocate(map, () => { fitted = true; });
   const layer = L.layerGroup().addTo(map);
@@ -19,13 +20,15 @@
     const col = COLOR();
     // ระดับต่ำวาดก่อน ให้ระดับสูงอยู่ด้านบน
     const segs = data.segments.filter((s) => show[s.tier]).sort((a, b) => a.tier - b.tier);
-    for (const s of segs) {
-      const pop = `<div class="pp"><span class="badge" style="--c:${col[s.tier]}">${NAME[s.tier]}</span> <span class="m">คะแนน ${(s.score * 100).toFixed(0)}/100</span>
+    // เส้นขอบขาวเฉพาะระดับกลาง/สูง ส่วนป๊อปอัปสร้างตอนกดเท่านั้น
+    const pop = (s) => `<div class="pp"><span class="badge" style="--c:${col[s.tier]}">${NAME[s.tier]}</span> <span class="m">คะแนน ${(s.score * 100).toFixed(0)}/100</span>
         <h3>${esc(s.name || 'ถนนไม่มีชื่อ')}</h3><div class="m">เขต${esc(s.district)}</div>
-        <ul class="plist">${s.why.map((w) => `<li>${esc(w)}</li>`).join('') || '<li>คะแนนรวมจากหลายปัจจัยเล็กน้อย</li>'}</ul>
+        <ul class="plist">${(s.why || []).map((w) => `<li>${esc(w)}</li>`).join('') || '<li>คะแนนรวมจากหลายปัจจัยเล็กน้อย</li>'}</ul>
         <div class="m">ประมาณการ ไม่ใช่การยืนยัน</div></div>`;
-      L.polyline(s.c, { color: '#fff', weight: s.tier === 3 ? 11 : 9, opacity: 0.85, lineCap: 'round', interactive: false }).addTo(layer);
-      L.polyline(s.c, { color: col[s.tier], weight: s.tier === 3 ? 7 : s.tier === 2 ? 6 : 5, opacity: 1, dashArray: s.tier === 1 ? '8 6' : null, lineCap: 'round' }).bindPopup(pop, { maxWidth: 320 }).addTo(layer);
+    for (const s of segs) {
+      if (s.tier > 1) L.polyline(s.c, { color: '#fff', weight: s.tier === 3 ? 11 : 9, opacity: 0.85, lineCap: 'round', interactive: false }).addTo(layer);
+      L.polyline(s.c, { color: col[s.tier], weight: s.tier === 3 ? 7 : s.tier === 2 ? 6 : 4, opacity: s.tier === 1 ? 0.8 : 1, dashArray: s.tier === 1 ? '8 6' : null, lineCap: 'round' })
+        .bindPopup(() => pop(s), { maxWidth: 320 }).addTo(layer);
     }
     if (!fitted && segs.length) { map.fitBounds(L.latLngBounds(segs.flatMap((s) => s.c)).pad(0.1), { maxZoom: 14 }); fitted = true; }
   }

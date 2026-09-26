@@ -42,8 +42,11 @@ const log = (...a) => console.log('[update]', ...a);
 async function readJSON(file, fallback) {
   try { return JSON.parse(await readFile(path.join(DATA, file), 'utf8')); } catch { return fallback; }
 }
+// เขียนแบบไม่เว้นบรรทัด: ไฟล์ที่มีพิกัดจำนวนมาก (เช่น risk-roads.json) เล็กลงหลายเท่า เบราว์เซอร์โหลดเร็วขึ้น
 async function writeJSON(file, obj) {
-  await writeFile(path.join(DATA, file), JSON.stringify(obj, null, 1) + '\n');
+  const text = JSON.stringify(obj) + '\n';
+  await writeFile(path.join(DATA, file), text);
+  if (text.length > 300000) log(`${file}: ${(Buffer.byteLength(text) / 1e6).toFixed(2)} MB`);
 }
 async function fetchText(url, opts = {}, ms = 30000) {
   const ctl = new AbortController();
@@ -448,7 +451,7 @@ async function updateRisk(meta) {
   const accuracy = evaluate(hist, roads, evalReports, now.getTime());
   const counts = { 3: 0, 2: 0, 1: 0 };
   segs.forEach((s) => counts[s.tier]++);
-  await writeJSON('risk-roads.json', { updated: now.toISOString(), roadSegments: roads.segments.length, sources: src, counts, accuracy, params: RISK_PARAMS, segments: segs.slice(0, 2500) });
+  await writeJSON('risk-roads.json', { updated: now.toISOString(), roadSegments: roads.segments.length, sources: src, counts, accuracy, params: RISK_PARAMS, segments: segs.slice(0, 2500).map((x) => ({ name: x.name, district: x.district, c: x.c, la: x.la, lo: x.lo, score: x.score, tier: x.tier, why: x.why })) });
   meta.sources.risk = { ok: true, segments: segs.length, counts, sources: src };
 }
 
