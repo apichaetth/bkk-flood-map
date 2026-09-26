@@ -16,13 +16,21 @@
   try { const v = JSON.parse(localStorage.getItem('bkkflood.traffyFilter') || 'null'); if (v) { fTime = v.t || fTime; fState = v.s || fState; } } catch (e) { /* ใช้ค่าเริ่มต้น */ }
 
   // ---------- ดึงข้อมูล ----------
+  let rawCount = 0, source = '';
   async function fetchAll() {
-    // ลองให้ API กรองประเภทน้ำท่วมมาให้ (ถ้า API ไม่รองรับพารามิเตอร์นี้ จะได้ข้อมูลรวมทุกประเภทแล้วกรองเองด้านล่าง)
-    let d = null;
-    for (const url of [API + '?type=' + encodeURIComponent('น้ำท่วม') + '&limit=1000', API + '?limit=1000', API + '?limit=500']) {
-      try { d = await F.getJSON(url, 90000); if (Array.isArray(d.results)) break; } catch (e) { d = null; }
+    // ใช้วิธีเดียวกับหน้าหลัก (ไม่ใช้พารามิเตอร์กรองที่ไม่มีเอกสารยืนยัน) ถ้า 1000 ช้า/ล้มเหลว ลด 500
+    let d = null, lastErr = null;
+    for (const lim of [1000, 500]) {
+      $('updated').textContent = `กำลังโหลดจาก Traffy Fondue (${lim} เรื่องล่าสุด)…`;
+      try {
+        d = await F.getJSON(API + '?limit=' + lim, 60000);
+        if (Array.isArray(d.results) && d.results.length) { source = `${lim} เรื่องล่าสุด`; break; }
+        lastErr = new Error('Traffy ส่งข้อมูลว่างกลับมา');
+      } catch (e) { lastErr = e; }
+      d = null;
     }
-    if (!d || !Array.isArray(d.results)) throw new Error('ดึงข้อมูลจาก Traffy ไม่ได้');
+    if (!d) throw lastErr || new Error('ดึงข้อมูลจาก Traffy ไม่ได้');
+    rawCount = d.results.length;
     const times = d.results.map((r) => isoDate(r.timestamp)).filter(Boolean);
     oldest = times.length ? new Date(Math.min(...times)) : null;
     return d.results
@@ -134,7 +142,7 @@
           <p class="muted small">${esc(r.address || '')}${x.district ? ` · เขต${esc(x.district)}` : ''}</p>
           <div class="small"><a href="#" data-go="${x.la},${x.lo}">ดูบนแผนที่</a> · <a href="https://share.traffy.in.th/teamchadchart/${encodeURIComponent(r.ticket_id)}" target="_blank" rel="noopener">เปิดใน Traffy</a></div>
         </div></article>`;
-    }).join('') : '<p class="muted">ไม่มีเรื่องแจ้งน้ำท่วมในช่วงเวลาและสถานะที่เลือก</p>';
+    }).join('') : `<p class="muted">ไม่มีเรื่องแจ้งน้ำท่วมในช่วงเวลาและสถานะที่เลือก${all.length ? ` (ทั้งหมดที่ดึงได้มี ${all.length} เรื่อง ลองเลือกช่วงเวลาให้ยาวขึ้น)` : rawCount ? ` (จาก ${rawCount} เรื่องล่าสุดใน Traffy ยังไม่มีเรื่องน้ำท่วม)` : ''}</p>`;
     $('more').hidden = list.length <= shown;
     $('list').querySelectorAll('[data-go]').forEach((a) => a.onclick = (e) => {
       e.preventDefault();
@@ -177,7 +185,7 @@
     try {
       [geo, all] = await Promise.all([F.loadDistricts().catch(() => null), fetchAll()]);
       render();
-      $('updated').textContent = `อัปเดต ${fmtDT(new Date())} · พบเรื่องน้ำท่วม ${all.length} เรื่อง · รีเฟรชอัตโนมัติทุก 15 นาที`;
+      $('updated').textContent = `อัปเดต ${fmtDT(new Date())} · ดึงจาก Traffy ${rawCount} เรื่อง เป็นเรื่องน้ำท่วม ${all.length} เรื่อง · รีเฟรชทุก 15 นาที`;
     } catch (e) {
       $('updated').textContent = 'โหลดไม่สำเร็จ: ' + e.message;
       $('list').innerHTML = `<p>ดึงข้อมูลจาก Traffy ไม่สำเร็จ (${esc(e.message)}) กด รีเฟรช เพื่อลองใหม่</p>`;
