@@ -232,14 +232,18 @@
     $('nConfirmed').textContent = n3; $('nReported').textContent = n2; $('nRisk').textContent = n1; $('nDistricts').textContent = flooded.length;
     const hero = document.querySelector('.hero');
     hero.dataset.level = n3 ? 3 : n2 ? 2 : n1 ? 1 : 0;
-    if (!n3 && !n2) {
+    const pending = feeds.filter((f) => f.pending).length;
+    if (!n3 && !n2 && pending) {
+      $('headline').textContent = n1 ? `พบพื้นที่เสี่ยง ${n1} จุด กำลังโหลดข้อมูลเพิ่ม…` : 'กำลังโหลดข้อมูล…';
+      $('subline').textContent = `โหลดแล้ว ${feeds.length - pending}/${feeds.length} แหล่ง`;
+    } else if (!n3 && !n2) {
       $('headline').textContent = n1 ? `ยังไม่พบรายงานน้ำท่วม แต่มี ${n1} พื้นที่เสี่ยง` : 'ขณะนี้ยังไม่พบรายงานน้ำท่วมใน กทม.';
       $('subline').textContent = n1 ? 'มีฝนตกหนักหรือระดับน้ำในคลองสูง โปรดติดตามสถานการณ์' : 'ข้อมูลจากทุกแหล่งยังไม่มีรายงานน้ำท่วมบนถนน';
     } else {
       $('headline').innerHTML = `พบจุดน้ำท่วม <em>${n3 + n2}</em> จุด ใน <em>${flooded.length}</em> เขต`;
       $('subline').textContent = 'เขตที่น่าห่วง: ' + flooded.slice(0, 5).map((d) => 'เขต' + d.name).join(', ') + (flooded.length > 5 ? ` และอีก ${flooded.length - 5} เขต` : '');
     }
-    const ok = feeds.filter((f) => f.ok), bad = feeds.filter((f) => !f.ok && !f.off);
+    const ok = feeds.filter((f) => f.ok), bad = feeds.filter((f) => !f.ok && !f.off && !f.pending);
     $('warn').hidden = !bad.length;
     $('warn').textContent = bad.length ? `ดึงข้อมูลไม่สำเร็จ ${bad.length} แหล่ง (${bad.map((f) => f.name).join(', ')}) ตัวเลขอาจน้อยกว่าความจริง` : '';
     $('sources').textContent = `แหล่งข้อมูลที่ใช้ได้รอบนี้ ${ok.length}/${feeds.filter((f) => !f.off).length}: ${ok.map((f) => f.name).join(', ')} · รายละเอียดดูที่หน้าแผนที่ละเอียด แท็บ "แหล่งข้อมูล"`;
@@ -287,27 +291,45 @@
   // ---------- โหลดทั้งหมด ----------
   const FEEDS = [['sensor', 'เซ็นเซอร์ กทม.', 'fetchSensors'], ['event', 'หน่วยงาน/iTIC', 'fetchEvents'], ['traffy', 'Traffy', 'fetchTraffy'],
     ['rain', 'ฝน ThaiWater', 'fetchRain'], ['wl', 'ระดับน้ำ ThaiWater', 'fetchWl'], ['news', 'ข่าว', 'fetchNews'], ['web', 'ประชาชนปักหมุด', 'fetchWebReports']];
-  let last = 0;
+  let last = 0, gen = 0;
+  // แสดงผลทันทีที่แต่ละแหล่งโหลดเสร็จ ไม่ต้องรอแหล่งที่ช้าที่สุด (บางแหล่งใช้เวลานานถึง 1–2 นาที)
   async function refresh() {
+    const my = ++gen;
     last = Date.now();
     $('updated').textContent = 'กำลังอัปเดต…';
     renderTmd();
-    const [geo, ...res] = await Promise.all([F.loadDistricts().catch(() => null), ...FEEDS.map(([, , fn]) => F[fn]().catch((e) => ({ error: e })))]);
-    const D = {}, feeds = [];
-    // ระบบปักหมุดที่ยังไม่เปิดใช้ ไม่นับเป็นแหล่งที่ล้มเหลว
-    FEEDS.forEach(([k, name], i) => { const r = res[i]; D[k] = r.error ? null : r.items; feeds.push({ name, ok: !r.error, off: !!r.error && /ยังไม่ได้เปิด/.test(r.error.message) }); });
-    const clusters = cluster(signals(D), geo);
-    const dists = byDistrict(clusters, D.news);
-    renderHeadline(clusters, dists, feeds);
-    drawDistricts(geo, dists);
-    drawSpots(clusters);
-    renderTop(clusters);
-    renderDistricts(dists);
-    renderSpots(clusters);
-    $('asof').textContent = `ข้อมูล ณ ${fmtDT(new Date(last))}`;
-    $('updated').textContent = `อัปเดต ${fmtTime(new Date(last))} · รีเฟรชอัตโนมัติทุก 15 นาที`;
-    fitToSpots(clusters);
-    drawRoads(clusters);
+    const geo = await F.loadDistricts().catch(() => null);
+    drawDistricts(geo, []);
+    const D = {};
+    const feeds = FEEDS.map(([, name]) => ({ name, ok: false, pending: true }));
+    let timer = null;
+    const render = (final) => {
+      if (my !== gen) return; // มีรอบใหม่เริ่มแล้ว
+      try {
+        const clusters = cluster(signals(D), geo);
+        const dists = byDistrict(clusters, D.news);
+        renderHeadline(clusters, dists, feeds);
+        drawSpots(clusters);
+        renderTop(clusters);
+        renderDistricts(dists);
+        renderSpots(clusters);
+        fitToSpots(clusters);
+        const waiting = feeds.filter((f) => f.pending).map((f) => f.name);
+        $('asof').textContent = `ข้อมูล ณ ${fmtDT(new Date(last))}`;
+        $('updated').textContent = waiting.length ? `กำลังโหลด: ${waiting.join(', ')}…` : `อัปเดต ${fmtTime(new Date(last))} · รีเฟรชอัตโนมัติทุก 15 นาที`;
+        if (final) drawRoads(clusters);
+      } catch (e) {
+        console.error(e);
+        $('headline').textContent = 'แสดงผลไม่สำเร็จ: ' + e.message;
+      }
+    };
+    await Promise.all(FEEDS.map(([k, , fn], i) => F[fn]()
+      .then((r) => { D[k] = r.items; feeds[i].ok = true; })
+      // ระบบปักหมุดที่ยังไม่เปิดใช้ ไม่นับเป็นแหล่งที่ล้มเหลว
+      .catch((e) => { D[k] = null; feeds[i].off = /ยังไม่ได้เปิด/.test(e.message); })
+      .finally(() => { feeds[i].pending = false; clearTimeout(timer); timer = setTimeout(() => render(false), 150); })));
+    clearTimeout(timer);
+    render(true);
   }
   // ซูมให้เห็นจุดน้ำท่วมทั้งหมด (ถนนสีแดงจะเห็นชัดขึ้น) เว้นแต่ผู้ใช้เลื่อนแผนที่เองแล้ว
   let userMoved = false;

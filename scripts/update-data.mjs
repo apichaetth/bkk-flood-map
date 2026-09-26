@@ -294,7 +294,10 @@ async function updateTmd(meta) {
   const url = `https://data.tmd.go.th/api/WeatherWarningNews/v2/?uid=${encodeURIComponent(uid)}&ukey=${encodeURIComponent(ukey)}&format=json`;
   try {
     const json = JSON.parse(await fetchText(url, {}, 30000));
-    const items = findRecords(json).map((r) => ({
+    // ข้ามส่วนหัวของ feed (เช่น "Thailand Weather and Climate News") ที่ไม่มีเนื้อหาประกาศ
+    const records = findRecords(json).filter((r) => Object.keys(r).some((k) => /desc/i.test(k) && String(r[k] || '').trim())
+      && !/weather and climate news/i.test(pickField(r, /title/i)));
+    const items = records.map((r) => ({
       title: stripTags(pickField(r, /^title.*th|^titlethai$/i) || pickField(r, /title/i)),
       description: stripTags(pickField(r, /^desc.*th|^descriptionthai$/i) || pickField(r, /desc/i)).slice(0, 1200),
       announced: pickField(r, /announce|date|time/i),
