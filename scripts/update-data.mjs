@@ -5,6 +5,7 @@
 // env ที่ใช้ได้ (ตั้งเป็น GitHub Secrets):
 //   GEMINI_API_KEY  – key ฟรีจาก https://aistudio.google.com/apikey (ไม่มีก็ทำงานได้ แต่ไม่มีสรุปด้วย AI)
 //   GEMINI_MODEL    – ค่าเริ่มต้น gemini-flash-latest
+//   TMD_TOKEN       – token ของ TMD NWP API (data.tmd.go.th/nwpapi) สำหรับพยากรณ์ฝนรายชั่วโมงรายเขต
 //   TMD_UID, TMD_UKEY – key กรมอุตุฯ จาก https://data.tmd.go.th/api/index1.php (ไม่มีจะใช้ demo)
 //   YOUTUBE_API_KEY – key ฟรีจาก Google Cloud (YouTube Data API v3) ไม่มีก็ข้ามส่วนคลิป
 
@@ -387,6 +388,39 @@ async function updateCamsRadar(meta) {
   } catch (e) { log('radar failed:', e.message); meta.sources.radar = { ok: false, error: e.message }; }
 }
 
+// ---------- กรมอุตุฯ พยากรณ์ฝนรายชั่วโมงรายเขต (NWP API ใช้ token ใน secret TMD_TOKEN) ----------
+async function updateTmdForecast(meta) {
+  const token = process.env.TMD_TOKEN;
+  if (!token) { meta.sources.tmdFcst = { ok: false, status: 'no-key' }; return; }
+  const API = 'https://data.tmd.go.th/nwpapi/v1/forecast/';
+  const hdr = { accept: 'application/json', authorization: 'Bearer ' + token };
+  // เวลาเริ่ม = ชั่วโมงปัจจุบันตามเวลาไทย
+  const bkk = new Date(now.getTime() + 7 * 36e5);
+  const start = bkk.toISOString().slice(0, 13) + ':00:00';
+  const tries = [
+    `area/place?domain=2&province=${encodeURIComponent('กรุงเทพมหานคร')}&fields=rain,cond,tc&starttime=${start}&duration=24`,
+    `area/place?domain=2&province=${encodeURIComponent('กรุงเทพมหานคร')}&fields=rain,cond,tc&starttime=${start}`,
+    `location/hourly/at?lat=13.75&lon=100.5&fields=rain,cond,tc&duration=24`,
+  ];
+  let j = null, used = '', lastErr = null;
+  for (const q of tries) {
+    try { j = JSON.parse(await fetchText(API + q, { headers: hdr }, 60000)); used = q.split('?')[0]; if ((j.WeatherForecasts || []).length) break; }
+    catch (e) { lastErr = e; log('tmd forecast', q.split('?')[0], 'failed:', e.message); j = null; }
+  }
+  if (!j || !(j.WeatherForecasts || []).length) { meta.sources.tmdFcst = { ok: false, error: lastErr ? lastErr.message : 'empty' }; return; }
+  const first = j.WeatherForecasts[0];
+  log('tmd forecast via', used, 'locations:', j.WeatherForecasts.length, 'sample:', JSON.stringify(first).slice(0, 400));
+  const areas = j.WeatherForecasts.map((w) => {
+    const L = w.location || {};
+    const hours = (w.forecasts || []).map((f) => ({ t: f.time, rain: +((f.data || {}).rain ?? 0), cond: (f.data || {}).cond ?? null, tc: (f.data || {}).tc ?? null }));
+    return { name: L.amphoe || L.name || L.province || '', la: +L.lat || null, lo: +L.lon || null, hours };
+  }).filter((a) => a.hours.length);
+  const sum = (a, n) => a.hours.slice(0, n).reduce((x, h) => x + (h.rain || 0), 0);
+  for (const a of areas) { a.r3 = +sum(a, 3).toFixed(1); a.r6 = +sum(a, 6).toFixed(1); a.r24 = +sum(a, 24).toFixed(1); }
+  await writeJSON('tmd-forecast.json', { updated: now.toISOString(), via: used, areas });
+  meta.sources.tmdFcst = { ok: true, areas: areas.length, hours: areas[0] ? areas[0].hours.length : 0 };
+}
+
 // ---------- ThaiWater: เขื่อนลุ่มเจ้าพระยา + พยากรณ์ฝน (thailand_main ไฟล์ใหญ่ ~8 MB จึงดึงที่นี่ ไม่ให้เบราว์เซอร์โหลด) ----------
 const CPY_DAMS = ['ภูมิพล', 'สิริกิติ์', 'แควน้อยบำรุงแดน', 'ป่าสักชลสิทธิ์', 'ทับเสลา', 'กระเสียว'];
 async function updateThaiwater(meta) {
@@ -557,6 +591,7 @@ await checkReports(meta);
 await updateTraffy(meta);
 await updateCamsRadar(meta);
 await updateThaiwater(meta);
+await updateTmdForecast(meta).catch((e) => { log('tmd forecast failed:', e.message); meta.sources.tmdFcst = { ok: false, error: e.message }; });
 await updateRisk(meta).catch((e) => { log('risk failed:', e); meta.sources.risk = { ok: false, error: e.message }; });
 await writeJSON('meta.json', meta);
 log('done', JSON.stringify(meta));

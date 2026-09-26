@@ -50,6 +50,7 @@ jobs:
             data/tw-rain.json
             data/tw-wl.json
             data/risk-roads.json
+            data/tmd-forecast.json
             data/cams.json
             data/radar.json
             data/roads.json
@@ -64,6 +65,7 @@ jobs:
           GEMINI_MODEL: ${{ vars.GEMINI_MODEL }}
           TMD_UID: ${{ secrets.TMD_UID }}
           TMD_UKEY: ${{ secrets.TMD_UKEY }}
+          TMD_TOKEN: ${{ secrets.TMD_TOKEN }}
           YOUTUBE_API_KEY: ${{ secrets.YOUTUBE_API_KEY }}
 
       - name: Save data cache
@@ -83,6 +85,7 @@ jobs:
             data/tw-rain.json
             data/tw-wl.json
             data/risk-roads.json
+            data/tmd-forecast.json
             data/cams.json
             data/radar.json
             data/roads.json
