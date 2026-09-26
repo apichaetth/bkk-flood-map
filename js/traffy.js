@@ -41,6 +41,8 @@
   // ---------- แผนที่ ----------
   const map = L.map('tmap', { scrollWheelZoom: false, minZoom: 9, maxZoom: 18 }).setView([13.75, 100.56], 11);
   L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png', { maxZoom: 19, className: 'basemap', attribution: '© <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors' }).addTo(map);
+  let userMoved = false; // ผู้ใช้กดดูตำแหน่งตัวเองแล้ว ไม่ต้องซูมอัตโนมัติทับ
+  F.addLocate(map, () => { userMoved = true; });
   const hotLayer = L.layerGroup().addTo(map), ptLayer = L.layerGroup().addTo(map);
   $('showPts').onchange = (e) => (e.target.checked ? map.addLayer(ptLayer) : map.removeLayer(ptLayer));
   const colorOf = (x) => (x.g === 'done' ? cssVar('--stale') : cssVar(F.LEVEL[x.lv].color.slice(4, -1)));
@@ -169,7 +171,7 @@
     drawList(list);
     const cut = Date.now() - fTime * 36e5;
     $('coverage').textContent = oldest ? `ข้อมูลที่ดึงได้ครอบคลุมเรื่องที่แจ้งตั้งแต่ ${fmtDT(oldest)}` + (oldest > cut ? ' (ไม่ถึงช่วงเวลาที่เลือก ตัวเลขอาจน้อยกว่าจริง)' : '') : '';
-    if (hots.length) map.fitBounds(L.latLngBounds(hots.map((h) => [h.la, h.lo])).pad(0.3), { maxZoom: 14 });
+    if (userMoved) { /* คงมุมมองของผู้ใช้ */ } else if (hots.length) map.fitBounds(L.latLngBounds(hots.map((h) => [h.la, h.lo])).pad(0.3), { maxZoom: 14 });
     else if (list.length) map.fitBounds(L.latLngBounds(list.map((x) => [x.la, x.lo])).pad(0.2), { maxZoom: 14 });
   }
   $('more').onclick = () => { shown += PAGE; drawList(filtered()); };
