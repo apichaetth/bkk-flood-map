@@ -1,6 +1,6 @@
 // สำรวจ API สาธารณะของ ThaiWater (รันด้วยมือจาก workflow probe-thaiwater) พิมพ์โครงสร้างข้อมูลแต่ละ endpoint
 const TW = 'https://api-v3.thaiwater.net/api/v1/thaiwater30/';
-const EP = process.argv.slice(2).length ? process.argv.slice(2) : ['public/thailand_main', 'public/rain_24h', 'public/warning', 'public/flow'];
+const EP = process.argv.slice(2).length ? process.argv.slice(2) : ['detail'];
 const OLD = [
   'public/thailand_main', 'public/rain_24h', 'public/rain_today', 'public/rain_yesterday', 'public/rain_3d', 'public/rain_7d', 'public/rain_1h',
   'public/waterlevel_load', 'public/waterlevel', 'public/dam_load', 'public/dam', 'public/dam_daily', 'public/waterquality_load', 'public/waterquality',
@@ -16,6 +16,29 @@ const shape = (v, d = 0) => {
   }
   return JSON.stringify(v)?.slice(0, 40);
 };
+// โหมดดูตัวอย่างละเอียด: node probe-thaiwater.mjs detail
+if (EP[0] === 'detail') {
+  const r = await fetch(TW + 'public/thailand_main', { headers: { Referer: 'https://www.thaiwater.net/' } });
+  const j = await r.json();
+  const pick = (o, ...k) => k.reduce((a, x) => (a == null ? a : a[x]), o);
+  const show = (label, v) => console.log(`\n### ${label}\n` + JSON.stringify(v, null, 1).slice(0, 3000));
+  show('pre_rain', pick(j, 'pre_rain', 'data', 'data'));
+  show('pre_rain_basin', pick(j, 'pre_rain_basin', 'data', 'data'));
+  show('pre_rain_animation', pick(j, 'pre_rain_animation', 'data'));
+  show('radar[0..2]', (pick(j, 'radar', 'data', 'data') || []).slice(0, 2));
+  show('temp_data2', pick(j, 'warning', 'temp_data2', 'data'));
+  const dams = pick(j, 'dam', 'data', 'data') || [];
+  show('dam[0]', dams[0]);
+  console.log('\n### dam names', dams.map((d) => (d.dam && d.dam.dam_name && d.dam.dam_name.th) + ' ' + d.dam_date + ' ' + d.dam_storage_percent + '% rel ' + d.dam_released).join('\n'));
+  // ลองหา URL รูป
+  const m = pick(j, 'pre_rain', 'data', 'data', 0);
+  if (m) for (const u of [
+    'https://api-v3.thaiwater.net/api/v1/thaiwater30/shared/image?image=' + m.media_path,
+    'https://api-v3.thaiwater.net/api/v1/thaiwater30/shared/image?image=' + m.file_path + '/' + m.filename,
+    'https://api-v3.thaiwater.net/' + m.media_path, 'https://www.thaiwater.net/' + m.media_path, 'https://live1.hii.or.th/' + m.media_path,
+  ]) { try { const x = await fetch(u, { headers: { Referer: 'https://www.thaiwater.net/' } }); console.log('IMG', x.status, x.headers.get('content-type'), x.headers.get('access-control-allow-origin'), u); } catch (e) { console.log('IMG ERR', u, e.message); } }
+  process.exit(0);
+}
 for (const ep of EP) {
   try {
     const ctl = new AbortController(); const t = setTimeout(() => ctl.abort(), 60000);
