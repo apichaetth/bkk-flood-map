@@ -140,10 +140,10 @@ h2 { font-size: 14px; font-weight: 600; margin: 18px 0 6px; color: var(--ink2); 
 
 /* ---------- map markers & popups ---------- */
 .mk { display: flex; align-items: center; justify-content: center; font-size: 10.5px; font-weight: 700; color: #fff; background: var(--c); border: 2px solid #fff; box-shadow: 0 1px 4px rgba(0,0,0,.35); font-family: "IBM Plex Sans Thai", sans-serif; }
-.mk.sensor { border-radius: 50%; }
+.mk.sensor { border-radius: 50%; font-size: 8.5px; border-width: 1.5px; }
 .mk.dark { color: #1b2430; }
 .mk.event { border-radius: 4px; }
-.mk.traffy { border-radius: 50%; background: #fff; border: 3px solid var(--c); }
+.mk.traffy { border-radius: 50%; background: #fff; border: 2.5px solid var(--c); }
 .mk.wl { transform: rotate(45deg); border-radius: 3px; }
 .mk.news { border-radius: 50% 50% 50% 0; transform: rotate(-45deg); }
 .mk.news.yt { transform: none; border-radius: 5px; font-size: 9px; }
@@ -224,6 +224,8 @@ body.summary { overflow: auto; display: block; height: auto; }
 .lg-line { display: inline-block; width: 26px; height: 0; border-top: 6px solid var(--flood3); border-radius: 3px; }
 .lg-line.t2 { border-top: 4px dashed var(--flood2); }
 .lg-area { display: inline-block; width: 16px; height: 16px; border-radius: 50%; border: 1.5px dashed var(--flood3); background: color-mix(in srgb, var(--flood3) 12%, transparent); }
+.lg-dot { display: inline-block; width: 12px; height: 12px; border-radius: 50%; background: var(--flood3); border: 2px solid #fff; box-shadow: 0 0 0 1px var(--flood3); }
+.lg-line { box-shadow: 0 0 0 2px #fff; }
 .lg-dist { display: inline-block; width: 14px; height: 12px; border: 1px solid #7d8896; background: color-mix(in srgb, var(--flood3) 38%, transparent); }
 .lg-dist.d2 { background: color-mix(in srgb, var(--flood3) 20%, transparent); }
 .lg-dist.d1 { background: color-mix(in srgb, var(--flood3) 8%, transparent); margin-right: 2px; }

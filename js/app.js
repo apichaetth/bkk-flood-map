@@ -103,7 +103,7 @@
     if (!S.sensor) { $('kSensor').textContent = '–'; return; }
     for (const x of S.sensor) {
       const flooded = x.lv > 0;
-      const size = flooded ? 26 : 12;
+      const size = flooded ? 16 : 6; // ย่อครึ่งหนึ่ง (จุดที่มีตัวเลขเล็กสุดที่ยังอ่านได้)
       const html = `<div class="pp"><div class="m">เซ็นเซอร์น้ำท่วมถนน กทม. · ${esc(x.s.code)}</div>
         <h3>${esc(x.s.name || x.s.road || '')}</h3>
         ${x.stale ? '<span class="badge" style="--c:var(--stale)">ไม่มีค่าล่าสุด</span>' : badge(x.lv)}
@@ -163,7 +163,7 @@
         ${r.photo_url ? `<img loading="lazy" src="${esc(r.photo_url)}" alt="ภาพจากผู้แจ้ง" referrerpolicy="no-referrer">` : ''}
         <div class="m" style="margin-top:6px">${esc(r.address || '')}<br>แจ้งเมื่อ ${fmtDT(x.t)} (${ago(x.t)}) · สถานะ: ${esc(r.state || '')}<br>
         <a href="https://share.traffy.in.th/teamchadchart/${encodeURIComponent(r.ticket_id)}" target="_blank" rel="noopener">ดูเรื่อง ${esc(r.ticket_id)}</a></div></div>`;
-      x.marker = L.marker([x.la, x.lo], { icon: icon('traffy', LEVEL[x.lv].color, '', 16), zIndexOffset: 400 }).bindPopup(html, { maxWidth: 300 }).addTo(layers.traffy);
+      x.marker = L.marker([x.la, x.lo], { icon: icon('traffy', LEVEL[x.lv].color, '', 10), zIndexOffset: 400 }).bindPopup(html, { maxWidth: 300 }).addTo(layers.traffy);
     }
     $('kTraffy').textContent = S.traffy.length;
     renderFloodList(); renderCams();
@@ -193,11 +193,11 @@
       // ฝนน้อย/ไม่มีฝน: จุดเล็กและจาง ไม่ให้แย่งสายตาจากจุดที่สำคัญ
       // ฝนหนัก = จุดเสี่ยงน้ำท่วม ใช้สีแดงทั้งจุด (แดงหมายถึงเสี่ยงน้ำท่วมทั้งแผนที่) ฝนหนักมาก (> 90 มม.) ใหญ่ขึ้นอีก
       // ขนาดวงแปรตามปริมาณฝน (รากที่สอง เพื่อให้พื้นที่วงสัมพันธ์กับปริมาณ) เห็นแนวโน้มได้ทันที
-      const radius = Math.min(20, 3 + Math.sqrt(Math.max(0, s.mm)) * 1.3);
-      const style = heavy ? { radius, color: '#fff', weight: 2, fillOpacity: 1, opacity: 1 }
+      const radius = Math.min(10, 1.5 + Math.sqrt(Math.max(0, s.mm)) * 0.65);
+      const style = heavy ? { radius, color: '#fff', weight: 1.5, fillOpacity: 1, opacity: 1 }
         : s.mm > 10 ? { radius, color: '#fff', weight: 1.5, fillOpacity: 0.85, opacity: 1 }
         : s.mm > 0 ? { radius, color: '#fff', weight: 1, fillOpacity: 0.5, opacity: 0.6 }
-        : { radius: 2.5, color: '#fff', weight: 0.5, fillOpacity: 0.3, opacity: 0.4 };
+        : { radius: 1.5, color: '#fff', weight: 0.5, fillOpacity: 0.3, opacity: 0.4 };
       s.marker = L.circleMarker([s.la, s.lo], { ...style, fillColor: heavy ? heavyRed(s.mm) : cssVar(st[1].slice(4, -1)) })
         .bindPopup(html).addTo(layers.rain);
       if (heavy) s.marker.bringToFront();

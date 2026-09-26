@@ -45,10 +45,10 @@
       }
     }
     for (const s of D.rain || []) if (s.mm > F.RAIN_HEAVY_MM) {
-      out.push({ la: s.la, lo: s.lo, src: 'rain', tier: 1, name: 'สถานีฝน ' + th(s.x.station.tele_station_name), detail: `ฝน ${s.mm} มม. ใน 24 ชม.`, cm: 0, t: s.t, radius: 1000 });
+      out.push({ la: s.la, lo: s.lo, src: 'rain', tier: 1, name: 'สถานีฝน ' + th(s.x.station.tele_station_name), detail: `ฝน ${s.mm} มม. ใน 24 ชม.`, cm: 0, t: s.t, radius: 350 });
     }
     for (const s of D.wl || []) if (!s.stale && s.pct != null && s.pct >= 90) {
-      out.push({ la: s.la, lo: s.lo, src: 'wl', tier: 1, name: th(s.x.station.tele_station_name), detail: `ระดับน้ำ ${s.pct.toFixed(0)}% ของตลิ่ง`, cm: 0, t: s.t, radius: 600 });
+      out.push({ la: s.la, lo: s.lo, src: 'wl', tier: 1, name: th(s.x.station.tele_station_name), detail: `ระดับน้ำ ${s.pct.toFixed(0)}% ของตลิ่ง`, cm: 0, t: s.t, radius: 250 });
     }
     return out;
   }
@@ -108,12 +108,10 @@
     lyr.districts.clearLayers();
     if (!geo) return;
     const lvl = new Map(dists.map((d) => [d.name, d]));
-    const red = cssVar('--flood3');
     L.geoJSON(geo, {
       style: (f) => {
-        const d = lvl.get(f.properties.name);
-        const op = !d ? 0 : d.level === 3 ? 0.38 : d.level === 2 ? 0.2 : 0.08;
-        return { color: '#7d8896', weight: 1, opacity: 0.55, fillColor: red, fillOpacity: op };
+        // ไม่ระบายสีเขต (ดูสับสน) แสดงเฉพาะเส้นขอบบาง ๆ ให้รู้ตำแหน่ง
+        return { color: '#7d8896', weight: 1, opacity: 0.45, dashArray: '3 3', fill: true, fillOpacity: 0 };
       },
       onEachFeature: (f, layer) => {
         const d = lvl.get(f.properties.name);
@@ -130,7 +128,7 @@
         <ul class="plist">${c.members.slice(0, 5).map((m) => `<li><b>${SRC[m.src]}</b> ${esc(m.detail)}</li>`).join('')}</ul>
         <a href="${mapLink(c)}">ดูบนแผนที่ละเอียด →</a></div>`;
       if (c.tier === 1) {
-        const r = Math.max(...c.members.map((m) => m.radius || 600));
+        const r = Math.max(...c.members.map((m) => m.radius || 250));
         L.circle([c.la, c.lo], { radius: r, color: red[3], weight: 1.5, dashArray: '5 5', fillColor: red[3], fillOpacity: 0.1 }).bindPopup(popup).addTo(lyr.areas);
       } else {
         // บริเวณรอบจุด (เผื่อไม่มีข้อมูลถนน) + จุด
@@ -192,7 +190,9 @@
       const red = RED();
       // วาดระดับต่ำก่อน ให้ถนนที่ยืนยันแล้วอยู่ด้านบน
       for (const l of lines.sort((a, b) => a.tier - b.tier)) {
-        L.polyline(l.pts, { pane: 'roads', color: red[l.tier], weight: l.tier === 3 ? 7 : 5, opacity: 0.9, dashArray: l.tier === 3 ? null : '10 7', lineCap: 'round', interactive: false }).addTo(lyr.roads);
+        // ขอบขาวรองใต้เส้นแดง ให้เห็นชัดบนแผนที่ทุกสี
+        L.polyline(l.pts, { pane: 'roads', color: '#fff', weight: l.tier === 3 ? 12 : 10, opacity: 0.9, lineCap: 'round', interactive: false }).addTo(lyr.roads);
+        L.polyline(l.pts, { pane: 'roads', color: red[l.tier], weight: l.tier === 3 ? 8 : 6, opacity: 1, dashArray: l.tier === 3 ? null : '12 8', lineCap: 'round', interactive: false }).addTo(lyr.roads);
       }
       $('roadNote').textContent = lines.length ? `ระบายสีแดงบนถนน ${lines.length} ช่วง ในรัศมีประมาณ ${ROAD_SPAN_M} ม. จากจุดที่มีรายงาน (ข้อมูลถนน © OpenStreetMap)` : 'ไม่พบเส้นถนนใกล้จุดรายงาน แสดงเป็นวงบริเวณแทน';
     } catch (e) {
@@ -285,7 +285,20 @@
     renderSpots(clusters);
     $('asof').textContent = `ข้อมูล ณ ${fmtDT(new Date(last))}`;
     $('updated').textContent = `อัปเดต ${fmtTime(new Date(last))} · รีเฟรชอัตโนมัติทุก 15 นาที`;
+    fitToSpots(clusters);
     drawRoads(clusters);
+  }
+  // ซูมให้เห็นจุดน้ำท่วมทั้งหมด (ถนนสีแดงจะเห็นชัดขึ้น) เว้นแต่ผู้ใช้เลื่อนแผนที่เองแล้ว
+  let userMoved = false;
+  map.on('dragstart zoomstart', (e) => { if (!fitting) userMoved = true; });
+  let fitting = false;
+  function fitToSpots(clusters) {
+    if (userMoved) return;
+    const pts = clusters.filter((c) => c.tier >= 2).map((c) => [c.la, c.lo]);
+    if (!pts.length) return;
+    fitting = true;
+    if (pts.length === 1) map.setView(pts[0], 15); else map.fitBounds(L.latLngBounds(pts).pad(0.15), { maxZoom: 15 });
+    setTimeout(() => { fitting = false; }, 500);
   }
   $('refresh').onclick = refresh;
   document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'visible' && Date.now() - last > F.REFRESH_MS) refresh(); });
