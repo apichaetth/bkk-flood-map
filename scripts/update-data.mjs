@@ -316,9 +316,10 @@ async function updateTmd(meta) {
 }
 
 // ---------- Traffy Fondue: เรื่องแจ้งน้ำท่วม (เบราว์เซอร์ดึงตรงไม่ได้เพราะติด CORS จึงดึงที่นี่แล้วเก็บเป็นไฟล์) ----------
-// สะสมข้ามรอบได้สูงสุด 7 วัน (API ให้ครั้งละไม่เกิน ~1000 เรื่องล่าสุด)
+// สะสมข้ามรอบ: 7 วันล่าสุดใน traffy.json (ทุกหน้าใช้) และวันที่ 8–30 ใน traffy-archive.json (หน้า Traffy โหลดเมื่อเลือกช่วงยาว)
+// (API ให้ครั้งละไม่เกิน ~1000 เรื่องล่าสุด ดึงย้อนหลังเองไม่ได้ จึงต้องสะสมไปเรื่อย ๆ)
 const TRAFFY_API = 'https://publicapi.traffy.in.th/share/teamchadchart/search';
-const TRAFFY_KEEP_D = 7;
+const TRAFFY_KEEP_D = 7, TRAFFY_ARCHIVE_D = 30;
 const T_FLOOD_RE = /น้ำท่วม|ท่วมขัง|ท่วมถนน|น้ำขัง|น้ำรอระบาย|รอการระบาย|น้ำเจิ่ง/;
 const T_NOT_FLOOD_RE = /ประปา|น้ำไม่ไหล|ท่อแตก|ท่อรั่ว|น้ำรั่ว|น้ำเสีย|กลิ่น|ยุง/;
 function isFloodTicket(r) {
@@ -348,6 +349,14 @@ async function updateTraffy(meta) {
   const cutoff = now - TRAFFY_KEEP_D * 864e5;
   const ts = (x) => new Date(String(x.timestamp).replace(' ', 'T').replace(/\+00$/, 'Z')).getTime();
   const items = [...byId.values()].filter((x) => ts(x) >= cutoff).sort((a, b) => ts(b) - ts(a));
+  // เรื่องที่เก่ากว่า 7 วันย้ายไปเก็บในไฟล์ย้อนหลัง (ย่อข้อความให้ไฟล์เล็ก)
+  const arch = await readJSON('traffy-archive.json', { results: [] });
+  const aById = new Map((arch.results || []).map((x) => [x.ticket_id, x]));
+  for (const x of byId.values()) if (ts(x) < cutoff) aById.set(x.ticket_id, { ...x, description: String(x.description || '').slice(0, 200) });
+  const aCut = now - TRAFFY_ARCHIVE_D * 864e5;
+  const aItems = [...aById.values()].filter((x) => ts(x) >= aCut && ts(x) < cutoff).sort((a, b) => ts(b) - ts(a));
+  const aSince = Math.min(...[arch.since ? new Date(arch.since).getTime() : Infinity, ...aItems.map(ts)].filter(isFinite));
+  await writeJSON('traffy-archive.json', { updated: now.toISOString(), since: isFinite(aSince) ? new Date(Math.max(aSince, aCut)).toISOString() : null, results: aItems });
   const times = d.results.map(ts).filter((t) => !isNaN(t));
   const oldestFetched = times.length ? Math.min(...times) : null;
   const since = Math.min(...[oldestFetched, prev.since ? new Date(prev.since).getTime() : Infinity].filter((v) => v != null && isFinite(v)));
@@ -430,13 +439,14 @@ async function updateRisk(meta) {
   const reports = [], history = [], rain = [], wl = [];
   // Traffy (สะสมไว้แล้วใน traffy.json)
   const tf = await readJSON('traffy.json', { results: [] });
-  for (const r of tf.results || []) {
+  const tfa = await readJSON('traffy-archive.json', { results: [] });
+  for (const r of [...(tf.results || []), ...(tfa.results || [])]) {
     const la = +r.coords[1], lo = +r.coords[0], t = utcTime(r.timestamp);
     if (!inBkk(la, lo) || isNaN(t)) continue;
     history.push({ la, lo, t });
     if (r.state !== 'เสร็จสิ้น') reports.push({ la, lo, t, src: 'traffy' });
   }
-  src.traffy = tf.results ? tf.results.length : 0;
+  src.traffy = (tf.results || []).length + (tfa.results || []).length;
   // iTIC / Longdo
   try {
     const ev = JSON.parse(await fetchText('https://event.longdo.com/feed/json', {}, 45000));

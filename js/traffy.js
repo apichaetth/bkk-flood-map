@@ -5,7 +5,7 @@
   const { $, esc, isoDate, fmtDT, ago, num, inBkk, cssVar } = F;
 
   const API = 'https://publicapi.traffy.in.th/share/teamchadchart/search';
-  const TIMES = [[3, '3 ชม.'], [6, '6 ชม.'], [24, '24 ชม.'], [48, '48 ชม.'], [168, '7 วัน']];
+  const TIMES = [[3, '3 ชม.'], [6, '6 ชม.'], [24, '24 ชม.'], [48, '48 ชม.'], [168, '7 วัน'], [336, '14 วัน'], [720, '30 วัน']];
   const STATES = [['all', 'ทั้งหมด'], ['open', 'ยังไม่เสร็จ'], ['wait', 'รอรับเรื่อง'], ['work', 'กำลังดำเนินการ'], ['done', 'เสร็จสิ้น']];
   const HOT_CELL_M = 500;
   const PAGE = 30;
@@ -17,7 +17,7 @@
 
   // ---------- ดึงข้อมูล ----------
   let rawCount = 0;
-  // ดึงจากไฟล์ที่ระบบดึงไว้ทุก 15 นาที (สะสมได้ถึง 7 วัน) ถ้าไม่มีค่อยดึงตรงจาก Traffy
+  // ดึงจากไฟล์ที่ระบบดึงไว้ทุก 15 นาที (7 วันล่าสุด; ย้อนหลังถึง 30 วันอยู่ในไฟล์แยก) ถ้าไม่มีค่อยดึงตรงจาก Traffy
   let via = '';
   async function fetchN() {
     const d = await F.traffyRaw();
@@ -26,16 +26,34 @@
     return {
       raw: d.results.length,
       oldest: d.since || (times.length ? new Date(Math.min(...times)) : null),
-      items: d.results
+      items: mapRaw(d.results),
+    };
+  }
+  function mapRaw(results) {
+    return results
         .map((r) => ({ r, t: isoDate(r.timestamp), lo: num(r.coords && r.coords[0]), la: num(r.coords && r.coords[1]) }))
         .filter((x) => x.la && x.lo && x.t && inBkk(x.la, x.lo) && F.isFloodTicket(x.r))
         .map((x) => ({ ...x, ...F.levelFromText(x.r.description), g: stateGroup(x.r.state) }))
-        .sort((a, b) => b.t - a.t),
-    };
+        .sort((a, b) => b.t - a.t);
   }
+  // ย้อนหลัง 8–30 วัน: โหลดเฉพาะเมื่อเลือกช่วงเกิน 7 วัน (ไฟล์แยก ไม่ให้หน้าแรกช้า)
+  let arch = null, archSince = null, archLoading = null;
+  function loadArchive() {
+    archLoading = archLoading || F.getJSON('data/traffy-archive.json', 30000, { cache: 'no-cache' })
+      .then((d) => { arch = mapRaw(d.results || []); archSince = d.since ? new Date(d.since) : null; })
+      .catch(() => { arch = []; })
+      .finally(() => render());
+    return archLoading;
+  }
+  const pool = () => {
+    if (fTime <= 168) return all;
+    if (!arch) { loadArchive(); return all; }
+    const seen = new Set(all.map((x) => x.r.ticket_id));
+    return all.concat(arch.filter((x) => !seen.has(x.r.ticket_id)));
+  };
   const filtered = () => {
     const cut = Date.now() - fTime * 36e5;
-    return all.filter((x) => x.t >= cut && (fState === 'all' || (fState === 'open' ? x.g !== 'done' : x.g === fState)));
+    return pool().filter((x) => x.t >= cut && (fState === 'all' || (fState === 'open' ? x.g !== 'done' : x.g === fState)));
   };
 
   // ---------- แผนที่ ----------
@@ -90,25 +108,28 @@
 
   // ---------- กราฟรายชั่วโมง (แท่งเดียว สีเดียว มี tooltip) ----------
   function drawChart(list) {
-    const hours = Math.min(fTime, 48);
-    const now = Date.now(), start = now - hours * 36e5;
+    // เกิน 48 ชม. สรุปเป็นรายวัน
+    const daily = fTime > 48, unit = daily ? 864e5 : 36e5;
+    const hours = daily ? Math.round(fTime / 24) : fTime;
+    const now = Date.now(), start = now - hours * unit;
     const bins = new Array(hours).fill(0);
-    for (const x of list) { const i = Math.floor((x.t - start) / 36e5); if (i >= 0 && i < hours) bins[i]++; }
+    for (const x of list) { const i = Math.floor((x.t - start) / unit); if (i >= 0 && i < hours) bins[i]++; }
     const W = 720, H = 180, pad = { l: 28, r: 8, t: 10, b: 24 };
     const max = Math.max(1, ...bins);
     const bw = (W - pad.l - pad.r) / hours;
     const y = (v) => pad.t + (H - pad.t - pad.b) * (1 - v / max);
     const ticks = [0, Math.ceil(max / 2), max].filter((v, i, a) => a.indexOf(v) === i);
-    const hh = (i) => new Intl.DateTimeFormat('th-TH', { timeZone: F.TZ, hour: '2-digit', minute: '2-digit' }).format(new Date(start + i * 36e5));
+    const hh = (i) => new Intl.DateTimeFormat('th-TH', daily ? { timeZone: F.TZ, day: 'numeric', month: 'short' } : { timeZone: F.TZ, hour: '2-digit', minute: '2-digit' }).format(new Date(start + i * unit));
     const step = Math.ceil(hours / 8);
     $('chart').innerHTML = `<svg viewBox="0 0 ${W} ${H}" preserveAspectRatio="none" aria-hidden="true">
       ${ticks.map((v) => `<line x1="${pad.l}" x2="${W - pad.r}" y1="${y(v)}" y2="${y(v)}" class="grid"/><text x="${pad.l - 6}" y="${y(v) + 4}" class="ax" text-anchor="end">${v}</text>`).join('')}
-      ${bins.map((v, i) => `<g><title>${hh(i)}–${hh(i + 1)} น.: ${v} เรื่อง</title>
+      ${bins.map((v, i) => `<g><title>${daily ? hh(i) : hh(i) + '–' + hh(i + 1) + ' น.'}: ${v} เรื่อง</title>
         <rect x="${pad.l + i * bw + 1}" y="${pad.t}" width="${Math.max(1, bw - 2)}" height="${H - pad.t - pad.b}" class="hit"/>
         ${v ? `<rect x="${pad.l + i * bw + 1}" y="${y(v)}" width="${Math.max(1, bw - 2)}" height="${H - pad.b - y(v)}" rx="${Math.min(3, bw / 4)}" class="bar"/>` : ''}</g>`).join('')}
       ${bins.map((_, i) => (i % step === 0 ? `<text x="${pad.l + i * bw + bw / 2}" y="${H - 6}" class="ax" text-anchor="middle">${hh(i)}</text>` : '')).join('')}
     </svg>`;
-    $('chartNote').textContent = `${hours} ชม. ล่าสุด · ชั่วโมงที่แจ้งมากที่สุด ${max} เรื่อง`;
+    $('chartNote').textContent = daily ? `${hours} วันล่าสุด (รายวัน) · วันที่แจ้งมากที่สุด ${max} เรื่อง` : `${hours} ชม. ล่าสุด · ชั่วโมงที่แจ้งมากที่สุด ${max} เรื่อง`;
+    $('chartTitle').textContent = daily ? 'จำนวนเรื่องแจ้งรายวัน' : 'จำนวนเรื่องแจ้งรายชั่วโมง';
   }
 
   // ---------- จัดอันดับเขต ----------
@@ -159,7 +180,7 @@
     try { localStorage.setItem('bkkflood.traffyFilter', JSON.stringify({ t: fTime, s: fState })); } catch (e) { /* ไม่เป็นไร */ }
     const list = filtered();
     const hots = hotspots(list);
-    const inTime = all.filter((x) => x.t >= Date.now() - fTime * 36e5);
+    const inTime = pool().filter((x) => x.t >= Date.now() - fTime * 36e5);
     $('kAll').textContent = list.length;
     $('kWait').textContent = inTime.filter((x) => x.g === 'wait').length;
     $('kWork').textContent = inTime.filter((x) => x.g === 'work').length;
@@ -170,7 +191,9 @@
     drawRank(list);
     drawList(list);
     const cut = Date.now() - fTime * 36e5;
-    $('coverage').textContent = oldest ? `ข้อมูลที่ดึงได้ครอบคลุมเรื่องที่แจ้งตั้งแต่ ${fmtDT(oldest)}` + (oldest > cut ? ' (ไม่ถึงช่วงเวลาที่เลือก ตัวเลขอาจน้อยกว่าจริง)' : '') : '';
+    const from = fTime > 168 && arch && arch.length ? (archSince || new Date(Math.min(...arch.map((x) => x.t)))) : oldest;
+    $('coverage').textContent = fTime > 168 && !arch ? 'กำลังโหลดข้อมูลย้อนหลัง…'
+      : from ? `ข้อมูลที่ระบบเก็บไว้ครอบคลุมเรื่องที่แจ้งตั้งแต่ ${fmtDT(from)}` + (from > cut ? ' (ระบบเริ่มสะสมหลังจากนั้น ยังย้อนไม่ถึงช่วงที่เลือก ตัวเลขอาจน้อยกว่าจริง)' : '') : '';
     if (userMoved) { /* คงมุมมองของผู้ใช้ */ } else if (hots.length) map.fitBounds(L.latLngBounds(hots.map((h) => [h.la, h.lo])).pad(0.3), { maxZoom: 14 });
     else if (list.length) map.fitBounds(L.latLngBounds(list.map((x) => [x.la, x.lo])).pad(0.2), { maxZoom: 14 });
   }

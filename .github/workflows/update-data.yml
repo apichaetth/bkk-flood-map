@@ -44,6 +44,7 @@ jobs:
             data/tmd.json
             data/yt-state.json
             data/traffy.json
+            data/traffy-archive.json
             data/cams.json
             data/radar.json
             data/roads.json
@@ -71,6 +72,7 @@ jobs:
             data/tmd.json
             data/yt-state.json
             data/traffy.json
+            data/traffy-archive.json
             data/cams.json
             data/radar.json
             data/roads.json
