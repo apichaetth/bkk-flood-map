@@ -140,7 +140,7 @@
       const html = `<div class="pp">${badge(x.lv)} <span class="m">รายงานจาก ${esc(e.contributor || 'iTIC / Longdo')}</span>
         <h3>${esc(e.title)}</h3><div>${esc(e.description || '').slice(0, 500)}</div>
         <div class="m" style="margin-top:6px">${esc(x.why)}<br>เริ่ม ${fmtDT(x.start)}${x.stop ? ' · ถึง ' + fmtDT(x.stop) : ''}</div></div>`;
-      x.marker = L.marker([x.la, x.lo], { icon: icon('event', LEVEL[x.lv].color, '', 20, LEVEL[x.lv].dark ? 'dark' : ''), zIndexOffset: 800 }).bindPopup(html, { maxWidth: 320 }).addTo(layers.event);
+      x.marker = L.marker([x.la, x.lo], { icon: icon('event', LEVEL[x.lv].color, '', 6, LEVEL[x.lv].dark ? 'dark' : ''), zIndexOffset: 800 }).bindPopup(html, { maxWidth: 320 }).addTo(layers.event);
     }
     $('kEvent').textContent = S.event.length;
     renderFloodList(); renderCams();
@@ -244,7 +244,7 @@
         ${s.pct != null ? badge(lv, `${s.pct.toFixed(0)}% ของตลิ่ง`) : ''} ${s.stale ? '<span class="badge" style="--c:var(--stale)">ค่าเก่า</span>' : ''}
         <div style="margin-top:4px"><span class="big">${s.msl != null ? s.msl.toFixed(2) : '–'}</span> ม.รทก. <span class="m">${trend(s)}</span></div>
         <div class="m">ตลิ่งต่ำสุด ${s.bank != null ? s.bank.toFixed(2) + ' ม.รทก.' : '–'} · เขต${esc(th(s.x.geocode.amphoe_name))}<br>${fmtDT(s.t)} (${ago(s.t)})</div></div>`;
-      s.marker = L.marker([s.la, s.lo], { icon: icon('wl', LEVEL[lv].color, '', 14, s.stale ? 'stale' : ''), zIndexOffset: 200 }).bindPopup(html).addTo(layers.wl);
+      s.marker = L.marker([s.la, s.lo], { icon: icon('wl', LEVEL[lv].color, '', 18, s.stale ? 'stale' : ''), zIndexOffset: 200 }).bindPopup(html).addTo(layers.wl);
     }
     const hi = S.wl.filter((s) => !s.stale && s.pct != null).sort((a, b) => b.pct - a.pct).slice(0, 6);
     listInto('listWl', hi, (s) => ({ dot: LEVEL[wlLevel(s.pct)].color, title: th(s.x.station.tele_station_name), sub: `${trend(s) || 'ไม่มีแนวโน้ม'} · ${fmtTime(s.t)}`, right: s.pct.toFixed(0) + '%', go: s }), 'ไม่มีสถานีที่มีค่าล่าสุด');
@@ -290,7 +290,7 @@
         // ข่าวที่รายงานน้ำท่วมจริง (ความรุนแรงสูง/กลาง) = หมุดแดง ส่วนข่าวเตือนภัย/น้ำลดแล้ว (ต่ำ) = ม่วง
         const flooded = lv >= 2;
         const color = isYt(n) ? 'var(--yt)' : flooded ? 'var(--critical)' : 'var(--news)';
-        return L.marker([p.lat, p.lng], { icon: icon('news', color, isYt(n) ? '▶' : '', p.precision === 'district' ? 16 : 20, isYt(n) ? 'yt' : ''), zIndexOffset: flooded ? 350 : 300 })
+        return L.marker([p.lat, p.lng], { icon: icon('news', color, '', isYt(n) ? 6 : p.precision === 'district' ? 16 : 20, isYt(n) ? 'yt' : ''), zIndexOffset: flooded ? 350 : 300 })
           .bindPopup(html, { maxWidth: 320 }).addTo(layers.news);
       });
     });

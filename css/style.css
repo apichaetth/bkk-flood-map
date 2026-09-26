@@ -142,11 +142,11 @@ h2 { font-size: 14px; font-weight: 600; margin: 18px 0 6px; color: var(--ink2); 
 .mk { display: flex; align-items: center; justify-content: center; font-size: 10.5px; font-weight: 700; color: #fff; background: var(--c); border: 2px solid #fff; box-shadow: 0 1px 4px rgba(0,0,0,.35); font-family: "IBM Plex Sans Thai", sans-serif; }
 .mk.sensor { border-radius: 50%; border-width: 1px; }
 .mk.dark { color: #1b2430; }
-.mk.event { border-radius: 4px; }
+.mk.event { border-radius: 1.5px; border-width: 1px; }
 .mk.traffy { border-radius: 50%; background: #fff; border: 2px solid var(--c); }
 .mk.wl { transform: rotate(45deg); border-radius: 3px; }
 .mk.news { border-radius: 50% 50% 50% 0; transform: rotate(-45deg); }
-.mk.news.yt { transform: none; border-radius: 5px; font-size: 9px; }
+.mk.news.yt { transform: none; border-radius: 1.5px; border-width: 1px; }
 .mk.cam { border-radius: 5px; background: #1d2330; font-size: 9px; }
 .mk.stale { background: var(--stale); }
 .basemap { filter: saturate(.55) contrast(.95); }
