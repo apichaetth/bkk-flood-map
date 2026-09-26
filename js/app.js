@@ -414,7 +414,10 @@
           ${n.summary ? `<div>${esc(n.summary)}</div>` : ''}
           <div class="m" style="margin-top:6px">ตำแหน่ง: ${esc(p.label)}${p.precision === 'district' ? ' (โดยประมาณระดับเขต)' : ''}<br>
           <a href="${esc(n.link)}" target="_blank" rel="noopener">${isYt(n) ? 'ดูคลิปบน YouTube' : 'อ่านข่าวต้นฉบับ'}</a></div></div>`;
-        return L.marker([p.lat, p.lng], { icon: icon('news', isYt(n) ? 'var(--yt)' : 'var(--news)', isYt(n) ? '▶' : '', p.precision === 'district' ? 16 : 20, isYt(n) ? 'yt' : ''), zIndexOffset: 300 })
+        // ข่าวที่รายงานน้ำท่วมจริง (ความรุนแรงสูง/กลาง) = หมุดแดง ส่วนข่าวเตือนภัย/น้ำลดแล้ว (ต่ำ) = ม่วง
+        const flooded = lv >= 2;
+        const color = isYt(n) ? 'var(--yt)' : flooded ? 'var(--critical)' : 'var(--news)';
+        return L.marker([p.lat, p.lng], { icon: icon('news', color, isYt(n) ? '▶' : '', p.precision === 'district' ? 16 : 20, isYt(n) ? 'yt' : ''), zIndexOffset: flooded ? 350 : 300 })
           .bindPopup(html, { maxWidth: 320 }).addTo(layers.news);
       });
     });
