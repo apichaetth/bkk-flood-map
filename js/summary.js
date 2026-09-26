@@ -105,8 +105,8 @@
     maxZoom: 19, className: 'basemap', attribution: '© <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors',
   }).addTo(map);
   map.createPane('roads').style.zIndex = 450;
-  const lyr = { districts: L.layerGroup().addTo(map), risk: L.layerGroup(), areas: L.layerGroup().addTo(map), roads: L.layerGroup().addTo(map), spots: L.layerGroup().addTo(map), web: L.layerGroup().addTo(map) };
-  // พื้นที่เสี่ยงซ่อนไว้ก่อน เปิดเมื่อผู้ใช้ติ๊ก
+  const lyr = { districts: L.layerGroup().addTo(map), risk: L.layerGroup().addTo(map), areas: L.layerGroup().addTo(map), roads: L.layerGroup().addTo(map), spots: L.layerGroup().addTo(map), web: L.layerGroup().addTo(map) };
+  // พื้นที่เสี่ยงแสดงเป็นค่าเริ่มต้น ยกเลิกติ๊กเพื่อซ่อน
   $('showRisk').onchange = (e) => { if (e.target.checked) map.addLayer(lyr.risk); else map.removeLayer(lyr.risk); };
 
   // ให้ js/report.js ใช้แผนที่หน้านี้สำหรับปักหมุดแจ้งน้ำท่วม/น้ำลด (ไม่ต้องไปหน้าแผนที่ละเอียด)
