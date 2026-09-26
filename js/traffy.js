@@ -174,31 +174,63 @@
   $('more').onclick = () => { shown += PAGE; drawList(filtered()); };
 
   // โหลด 500 เรื่องก่อน (เร็วกว่า) แสดงผลทันที แล้วค่อยดึง 1000 เรื่องเบื้องหลังเพื่อให้ย้อนหลังได้ไกลขึ้น
+  // เก็บผลล่าสุดไว้ในเบราว์เซอร์ ครั้งหน้าเปิดแล้วแสดงได้ทันที (เก็บเฉพาะเรื่องน้ำท่วม + ฟิลด์ที่ใช้ เพื่อไม่ให้ใหญ่)
+  const CACHE = 'bkkflood.traffyCache';
+  const CACHE_MAX_H = 72;
+  function saveCache() {
+    const slim = all.map((x) => ({
+      r: { ticket_id: x.r.ticket_id, description: String(x.r.description || '').slice(0, 400), address: x.r.address, state: x.r.state, photo_url: x.r.photo_url },
+      t: x.t.getTime(), la: x.la, lo: x.lo, lv: x.lv, why: x.why, cm: x.cm, g: x.g,
+    }));
+    try { localStorage.setItem(CACHE, JSON.stringify({ saved: Date.now(), raw: rawCount, oldest: oldest && oldest.getTime(), items: slim })); } catch (e) { /* พื้นที่เต็ม/ปิดไว้ ไม่เป็นไร */ }
+  }
+  function loadCache() {
+    try {
+      const c = JSON.parse(localStorage.getItem(CACHE) || 'null');
+      if (!c || Date.now() - c.saved > CACHE_MAX_H * 36e5) return null;
+      return { saved: new Date(c.saved), raw: c.raw, oldest: c.oldest ? new Date(c.oldest) : null, items: c.items.map((x) => ({ ...x, t: new Date(x.t) })) };
+    } catch (e) { return null; }
+  }
+  let cachedAt = null;
+
   let loading = 0;
   const status = () => `ดึงจาก Traffy ${rawCount} เรื่องล่าสุด เป็นเรื่องน้ำท่วม ${all.length} เรื่อง`;
   async function load() {
     const my = ++loading, t0 = Date.now();
-    const tick = setInterval(() => { if (my === loading && !all.length) $('updated').textContent = `กำลังโหลดจาก Traffy Fondue… ${Math.round((Date.now() - t0) / 1000)} วินาที (Traffy อาจตอบช้าช่วงมีคนใช้มาก)`; }, 1000);
+    const tick = setInterval(() => {
+      if (my !== loading) return;
+      const sec = Math.round((Date.now() - t0) / 1000);
+      $('updated').textContent = cachedAt
+        ? `แสดงข้อมูลที่บันทึกไว้เมื่อ ${fmtDT(cachedAt)} (${ago(cachedAt)}) · กำลังโหลดข้อมูลใหม่… ${sec} วินาที`
+        : `กำลังโหลดจาก Traffy Fondue… ${sec} วินาที (Traffy อาจตอบช้าช่วงมีคนใช้มาก)`;
+    }, 1000);
     try {
       geo = geo || await F.loadDistricts().catch(() => null);
       const first = await fetchN(500, 90000);
       if (my !== loading) return;
       ({ items: all, raw: rawCount, oldest } = first);
-      render();
+      cachedAt = null;
+      clearInterval(tick); // ได้ข้อมูลแล้ว หยุดตัวนับเวลารอ
+      render(); saveCache();
       $('updated').textContent = `อัปเดต ${fmtDT(new Date())} · ${status()} · กำลังดึงเพิ่มเพื่อย้อนหลังให้ไกลขึ้น…`;
       try {
         const more = await fetchN(1000, 90000);
-        if (my === loading && more.raw > rawCount) { ({ items: all, raw: rawCount, oldest } = more); render(); }
+        if (my === loading && more.raw > rawCount) { ({ items: all, raw: rawCount, oldest } = more); render(); saveCache(); }
       } catch (e) { /* ใช้ 500 เรื่องที่ได้แล้ว */ }
       if (my === loading) $('updated').textContent = `อัปเดต ${fmtDT(new Date())} · ${status()} · รีเฟรชทุก 15 นาที`;
     } catch (e) {
       if (my !== loading) return;
+      if (cachedAt) { $('updated').textContent = `โหลดข้อมูลใหม่ไม่สำเร็จ (${e.message}) · แสดงข้อมูลที่บันทึกไว้เมื่อ ${fmtDT(cachedAt)} · กด รีเฟรช เพื่อลองใหม่`; return; }
       $('updated').textContent = 'โหลดไม่สำเร็จ: ' + e.message + ' (กด รีเฟรช เพื่อลองใหม่)';
       $('list').innerHTML = `<p>ดึงข้อมูลจาก Traffy ไม่สำเร็จ (${esc(e.message)}) กด รีเฟรช เพื่อลองใหม่</p>`;
     } finally { clearInterval(tick); }
   }
   $('refresh').onclick = load;
   setInterval(load, F.REFRESH_MS);
+  // มีข้อมูลที่บันทึกไว้ -> แสดงทันที แล้วค่อยโหลดใหม่เบื้องหลัง
+  const c = loadCache();
+  if (c) { ({ items: all, raw: rawCount, oldest } = c); cachedAt = c.saved; }
   render(); // แสดงตัวกรองและโครงหน้าทันที ระหว่างรอข้อมูล
+  if (c) $('updated').textContent = `แสดงข้อมูลที่บันทึกไว้เมื่อ ${fmtDT(cachedAt)} (${ago(cachedAt)}) · กำลังโหลดข้อมูลใหม่…`;
   load();
 })();
