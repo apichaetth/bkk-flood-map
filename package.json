@@ -1,0 +1,10 @@
+{
+  "name": "bkk-flood-map",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "update": "node scripts/update-data.mjs",
+    "serve": "npx --yes http-server -p 8080 -c-1 ."
+  },
+  "engines": { "node": ">=20" }
+}

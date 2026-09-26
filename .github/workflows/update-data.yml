@@ -1,0 +1,78 @@
+# อัปเดตข่าว/ประกาศเตือนภัยทุก 15 นาที แล้ว deploy เว็บขึ้น GitHub Pages
+# ต้องตั้ง Settings → Pages → Source = "GitHub Actions" หนึ่งครั้ง
+name: update-data-and-deploy
+
+on:
+  schedule:
+    - cron: "*/15 * * * *"   # GitHub อาจเลื่อนเวลารันได้ 5–15 นาทีช่วงคนใช้เยอะ
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: pages
+  cancel-in-progress: false
+
+jobs:
+  build-deploy:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    environment:
+      name: github-pages
+      url: ${{ steps.deploy.outputs.page_url }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      # เก็บผลวิเคราะห์ข่าว/geocode ข้ามรอบ เพื่อไม่เรียก AI และ Nominatim ซ้ำ
+      - name: Restore data cache
+        uses: actions/cache/restore@v4
+        with:
+          path: |
+            data/news.json
+            data/news-cache.json
+            data/geocache.json
+            data/tmd.json
+          key: data-${{ github.run_id }}
+          restore-keys: data-
+
+      - name: Fetch news & TMD warnings
+        run: node scripts/update-data.mjs
+        env:
+          GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
+          GEMINI_MODEL: ${{ vars.GEMINI_MODEL }}
+          TMD_UID: ${{ secrets.TMD_UID }}
+          TMD_UKEY: ${{ secrets.TMD_UKEY }}
+
+      - name: Save data cache
+        if: always()
+        uses: actions/cache/save@v4
+        with:
+          path: |
+            data/news.json
+            data/news-cache.json
+            data/geocache.json
+            data/tmd.json
+          key: data-${{ github.run_id }}
+
+      - name: Prepare site
+        run: |
+          mkdir -p _site
+          cp -r index.html css js data _site/
+          rm -f _site/data/news-cache.json
+          touch _site/.nojekyll
+
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: _site
+
+      - id: deploy
+        uses: actions/deploy-pages@v4

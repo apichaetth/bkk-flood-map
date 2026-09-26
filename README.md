@@ -1,0 +1,65 @@
+# แผนที่สถานการณ์น้ำท่วม กทม. (bkk-flood-map)
+
+เว็บแผนที่แสดงสถานการณ์น้ำท่วมในกรุงเทพมหานครแบบรายจุด สำหรับประชาชนทั่วไป อัปเดตทุก 15 นาที ใช้บริการฟรีทั้งหมด
+
+## แหล่งข้อมูล
+
+| ชั้นข้อมูล | แหล่ง | ดึงจาก | ต้องใช้ key |
+|---|---|---|---|
+| เซ็นเซอร์น้ำท่วมถนน (ซม.) | สำนักการระบายน้ำ กทม. `floodbangkok.bangkok.go.th` | เบราว์เซอร์ผู้ชม* | ไม่ |
+| รายงานน้ำท่วมถนน | iTIC / Longdo Traffic `event.longdo.com/feed/json` | เบราว์เซอร์ | ไม่ |
+| เรื่องแจ้งจากประชาชน | Traffy Fondue `publicapi.traffy.in.th` | เบราว์เซอร์ | ไม่ |
+| ระดับน้ำคลอง/แม่น้ำ, ฝน 24 ชม. | ThaiWater (สสน.) `api-v3.thaiwater.net` | เบราว์เซอร์ | ไม่ |
+| กล้อง CCTV สาธารณะ | iTIC / Longdo `camera.longdo.com` | เบราว์เซอร์ | ไม่ |
+| เรดาร์ฝน | RainViewer | เบราว์เซอร์ | ไม่ |
+| ข่าว + สรุป/ปักหมุด | Google News RSS + Gemini + OpenStreetMap Nominatim | GitHub Actions | Gemini (ฟรี) |
+| ประกาศเตือนภัย | กรมอุตุนิยมวิทยา `data.tmd.go.th` | GitHub Actions | ใช้ demo ได้ |
+| ขอบเขต 50 เขต | [OpenGISData-Thailand](https://github.com/chingchai/OpenGISData-Thailand) | ไฟล์ในโปรเจกต์ | – |
+
+\* ระบบของ กทม. เปิดให้เฉพาะเครือข่ายในประเทศไทย จึงให้เบราว์เซอร์ของผู้ชมดึงข้อมูลเอง ผู้ชมจากต่างประเทศจะไม่เห็นชั้นข้อมูลนี้
+
+## โครงสร้าง
+
+```
+index.html                  หน้าเว็บ (Leaflet + แผนที่ CARTO/OSM)
+css/style.css
+js/app.js                   ดึงข้อมูลเรียลไทม์ + วาดแผนที่ (รีเฟรชทุก 15 นาที)
+scripts/update-data.mjs     ดึงข่าว → สรุปด้วย Gemini → geocode → data/news.json, ประกาศกรมอุตุฯ → data/tmd.json
+data/                       districts.json/geojson (คงที่), news.json, tmd.json, meta.json (สร้างอัตโนมัติ)
+.github/workflows/update-data.yml   รันสคริปต์ทุก 15 นาทีแล้ว deploy ขึ้น GitHub Pages
+```
+
+## ตั้งค่าครั้งแรก (ฟรีทั้งหมด)
+
+1. **เปิด GitHub Pages:** Settings → Pages → Build and deployment → Source = **GitHub Actions**
+2. **Gemini API key (ฟรี):** สร้างที่ https://aistudio.google.com/apikey แล้วใส่ใน Settings → Secrets and variables → Actions → New repository secret ชื่อ `GEMINI_API_KEY`
+   - ถ้าไม่ใส่ เว็บยังทำงานได้ แต่ข่าวจะแสดงเฉพาะหัวข่าวและปักหมุดระดับเขตจากชื่อเขตในหัวข่าว
+   - เปลี่ยนรุ่นโมเดลได้ด้วย Variable `GEMINI_MODEL` (ค่าเริ่มต้น `gemini-flash-latest`)
+3. **(ไม่บังคับ) key กรมอุตุฯ:** สมัครที่ https://data.tmd.go.th/api/index1.php แล้วใส่ secret `TMD_UID` และ `TMD_UKEY` (ถ้าไม่ใส่จะใช้ `demo`)
+4. ไปที่แท็บ Actions → `update-data-and-deploy` → **Run workflow** หนึ่งครั้ง เว็บจะอยู่ที่ `https://<user>.github.io/bkk-flood-map/`
+
+## รันบนเครื่อง
+
+```bash
+npm run update     # ดึงข่าว/ประกาศ (ใส่ GEMINI_API_KEY=... ข้างหน้าถ้ามี)
+npm run serve      # เปิด http://localhost:8080
+```
+
+## เกณฑ์สี
+
+| ชั้นข้อมูล | ปกติ | เล็กน้อย | ท่วม | ท่วมสูง |
+|---|---|---|---|---|
+| เซ็นเซอร์ถนน กทม. | < 5 ซม. | 5–10 ซม. | 10–15 ซม. | ≥ 15 ซม. |
+| ระดับน้ำ (% ของตลิ่ง) | < 70% | 70–90% | 90–100% | ≥ 100% |
+| รายงานข้อความ (iTIC/Traffy) | น้ำลดแล้ว | ข้อเท้า / < 10 ซม. | ไม่ระบุ / 10–20 ซม. | ผ่านไม่ได้ / ≥ 20 ซม. / เข่าขึ้นไป |
+
+ทุกสีมีข้อความกำกับเสมอ ไม่ใช้สีอย่างเดียวในการสื่อความหมาย
+
+## ข้อจำกัด
+
+- GitHub Actions แบบ cron อาจรันช้ากว่ากำหนด 5–15 นาทีในช่วงที่มีผู้ใช้มาก
+- เซ็นเซอร์ กทม., iTIC และ Traffy ไม่มี API ทางการที่มีเอกสารรองรับ อาจเปลี่ยนรูปแบบได้โดยไม่แจ้ง ก่อนเปิดใช้งานสาธารณะในวงกว้างควรขออนุญาตจากหน่วยงาน
+- ตำแหน่งจากข่าวได้มาจาก AI และ geocode อาจคลาดเคลื่อน หมุดระดับเขตเป็นจุดกึ่งกลางเขตเท่านั้น
+- ไม่มีรายงานในจุดใด ≠ ไม่มีน้ำท่วมในจุดนั้น
+
+เว็บนี้ไม่ใช่เว็บทางราชการ โปรดติดตามประกาศทางการจากกรุงเทพมหานคร (สายด่วน 1555) และกรมอุตุนิยมวิทยา
