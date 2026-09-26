@@ -34,6 +34,7 @@
         <h2 id="headline">กำลังรวบรวมข้อมูลจากทุกแหล่ง…</h2>
         <p id="subline" class="muted"></p>
         <div id="tmdLine"></div>
+        <div id="twLine"></div>
       </div>
       <div class="tiles">
         <div class="tile t3"><span class="tv" id="nConfirmed">–</span><span class="tl">จุดน้ำท่วม<br><b>ยืนยันแล้ว</b></span></div>
@@ -70,6 +71,17 @@
       <div class="card-h"><h2>จุดที่น่าห่วงที่สุด</h2><span class="muted small" id="topNote"></span></div>
       <ol id="top10" class="top10"></ol>
       <button type="button" class="btn" id="topMore" hidden>ดูทั้ง 10 จุด ▾</button>
+    </section>
+
+    <!-- แนวโน้มน้ำจาก ThaiWater -->
+    <section class="card" id="outlook">
+      <div class="card-h"><h2>แนวโน้มน้ำ 1–3 วันข้างหน้า</h2><a class="more" href="map.html">รายละเอียด →</a></div>
+      <div class="ol-grid">
+        <div class="ol-box"><h3>🌧 พยากรณ์ฝน</h3><div id="olRain" class="muted small">กำลังโหลด…</div></div>
+        <div class="ol-box"><h3>🌊 เจ้าพระยาช่วง กทม.</h3><div id="olRiver" class="muted small">กำลังโหลด…</div></div>
+        <div class="ol-box"><h3>⛰ น้ำเหนือและเขื่อน</h3><div id="olNorth" class="muted small">กำลังโหลด…</div></div>
+      </div>
+      <p class="muted small">ข้อมูลจาก ThaiWater (สสน.) · ระดับน้ำเจ้าพระยาใน กทม. ขึ้นลงตามน้ำทะเลหนุนด้วย ถ้าน้ำเหนือมากและตรงกับช่วงน้ำขึ้นสูง ริมแม่น้ำเสี่ยงล้นตลิ่ง</p>
     </section>
 
     <!-- 2) แยกตามเขต -->

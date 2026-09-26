@@ -199,8 +199,16 @@ window.Flood = (function () {
   }
 
   // 4) ThaiWater ฝน 24 ชม.
+  // ThaiWater: ใช้สำเนาย่อที่ GitHub Actions เก็บไว้ก่อน (เล็กกว่าหลายเท่า) ถ้าเก่าเกิน 40 นาทีหรือไม่มี ค่อยดึงตรง
+  async function twJSON(local, live) {
+    try {
+      const d = await getJSON(local, 20000, { cache: 'no-cache' });
+      if (d.updated && Date.now() - new Date(d.updated) < 40 * 60000) return d;
+    } catch (e) { /* ไม่มีสำเนา */ }
+    return getJSON(live, 120000);
+  }
   async function fetchRain() {
-    const d = await getJSON(URL.rain, 120000);
+    const d = await twJSON('data/tw-rain.json', URL.rain);
     if (!Array.isArray(d.data)) throw new Error('รูปแบบข้อมูลไม่ถูกต้อง');
     const cutoff = Date.now() - 30 * 36e5;
     let newest = null;
@@ -224,7 +232,7 @@ window.Flood = (function () {
 
   // 5) ThaiWater ระดับน้ำ
   async function fetchWl() {
-    const d = await getJSON(URL.wl, 120000);
+    const d = await twJSON('data/tw-wl.json', URL.wl);
     const arr = d && d.waterlevel_data && d.waterlevel_data.data;
     if (!Array.isArray(arr)) throw new Error('รูปแบบข้อมูลไม่ถูกต้อง');
     let newest = null;
@@ -264,6 +272,10 @@ window.Flood = (function () {
     const d = await getJSON(URL.tmd + '?t=' + Date.now());
     return { items: d.items || [], updated: new Date(d.updated) };
   }
+
+  // 7b) ThaiWater พยากรณ์ฝน + เขื่อน (GitHub Actions เตรียมไว้ใน data/thaiwater.json)
+  const fetchTw = () => getJSON('data/thaiwater.json', 20000, { cache: 'no-cache' });
+  const twBkkHeavy = (d) => (d && d.heavy || []).find((p) => p.code === '10') || null;
 
   // 8) ประชาชนแจ้งผ่านเว็บนี้ (Google Apps Script) — endpoint อยู่ใน data/report-config.json
   let reportCfg = null;
@@ -374,7 +386,7 @@ window.Flood = (function () {
     REFRESH_MS, TZ, RAIN_HEAVY_MM, URL,
     $, esc, num, inBkk, th, fmtTime, fmtDT, ago, bkkDate, isoDate, distKm, getJSON, cssVar, store,
     LEVEL, badge, sensorLevel, wlLevel, rainStep, SEV_LV, levelFromText,
-    fetchSensors, fetchEvents, fetchTraffy, traffyRaw, fetchCams, fetchRadar, isFloodTicket, fetchWebReports, reportEndpoint, deviceId, WEB_LEVEL, fetchRain, fetchWl, fetchNews, fetchTmd, errMsg,
+    fetchSensors, fetchEvents, fetchTraffy, traffyRaw, fetchCams, fetchRadar, isFloodTicket, fetchWebReports, fetchTw, twBkkHeavy, reportEndpoint, deviceId, WEB_LEVEL, fetchRain, fetchWl, fetchNews, fetchTmd, errMsg,
     loadDistricts, districtAt, addLocate,
   };
 })();

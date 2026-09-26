@@ -1,0 +1,21 @@
+name: smoke-test
+# ตรวจเว็บจริงหลัง deploy ที่มาจากการแก้โค้ด (ไม่รันทุก 15 นาที)
+on:
+  workflow_run:
+    workflows: [update-data-and-deploy]
+    types: [completed]
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  smoke:
+    if: github.event_name == 'workflow_dispatch' || (github.event.workflow_run.conclusion == 'success' && github.event.workflow_run.event == 'push')
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - run: npm install --no-save playwright-core@1.49.1
+      - run: sleep 60 && node scripts/smoke.mjs

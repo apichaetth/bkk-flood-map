@@ -460,8 +460,12 @@ async function updateRisk(meta) {
   // ใช้ทุกสถานีในกรอบรอบ กทม. (รวมนนทบุรี ปทุมธานี สมุทรปราการ นครปฐม สมุทรสาคร ที่อยู่ติดขอบเมือง)
   const nearBkk = (la, lo) => la >= 13.35 && la <= 14.1 && lo >= 100.2 && lo <= 101.05;
   const TW = 'https://api-v3.thaiwater.net/api/v1/thaiwater30/public/';
+  // จังหวัดที่หน้าเว็บใช้ (กทม. + ลุ่มเจ้าพระยา) — เก็บสำเนาย่อไว้ให้หน้าเว็บโหลดเร็วแทนไฟล์เต็มหลาย MB
+  const WEB_PROV = new Set(['10', '11', '12', '13', '14', '15', '16', '17', '18', '60', '61', '72']);
+  const keepWeb = (x) => (x.geocode && WEB_PROV.has(String(x.geocode.province_code))) || (x.station && nearBkk(+x.station.tele_station_lat, +x.station.tele_station_long));
   try {
     const d = JSON.parse(await fetchText(TW + 'rain_24h', { headers: { Referer: 'https://www.thaiwater.net/' } }, 90000));
+    await writeJSON('tw-rain.json', { updated: now.toISOString(), data: (d.data || []).filter(keepWeb) });
     for (const x of d.data || []) {
       if (!x.station || !nearBkk(+x.station.tele_station_lat, +x.station.tele_station_long)) continue;
       const t = bkkTime(x.rainfall_datetime);
@@ -472,6 +476,7 @@ async function updateRisk(meta) {
   } catch (e) { src.rain = 'error: ' + e.message; }
   try {
     const d = JSON.parse(await fetchText(TW + 'waterlevel_load', { headers: { Referer: 'https://www.thaiwater.net/' } }, 90000));
+    await writeJSON('tw-wl.json', { updated: now.toISOString(), waterlevel_data: { data: ((d.waterlevel_data && d.waterlevel_data.data) || []).filter(keepWeb) } });
     for (const x of (d.waterlevel_data && d.waterlevel_data.data) || []) {
       if (!x.station || !nearBkk(+x.station.tele_station_lat, +x.station.tele_station_long)) continue;
       const t = bkkTime(x.waterlevel_datetime);

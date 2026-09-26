@@ -350,6 +350,47 @@
     } catch (e) { $('tmdLine').innerHTML = ''; }
   }
 
+  // ---------- แนวโน้มน้ำ (ThaiWater) ----------
+  const fmt = (v, d = 0) => (v == null || isNaN(v) ? '–' : Number(v).toLocaleString('th-TH', { maximumFractionDigits: d }));
+  const lvDot = (lv) => `<span class="dot" style="--c:${F.LEVEL[lv].color}"></span>`;
+  async function renderOutlookTw() {
+    let d = null;
+    try { d = await F.fetchTw(); } catch (e) { /* ยังไม่มีไฟล์ */ }
+    if (!d) { $('olRain').textContent = 'ยังไม่มีข้อมูลพยากรณ์'; renderNorth([]); $('twLine').innerHTML = ''; return; }
+    const bkk = F.twBkkHeavy(d);
+    const near = (d.heavy || []).filter((p) => ['11', '12', '13', '73', '74'].includes(p.code)).map((p) => p.name);
+    $('twLine').innerHTML = bkk ? `<p class="tmdline">🌧 <b>ThaiWater:</b> คาดว่ากรุงเทพฯ มีฝนตกหนัก (ระดับ ${esc(bkk.level)})</p>` : '';
+    const imgs = (d.images || []).filter((i) => i.group === 'ประเทศไทย');
+    $('olRain').classList.remove('muted', 'small');
+    $('olRain').innerHTML = `<p class="ol-main">${bkk ? `<b class="tag t3">ฝนหนัก</b> กรุงเทพฯ อยู่ในรายชื่อจังหวัดที่คาดว่าฝนตกหนัก` : 'ไม่มีการพยากรณ์ฝนหนักใน กทม.'}</p>
+      ${near.length ? `<p class="small muted">จังหวัดรอบ ๆ ที่คาดว่าฝนหนัก: ${esc(near.join(', '))}</p>` : ''}
+      ${imgs.length ? `<div class="ol-imgs">${imgs.map((i) => `<a href="${esc(i.file)}" target="_blank" rel="noopener"><img src="${esc(i.file)}?v=${encodeURIComponent(i.datetime || '')}" alt="ภาพพยากรณ์ฝนวันที่ ${i.day}" loading="lazy"><span>วันที่ ${i.day}</span></a>`).join('')}</div>` : ''}`;
+    renderNorth(d.dams || []);
+  }
+  let upstream = null, dams = null;
+  function renderOutlookWl(up) { upstream = up || []; renderRiver(); renderNorth(); }
+  function renderRiver() {
+    const rows = (upstream || []).filter((c) => ['CPY014', 'C.12', 'CPY015'].includes(c.code));
+    $('olRiver').classList.remove('muted', 'small');
+    $('olRiver').innerHTML = rows.length ? rows.map((c) => {
+      if (c.missing || c.pct == null) return `<div class="ol-row">${lvDot(0)}<span>${esc(c.label)}</span><b>–</b></div>`;
+      const d = c.msl != null && c.prev != null ? c.msl - c.prev : 0;
+      const tr = Math.abs(d) < 0.005 ? 'ทรงตัว' : d > 0 ? '▲ ขึ้น' : '▼ ลง';
+      return `<div class="ol-row">${lvDot(F.wlLevel(c.pct))}<span>${esc(c.label)}<small>${tr}${c.stale ? ' · ค่าเก่า' : ''}</small></span><b>${fmt(c.pct)}%</b></div>`;
+    }).join('') + '<p class="small muted">% ของความสูงตลิ่ง</p>' : '<p class="muted small">ไม่มีข้อมูลระดับน้ำ</p>';
+  }
+  function renderNorth(d) {
+    if (d) dams = d;
+    const c13 = (upstream || []).find((c) => c.code === 'C.13');
+    const main = (dams || []).filter((m) => ['ภูมิพล', 'สิริกิติ์', 'แควน้อยบำรุงแดน', 'ป่าสักชลสิทธิ์'].includes(m.name));
+    if (!c13 && !main.length) { if (upstream && dams) $('olNorth').innerHTML = '<p class="muted small">ไม่มีข้อมูล</p>'; return; }
+    const rel = main.reduce((a, m) => a + (+m.released || 0), 0);
+    $('olNorth').classList.remove('muted', 'small');
+    $('olNorth').innerHTML = (c13 && c13.q != null ? `<div class="ol-row">${lvDot(c13.q >= 2500 ? 3 : c13.q >= 1500 ? 2 : c13.q >= 800 ? 1 : 0)}<span>เขื่อนเจ้าพระยา ชัยนาท<small>น้ำที่ปล่อยลงมา ถึง กทม. ใน 1–3 วัน</small></span><b>${fmt(c13.q)}<small> ลบ.ม./วิ</small></b></div>` : '')
+      + main.map((m) => `<div class="ol-row">${lvDot(m.pct >= 100 ? 3 : m.pct >= 90 ? 2 : m.pct >= 80 ? 1 : 0)}<span>เขื่อน${esc(m.name)}<small>ปล่อย ${fmt(m.released, 2)} ล้าน ลบ.ม./วัน</small></span><b>${fmt(m.pct)}%</b></div>`).join('')
+      + (main.length ? `<p class="small muted">% = น้ำในอ่างเทียบความจุ · 4 เขื่อนหลักปล่อยรวม ${fmt(rel, 1)} ล้าน ลบ.ม./วัน</p>` : '');
+  }
+
   // ---------- โหลดทั้งหมด ----------
   const FEEDS = [['sensor', 'เซ็นเซอร์ กทม.', 'fetchSensors'], ['event', 'หน่วยงาน/iTIC', 'fetchEvents'], ['traffy', 'Traffy', 'fetchTraffy'],
     ['rain', 'ฝน ThaiWater', 'fetchRain'], ['wl', 'ระดับน้ำ ThaiWater', 'fetchWl'], ['news', 'ข่าว', 'fetchNews'], ['web', 'ประชาชนปักหมุด', 'fetchWebReports']];
@@ -360,6 +401,7 @@
     last = Date.now();
     $('updated').textContent = 'กำลังอัปเดต…';
     renderTmd();
+    renderOutlookTw();
     loadRadar();
     if (!lyr.cam.getLayers().length) loadCams();
     const geo = await F.loadDistricts().catch(() => null);
@@ -388,7 +430,7 @@
       }
     };
     await Promise.all(FEEDS.map(([k, , fn], i) => F[fn]()
-      .then((r) => { D[k] = r.items; feeds[i].ok = true; })
+      .then((r) => { D[k] = r.items; feeds[i].ok = true; if (k === 'wl') renderOutlookWl(r.upstream); })
       // ระบบปักหมุดที่ยังไม่เปิดใช้ ไม่นับเป็นแหล่งที่ล้มเหลว
       .catch((e) => { D[k] = null; feeds[i].off = /ยังไม่ได้เปิด/.test(e.message); })
       .finally(() => { feeds[i].pending = false; clearTimeout(timer); timer = setTimeout(() => render(false), 150); })));

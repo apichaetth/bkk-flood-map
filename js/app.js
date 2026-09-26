@@ -85,7 +85,7 @@
     $('feeds').innerHTML = Object.values(FEEDS).map((f) => {
       const st = f.status || 'loading';
       const s = st === 'ok' ? 'ใช้งานได้' + (f.msg ? ' · ' + esc(f.msg) : '') + (f.dataTime ? ' · ข้อมูลล่าสุด ' + fmtDT(f.dataTime) : '')
-        : st === 'loading' ? 'กำลังโหลด…' : 'ใช้งานไม่ได้ขณะนี้ – ' + esc(f.msg || '');
+        : st === 'loading' ? 'กำลังโหลด…' : st === 'off' ? 'ยังไม่เปิดใช้ – ' + esc(f.msg || '') : 'ใช้งานไม่ได้ขณะนี้ – ' + esc(f.msg || '');
       return `<div class="feed ${st}"><span class="st"></span><div><a href="${f.link}" target="_blank" rel="noopener">${esc(f.name)}</a><div class="fs">${s}${f.note ? ' · ' + esc(f.note) : ''}</div></div></div>`;
     }).join('');
     const failed = Object.entries(FEEDS).filter(([k, f]) => f.status === 'fail' && k !== 'radar' && k !== 'cam' && !(k === 'web' && /ยังไม่ได้เปิด/.test(f.msg || ''))).map(([, f]) => f);
@@ -229,10 +229,12 @@
   // ---------- ThaiWater: พยากรณ์ฝน + เขื่อน (GitHub Actions ดึงมาเก็บใน data/thaiwater.json) ----------
   async function loadTw() {
     let d = null;
-    try { d = await getJSON('data/thaiwater.json', 20000, { cache: 'no-cache' }); } catch (e) { /* ยังไม่มีไฟล์ */ }
+    try { d = await Flood.fetchTw(); } catch (e) { /* ยังไม่มีไฟล์ */ }
     const f = $('twFcst'), el = $('listDam');
     if (!d) { f.innerHTML = el.innerHTML = '<div class="muted small">ยังไม่มีข้อมูล</div>'; return; }
-    const bkk = (d.heavy || []).find((p) => p.code === '10');
+    const bkk = Flood.twBkkHeavy(d);
+    // ฝนหนักใน กทม. แจ้งไว้บนสุดของแท็บสรุปด้วย
+    $('twTop').innerHTML = bkk ? `<div class="tw-alert on">🌧 ThaiWater คาดว่า <b>กรุงเทพฯ</b> มีฝนตกหนัก (ระดับ ${esc(bkk.level)}) · ดูภาพพยากรณ์ด้านล่าง</div>` : '';
     const near = (d.heavy || []).filter((p) => ['11', '12', '13', '73', '74'].includes(p.code)).map((p) => p.name);
     const imgs = d.images || [];
     const grp = [...new Set(imgs.map((i) => i.group))];
@@ -328,7 +330,8 @@
       if (src.news && src.news.ok === false) setFeed('news', 'fail', src.news.error || 'ดึงข่าวไม่สำเร็จ');
       else setFeed('news', 'ok', `${nNews} ข่าว`, d.updated);
       const yt = src.youtube;
-      if (!yt || yt.status === 'no-key') setFeed('youtube', 'fail', 'ยังไม่ได้ตั้งค่า YOUTUBE_API_KEY');
+      // ยังไม่ได้ใส่ key ไม่ใช่ความผิดพลาด ไม่ต้องขึ้นคำเตือนสีแดง
+      if (!yt || yt.status === 'no-key') setFeed('youtube', 'off', 'ยังไม่ได้ตั้งค่า YOUTUBE_API_KEY');
       else if (!yt.ok) setFeed('youtube', 'fail', yt.status || yt.error || 'ค้นไม่สำเร็จ');
       else setFeed('youtube', 'ok', `${nYt} คลิป`, d.updated);
     } catch (e) { S.news = null; setFeed('news', 'fail', 'ยังไม่มีไฟล์ข่าว (' + e.message + ')'); setFeed('youtube', 'fail', 'ยังไม่มีไฟล์ข่าว'); }
