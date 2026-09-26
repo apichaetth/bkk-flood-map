@@ -13,7 +13,8 @@ window.Flood = (function () {
   if (MS !== 1 && window.L && L.CircleMarker) {
     L.CircleMarker.addInitHook(function () {
       if (this instanceof L.Circle || this.options.keepSize) return; // วงรัศมีเป็นเมตร / จุดตำแหน่งตัวเอง ไม่ย่อ
-      this.options.radius = Math.max(2.5, this.options.radius * MS);
+      // initialize ตั้ง _radius ไปแล้ว ต้องแก้ทั้งสองค่า
+      this._radius = this.options.radius = Math.max(2.5, this.options.radius * MS);
       if (this.options.weight > 1.5) this.options.weight = Math.max(1.2, this.options.weight * 0.7);
     });
   }

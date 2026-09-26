@@ -152,7 +152,7 @@
       for (const c of d) {
         const la = F.num(c.latitude), lo = F.num(c.longitude);
         if (!la || !lo || !F.inBkk(la, lo) || !/^https:\/\//.test(c.hls_url || '') || /tempsus/.test(c.hls_url)) continue;
-        L.marker([la, lo], { icon: mkIcon('cam', '#1d2330', '▶', 12), zIndexOffset: -100 })
+        L.marker([la, lo], { icon: mkIcon('cam', '#1d2330', '▶', F.MS < 1 ? 20 : 12), zIndexOffset: -100 })
           .bindPopup(() => `<div class="pp" style="width:290px;max-width:100%"><div class="m">${esc(c.organization || '')} · ${esc(c.camid)}</div><h3>${esc(c.title)}</h3>
             <video muted autoplay playsinline controls></video><div class="m camst">กำลังเชื่อมต่อ…</div>
             <div class="m">ภาพจาก ${esc(c.sponsertext || c.organization || 'iTIC')} ผ่าน iTIC / Longdo</div></div>`, { maxWidth: 310, minWidth: 250 })
@@ -206,8 +206,10 @@
         <a href="${mapLink(c)}">ดูบนแผนที่ละเอียด →</a></div>`;
       if (c.tier === 1) {
         const r = Math.max(...c.members.map((m) => m.radius || 250));
-        // มือถือเห็นทั้งเมืองในจอเล็ก วงรัศมีเป็นเมตรจึงดูใหญ่ ย่อครึ่งหนึ่ง
-        L.circle([c.la, c.lo], { radius: r * F.MS, color: red[3], weight: F.MS < 1 ? 1 : 1.5, dashArray: F.MS < 1 ? '3 3' : '5 5', fillColor: red[3], fillOpacity: 0.1 }).bindPopup(popup).addTo(lyr.risk);
+        // มือถือเห็นทั้งเมืองในจอเล็ก วงรัศมีเป็นเมตรจะเล็กจนมองไม่เห็น ใช้วงขนาดคงที่บนจอแทน
+        (F.MS < 1
+          ? L.circleMarker([c.la, c.lo], { keepSize: true, radius: 7, color: red[3], weight: 1.5, dashArray: '3 2', fillColor: red[3], fillOpacity: 0.12 })
+          : L.circle([c.la, c.lo], { radius: r, color: red[3], weight: 1.5, dashArray: '5 5', fillColor: red[3], fillOpacity: 0.1 })).bindPopup(popup).addTo(lyr.risk);
       } else {
         // หมุดที่ประชาชนปักอย่างเดียว วาดโดย report.js (มีปุ่มน้ำลดแล้ว) ไม่ต้องวาดซ้ำ
         if (c.sources.length === 1 && c.sources[0] === 'web' && c.members.every((m) => m.src === 'web' || m.tier === 1)) continue;
