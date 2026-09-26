@@ -414,12 +414,12 @@ window.Flood = (function () {
   };
 })();
 
-// ---------- เมนูหน้าบนมือถือ: แถวเดียว 4 หน้าหลัก + ⋯ (บันทึกการแจ้ง / เกี่ยวกับ) ----------
+// ---------- เมนูหน้าบนมือถือ: แถวเดียว 5 หน้าหลัก + ⋯ (บันทึกการแจ้ง / เกี่ยวกับ) ----------
 (function () {
   const nav = document.querySelector('nav.pages');
   if (!nav) return;
   const here = (nav.querySelector('[aria-current="page"]') || {}).getAttribute?.('href') || '';
-  const MAIN = [['./', 'ภาพรวม'], ['risk.html', 'ถนนเสี่ยง'], ['map.html', 'รายละเอียด'], ['traffy.html', 'Traffy']];
+  const MAIN = [['./', 'ภาพรวม'], ['districts.html', 'เขต'], ['risk.html', 'ถนนเสี่ยง'], ['map.html', 'รายละเอียด'], ['traffy.html', 'Traffy']];
   const MORE = [['log.html', 'บันทึกการแจ้ง'], ['about.html', 'เกี่ยวกับ']];
   const cur = (h) => (h === here ? ' aria-current="page"' : '');
   const bar = document.createElement('nav');

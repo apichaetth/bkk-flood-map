@@ -1,0 +1,45 @@
+<!doctype html>
+<html lang="th">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <title>น้ำท่วมรายเขต กทม.</title>
+  <meta name="description" content="แผนที่ 50 เขตของกรุงเทพฯ ระบายสีตามสถานการณ์น้ำท่วม รวมจากเซ็นเซอร์ กทม. iTIC Traffy ข่าว ฝน และระดับน้ำ">
+  <meta name="theme-color" content="#0f5ea8">
+  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Cpath d='M16 3C11 11 7 15.5 7 20a9 9 0 0 0 18 0c0-4.5-4-9-9-17z' fill='%230f5ea8'/%3E%3C/svg%3E">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+Thai:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/leaflet@1.9.4/dist/leaflet.css">
+  <link rel="stylesheet" href="css/style.css">
+</head>
+<body class="summary">
+  <header class="top">
+    <div class="brand">
+      <svg viewBox="0 0 32 32" aria-hidden="true"><path d="M16 3C11 11 7 15.5 7 20a9 9 0 0 0 18 0c0-4.5-4-9-9-17z"/></svg>
+      <div>
+        <h1>น้ำท่วมรายเขต</h1>
+        <p id="updated" class="sub">กำลังโหลด…</p>
+      </div>
+    </div>
+    <nav class="pages" aria-label="หน้า"><a href="./">ภาพรวม</a><a href="districts.html" aria-current="page">เขต</a><a href="map.html">แผนที่ละเอียด</a><a href="traffy.html">Traffy Fondue</a><a href="risk.html">ถนนเสี่ยง</a><a href="log.html">บันทึกการแจ้ง</a><a href="about.html">เกี่ยวกับ</a></nav>
+    <button id="refresh" class="btn" type="button">↻ รีเฟรช</button>
+  </header>
+  <main class="sum">
+    <section class="card">
+      <div class="card-h"><h2>สถานการณ์รายเขต</h2><span class="muted small" id="dNote"></span></div>
+      <div id="dmap" role="region" aria-label="แผนที่เขตระบายสีตามสถานการณ์น้ำท่วม"></div>
+      <div class="dlegend" id="dLegend"></div>
+      <p class="muted small">สีคิดจากคะแนนรวมของแต่ละเขต: จุดยืนยันแล้ว ×3 + จุดที่มีรายงาน ×1 + ข่าวระบุเขต ×0.5 + พื้นที่เสี่ยง ×0.3 · กดที่เขตเพื่อดูจุดในเขตนั้น</p>
+    </section>
+    <section class="card">
+      <div class="card-h"><h2>อันดับเขต</h2><span class="muted small" id="dCount"></span></div>
+      <ol id="dRank" class="drank"></ol>
+    </section>
+  </main>
+  <script src="https://cdn.jsdelivr.net/npm/leaflet@1.9.4/dist/leaflet.js"></script>
+  <script src="js/core.js" defer></script>
+  <script src="js/agg.js" defer></script>
+  <script src="js/districts.js" defer></script>
+</body>
+</html>

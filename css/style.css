@@ -436,7 +436,7 @@ table.log .thumbs img { width: 56px; height: 56px; object-fit: cover; border-rad
 @media (max-width: 860px) {
   .pages { display: none !important; }
   .mnav { display: flex; order: 4; width: 100%; gap: 3px; position: relative; background: var(--bg); border: 1px solid var(--line); border-radius: 10px; padding: 3px; }
-  .mnav > a, .mnav > .more { flex: 1; text-align: center; text-decoration: none; color: var(--ink2); padding: 6px 2px; border-radius: 7px; font-size: 13.5px; white-space: nowrap; border: 0; background: none; font-family: inherit; }
+  .mnav > a, .mnav > .more { flex: 1; text-align: center; text-decoration: none; color: var(--ink2); padding: 6px 2px; border-radius: 7px; font-size: 13px; white-space: nowrap; border: 0; background: none; font-family: inherit; }
   .mnav > .more { flex: 0 0 38px; font-size: 18px; line-height: 1; }
   .mnav > a[aria-current="page"], .mnav > .more.on { background: var(--accent); color: #fff; font-weight: 600; }
   .mmore { position: absolute; right: 0; top: calc(100% + 4px); z-index: 2000; background: var(--surface); border: 1px solid var(--line); border-radius: 10px; box-shadow: var(--shadow); display: flex; flex-direction: column; min-width: 160px; overflow: hidden; }
@@ -452,3 +452,19 @@ table.log .thumbs img { width: 56px; height: 56px; object-fit: cover; border-rad
 .tmd-bars span { flex: 1; height: 100%; display: flex; align-items: flex-end; position: relative; }
 .tmd-bars i { display: block; width: 100%; min-height: 1px; background: var(--accent); border-radius: 2px 2px 0 0; }
 .tmd-bars em { position: absolute; top: 100%; left: 0; font-style: normal; font-size: 10px; color: var(--muted); padding-top: 2px; }
+
+/* ---------- หน้าเขต ---------- */
+#dmap { height: min(72vh, 640px); border-radius: 10px; background: var(--bg); }
+.dlegend { display: flex; flex-wrap: wrap; gap: 6px 14px; margin: 10px 0 4px; font-size: 13px; }
+.dlegend span { display: inline-flex; align-items: center; gap: 6px; }
+.dlegend i { width: 16px; height: 12px; border-radius: 3px; display: inline-block; border: 1px solid rgba(0,0,0,.08); }
+.dlegend i.none { background: color-mix(in srgb, #9aa4b1 20%, transparent); }
+.drank { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 4px; }
+.drank button { width: 100%; display: grid; grid-template-columns: minmax(96px, 150px) 1fr minmax(110px, auto); gap: 10px; align-items: center; background: none; border: 0; border-bottom: 1px solid var(--line); padding: 7px 2px; text-align: left; font: inherit; color: var(--ink); cursor: pointer; }
+.drank button:hover { background: color-mix(in srgb, var(--accent) 6%, transparent); }
+.drank .dn { font-weight: 600; }
+.drank .dbar { height: 12px; background: var(--bg); border-radius: 6px; overflow: hidden; }
+.drank .dbar i { display: block; height: 100%; border-radius: 6px; }
+.drank .dv { font-size: 13.5px; font-weight: 600; text-align: right; }
+.drank .dv small { display: block; font-weight: 400; color: var(--muted); font-size: 12px; }
+@media (max-width: 600px) { .drank button { grid-template-columns: 1fr auto; } .drank .dbar { grid-column: 1 / -1; grid-row: 2; } #dmap { height: 50vh; } }

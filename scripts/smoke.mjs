@@ -2,7 +2,7 @@
 import { chromium } from 'playwright-core';
 const BASE = process.env.SITE || 'https://apichaetth.github.io/bkk-flood-map/';
 const PAGES = [
-  ['index.html', '#updated'], ['map.html', '#updated'], ['traffy.html', '#updated'],
+  ['index.html', '#updated'], ['districts.html', '#updated'], ['map.html', '#updated'], ['traffy.html', '#updated'],
   ['risk.html', '#updated'], ['log.html', '#updated'], ['about.html', 'h1'],
 ];
 const b = await chromium.launch({ executablePath: process.env.CHROME || '/usr/bin/google-chrome' });
@@ -29,7 +29,7 @@ for (const [w, h, n] of [[390, 844, 'mobile'], [1280, 900, 'desktop']]) {
         extra: document.getElementById('olRain') ? document.getElementById('olRain').textContent.trim().slice(0, 80) : '',
       }), sel);
       const ms = Date.now() - t0;
-      if (errs.length || info.hscroll || info.locate === false || info.tabs.split('|').length !== 6) bad++;
+      if (errs.length || info.hscroll || info.locate === false || info.tabs.split('|').length !== 7) bad++;
       console.log(`\n[${n}] ${pg} (${ms} ms)\n  ${JSON.stringify(info)}${errs.length ? '\n  ' + [...new Set(errs)].slice(0, 12).join('\n  ') : ''}`);
     } catch (e) { bad++; console.log(`\n[${n}] ${pg} FAILED ${e.message}`); }
     await p.close();
