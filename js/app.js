@@ -271,11 +271,15 @@
       S.traffy = d.results
         .map((r) => ({ r, t: isoDate(r.timestamp), lo: num(r.coords && r.coords[0]), la: num(r.coords && r.coords[1]) }))
         .filter((x) => x.la && x.lo && x.t && x.t >= cutoff && inBkk(x.la, x.lo) && x.r.state !== 'เสร็จสิ้น'
-          && (/น้ำท่วม/.test(String(x.r.type || '')) || FLOOD_RE.test(x.r.description || '')))
+          // เรื่องใหม่มักยังไม่ถูกจัดประเภท จึงดูทั้งประเภท (problem_type_abdul / type) และข้อความ
+          && (/น้ำท่วม/.test(String(x.r.problem_type_abdul || '') + String(x.r.type || '')) || FLOOD_RE.test(x.r.description || '')))
         .map((x) => ({ ...x, ...levelFromText(x.r.description) }))
         .filter((x) => x.lv > 0);
       S.traffy.forEach((x) => { if (!newest || x.t > newest) newest = x.t; });
-      setFeed('traffy', 'ok', `${S.traffy.length} เรื่องใน ${TRAFFY_WINDOW_H} ชม.`, newest);
+      // บอกช่วงเวลาที่ข้อมูลครอบคลุมจริง (500 เรื่องล่าสุดอาจย้อนหลังได้ไม่ถึง 24 ชม. ช่วงคนแจ้งเยอะ)
+      const oldest = d.results.length ? isoDate(d.results[d.results.length - 1].timestamp) : null;
+      const span = oldest ? ` · ครอบคลุมเรื่องที่แจ้งตั้งแต่ ${fmtDT(oldest)}` : '';
+      setFeed('traffy', 'ok', `พบเรื่องน้ำท่วม ${S.traffy.length} เรื่อง จากทั้งหมด ${d.results.length} เรื่องล่าสุด${span}`, newest);
     } catch (e) { S.traffy = null; setFeed('traffy', 'fail', e.message); }
     drawTraffy();
   }
