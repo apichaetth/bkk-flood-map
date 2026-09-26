@@ -108,6 +108,8 @@
   const lyr = { districts: L.layerGroup().addTo(map), risk: L.layerGroup().addTo(map), areas: L.layerGroup().addTo(map), roads: L.layerGroup().addTo(map), spots: L.layerGroup().addTo(map), web: L.layerGroup().addTo(map) };
   // พื้นที่เสี่ยงแสดงเป็นค่าเริ่มต้น ยกเลิกติ๊กเพื่อซ่อน
   $('showRisk').onchange = (e) => { if (e.target.checked) map.addLayer(lyr.risk); else map.removeLayer(lyr.risk); };
+  // ยกเลิกติ๊กเพื่อดูเฉพาะถนนที่ไฮไลท์สีแดง (ซ่อนจุด วงบริเวณ และหมุดประชาชน)
+  $('showSpots').onchange = (e) => ['spots', 'areas', 'web'].forEach((k) => (e.target.checked ? map.addLayer(lyr[k]) : map.removeLayer(lyr[k])));
 
   // ---------- เรดาร์ฝน (RainViewer) + กล้อง CCTV สาธารณะ ----------
   lyr.radar = L.layerGroup().addTo(map);
