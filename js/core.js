@@ -263,6 +263,27 @@ window.Flood = (function () {
     return id;
   }
 
+  // 9) กล้อง CCTV สาธารณะ และเรดาร์ฝน: ลองดึงตรงก่อน ถ้าไม่ได้ใช้ไฟล์ที่ GitHub Actions ดึงไว้
+  async function fetchCams() {
+    try {
+      const d = await getJSON(URL.cams, 30000);
+      if (Array.isArray(d)) return d;
+      throw new Error('รูปแบบข้อมูลไม่ถูกต้อง');
+    } catch (e) {
+      const f = await getJSON('data/cams.json?t=' + Date.now(), 20000).catch(() => null);
+      if (f && Array.isArray(f.cams)) return f.cams;
+      throw e;
+    }
+  }
+  async function fetchRadar() {
+    try { return await getJSON(URL.radar, 20000); }
+    catch (e) {
+      const f = await getJSON('data/radar.json?t=' + Date.now(), 20000).catch(() => null);
+      if (f && f.radar) return f;
+      throw e;
+    }
+  }
+
   // ข้อความผิดพลาดที่อ่านเข้าใจง่าย
   function errMsg(key, e) {
     // เซิร์ฟเวอร์ กทม. ตอบ 503 "Under pressure" โดยไม่มี CORS header เบราว์เซอร์จึงเห็นเป็น Failed to fetch
@@ -291,7 +312,7 @@ window.Flood = (function () {
     REFRESH_MS, TZ, RAIN_HEAVY_MM, URL,
     $, esc, num, inBkk, th, fmtTime, fmtDT, ago, bkkDate, isoDate, distKm, getJSON, cssVar, store,
     LEVEL, badge, sensorLevel, wlLevel, rainStep, SEV_LV, levelFromText,
-    fetchSensors, fetchEvents, fetchTraffy, traffyRaw, isFloodTicket, fetchWebReports, reportEndpoint, deviceId, WEB_LEVEL, fetchRain, fetchWl, fetchNews, fetchTmd, errMsg,
+    fetchSensors, fetchEvents, fetchTraffy, traffyRaw, fetchCams, fetchRadar, isFloodTicket, fetchWebReports, reportEndpoint, deviceId, WEB_LEVEL, fetchRain, fetchWl, fetchNews, fetchTmd, errMsg,
     loadDistricts, districtAt,
   };
 })();

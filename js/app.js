@@ -386,7 +386,7 @@
   async function loadCams() {
     setFeed('cam', 'loading');
     try {
-      const d = await getJSON(URL.cams);
+      const d = await Flood.fetchCams();
       if (!Array.isArray(d)) throw new Error('รูปแบบข้อมูลไม่ถูกต้อง');
       // เฉพาะกล้องที่เผยแพร่สาธารณะผ่าน HTTPS และยังไม่ถูกระงับ
       S.cam = d.map((c) => ({ c, la: num(c.latitude), lo: num(c.longitude) }))
@@ -452,7 +452,7 @@
   async function loadRadar() {
     setFeed('radar', 'loading');
     try {
-      const d = await getJSON(URL.radar, 20000);
+      const d = await Flood.fetchRadar();
       const f = d.radar && d.radar.past && d.radar.past[d.radar.past.length - 1];
       if (!f) throw new Error('ไม่มีภาพเรดาร์');
       layers.radar.clearLayers();

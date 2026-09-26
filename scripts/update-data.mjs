@@ -351,6 +351,24 @@ async function updateTraffy(meta) {
   meta.sources.traffy = { ok: true, fetched: d.results.length, flood: fresh.length, kept: items.length };
 }
 
+// ---------- สำรองรายชื่อกล้อง CCTV และภาพเรดาร์ล่าสุด (ใช้เมื่อเบราว์เซอร์ดึงตรงไม่ได้) ----------
+async function updateCamsRadar(meta) {
+  try {
+    const cams = JSON.parse(await fetchText('https://camera.longdo.com/feed/?command=json', {}, 45000));
+    const keep = (Array.isArray(cams) ? cams : []).filter((c) => {
+      const la = +c.latitude, lo = +c.longitude;
+      return la >= 13.48 && la <= 13.97 && lo >= 100.32 && lo <= 100.95 && /^https:\/\//.test(c.hls_url || '') && !/tempsus/.test(c.hls_url);
+    }).map((c) => ({ camid: c.camid, title: c.title, latitude: c.latitude, longitude: c.longitude, hls_url: c.hls_url, imgurl: c.imgurl, organization: c.organization, sponsertext: c.sponsertext }));
+    if (keep.length) await writeJSON('cams.json', { updated: now.toISOString(), cams: keep });
+    meta.sources.cams = { ok: true, count: keep.length };
+  } catch (e) { log('cams failed:', e.message); meta.sources.cams = { ok: false, error: e.message }; }
+  try {
+    const d = JSON.parse(await fetchText('https://api.rainviewer.com/public/weather-maps.json', {}, 20000));
+    await writeJSON('radar.json', d);
+    meta.sources.radar = { ok: true };
+  } catch (e) { log('radar failed:', e.message); meta.sources.radar = { ok: false, error: e.message }; }
+}
+
 // ---------- ตรวจระบบรับแจ้งจากประชาชน (Google Apps Script) ว่ายังตอบได้ ----------
 async function checkReports(meta) {
   let ep = '';
@@ -373,5 +391,6 @@ await updateNews(meta).catch((e) => { log('news failed:', e); meta.sources.news 
 await updateTmd(meta);
 await checkReports(meta);
 await updateTraffy(meta);
+await updateCamsRadar(meta);
 await writeJSON('meta.json', meta);
 log('done', JSON.stringify(meta));

@@ -116,13 +116,14 @@
   $('showCam').onchange = (e) => (e.target.checked ? map.addLayer(lyr.cam) : map.removeLayer(lyr.cam));
   async function loadRadar() {
     try {
-      const d = await F.getJSON(F.URL.radar, 20000);
+      const d = await F.fetchRadar();
       const f = d.radar && d.radar.past && d.radar.past[d.radar.past.length - 1];
-      if (!f) return;
+      if (!f) { $('radarSt').textContent = '(ไม่มีภาพเรดาร์)'; return; }
       lyr.radar.clearLayers();
       L.tileLayer(d.host + f.path + '/256/{z}/{x}/{y}/2/1_1.png', { opacity: 0.45, maxNativeZoom: 7, maxZoom: 19, zIndex: 5, attribution: 'เรดาร์ © RainViewer' }).addTo(lyr.radar);
-      $('showRadar').parentElement.title = 'ภาพเรดาร์เวลา ' + fmtTime(new Date(f.time * 1000));
-    } catch (e) { /* ไม่มีเรดาร์ก็ยังใช้งานได้ */ }
+      // เรดาร์แสดงเฉพาะบริเวณที่มีฝน ถ้าไม่มีฝนแผนที่จะดูเหมือนไม่มีอะไร
+      $('radarSt').textContent = `(ภาพเวลา ${fmtTime(new Date(f.time * 1000))} · มีสีเฉพาะที่ฝนตก)`;
+    } catch (e) { $('radarSt').textContent = '(โหลดไม่ได้: ' + e.message + ')'; }
   }
   let hls = null;
   const stopStream = () => { if (hls) { try { hls.destroy(); } catch (e) { /* ignore */ } hls = null; } };
@@ -141,8 +142,8 @@
   }
   async function loadCams() {
     try {
-      const d = await F.getJSON(F.URL.cams, 45000);
-      if (!Array.isArray(d)) return;
+      const d = await F.fetchCams();
+      if (!Array.isArray(d)) { $('camSt').textContent = '(รูปแบบข้อมูลไม่ถูกต้อง)'; return; }
       lyr.cam.clearLayers();
       // เฉพาะกล้องที่เผยแพร่สาธารณะผ่าน HTTPS และยังไม่ถูกระงับ
       for (const c of d) {
@@ -156,7 +157,8 @@
           .on('popupclose', stopStream)
           .addTo(lyr.cam);
       }
-    } catch (e) { /* ไม่มีกล้องก็ยังใช้งานได้ */ }
+      $('camSt').textContent = `(${lyr.cam.getLayers().length} กล้อง · กดดูภาพสด)`;
+    } catch (e) { $('camSt').textContent = '(โหลดไม่ได้: ' + e.message + ')'; }
   }
 
   // ให้ js/report.js ใช้แผนที่หน้านี้สำหรับปักหมุดแจ้งน้ำท่วม/น้ำลด (ไม่ต้องไปหน้าแผนที่ละเอียด)
