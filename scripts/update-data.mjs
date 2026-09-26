@@ -26,7 +26,7 @@ const NEWS_QUERIES = [
   'ระดับน้ำ เจ้าพระยา กรุงเทพ',
 ];
 const NEWS_WINDOW_H = 48;
-const MAX_AI_ITEMS_PER_RUN = 40;
+const MAX_AI_ITEMS_PER_RUN = 10; // free tier จำกัดคำขอต่อนาที/วัน: สรุปเฉพาะข่าวใหม่สุดรอบละ 10 เรื่อง (ส่งครั้งเดียว)
 const MAX_OUTPUT_ITEMS = 80; // จำกัดจำนวนที่แสดง ไม่ให้แผนที่รก
 // YouTube search.list ใช้ 100 หน่วยต่อครั้ง โควต้าฟรี 10,000 หน่วย/วัน
 // ค้นทุก 30 นาที = 48 ครั้ง/วัน ≈ 4,800 หน่วย เหลือเผื่อการกดรันเอง
@@ -170,7 +170,8 @@ ${batch.map((n) => JSON.stringify({ id: n.id, title: n.title, snippet: n.snippet
       } catch (e) {
         lastErr = e;
         log(`gemini ${m} attempt ${attempt + 1} failed:`, e.message);
-        if (!/HTTP (429|500|502|503|504)|abort/i.test(e.message)) break; // เช่น 400/403/404 ลองซ้ำไม่ช่วย
+        // 429 = โควต้าหมด รอไม่กี่วินาทีไม่ช่วย ข้ามไปรุ่นสำรองทันที; 400/403/404 ลองซ้ำก็ไม่ช่วย
+        if (!/HTTP (500|502|503|504)|abort/i.test(e.message)) break;
         await sleep(3000 * 2 ** attempt);
       }
     }
@@ -248,7 +249,9 @@ async function updateNews(meta) {
   log('news items:', newsItems.length, 'youtube items:', yt.items.length);
 
   const hasKey = !!process.env.GEMINI_API_KEY;
-  const todo = items.filter((n) => !cache[n.id] || (hasKey && !cache[n.id].ai)).slice(0, MAX_AI_ITEMS_PER_RUN);
+  // ข่าวเรียงใหม่→เก่าอยู่แล้ว เลือกเฉพาะที่ยังไม่ได้สรุปและไม่เก่าเกิน 24 ชม. (ข่าวเก่าใช้การวิเคราะห์ด้วยคำสำคัญ)
+  const fresh = (n) => now - new Date(n.published) <= 24 * 36e5;
+  const todo = hasKey ? items.filter((n) => fresh(n) && !(cache[n.id] && cache[n.id].ai)).slice(0, MAX_AI_ITEMS_PER_RUN) : [];
   let aiStatus = hasKey ? 'ok' : 'no-key';
   if (hasKey && todo.length) {
     try {
