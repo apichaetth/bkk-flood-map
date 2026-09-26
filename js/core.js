@@ -39,6 +39,8 @@ window.Flood = (function () {
   const esc = (s) => String(s == null ? '' : s).replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
   const num = (v) => { const n = parseFloat(v); return Number.isFinite(n) ? n : null; };
   const inBkk = (la, lo) => la >= BBOX.s && la <= BBOX.n && lo >= BBOX.w && lo <= BBOX.e;
+  // รอบขอบ กทม. ประมาณ 10 กม. (นนทบุรี ปทุมธานี สมุทรปราการ ฯลฯ)
+  const nearBkk = (la, lo) => la >= BBOX.s - 0.1 && la <= BBOX.n + 0.12 && lo >= BBOX.w - 0.1 && lo <= BBOX.e + 0.12;
   const th = (o) => (o && typeof o === 'object' ? o.th || o.en || '' : o || '');
   const fmt = (d, opt) => (d ? new Intl.DateTimeFormat('th-TH', { timeZone: TZ, ...opt }).format(d) : '–');
   const fmtTime = (d) => fmt(d, { hour: '2-digit', minute: '2-digit' }) + ' น.';
@@ -215,9 +217,11 @@ window.Flood = (function () {
     if (!Array.isArray(d.data)) throw new Error('รูปแบบข้อมูลไม่ถูกต้อง');
     const cutoff = Date.now() - 30 * 36e5;
     let newest = null;
-    const items = d.data.filter((x) => x.geocode && String(x.geocode.province_code) === '10')
-      .map((x) => ({ x, t: bkkDate(x.rainfall_datetime), la: num(x.station && x.station.tele_station_lat), lo: num(x.station && x.station.tele_station_long), mm: num(x.rain_24h), mm1: num(x.rain_1h) }))
-      .filter((s) => s.la && s.lo && s.t && s.t >= cutoff && s.mm != null);
+    const toSt = (x) => ({ x, t: bkkDate(x.rainfall_datetime), la: num(x.station && x.station.tele_station_lat), lo: num(x.station && x.station.tele_station_long), mm: num(x.rain_24h), mm1: num(x.rain_1h) });
+    const ok = (s) => s.la && s.lo && s.t && s.t >= cutoff && s.mm != null;
+    const items = d.data.filter((x) => x.geocode && String(x.geocode.province_code) === '10').map(toSt).filter(ok);
+    // สถานีจังหวัดติดขอบ กทม. (แสดงบนแผนที่ละเอียดเท่านั้น ไม่นับในสรุป กทม.)
+    const edge = d.data.filter((x) => x.geocode && String(x.geocode.province_code) !== '10').map(toSt).filter((s) => ok(s) && nearBkk(s.la, s.lo));
     items.forEach((s) => { if (!newest || s.t > newest) newest = s.t; });
     // ฝนลุ่มเจ้าพระยา: สรุปรายจังหวัดจากต้นน้ำลงมา (ฝนต้นน้ำจะกลายเป็นน้ำเหนือไหลลง กทม.)
     const basin = BASIN_PROVINCES.map(([code, name]) => {
@@ -228,7 +232,7 @@ window.Flood = (function () {
       const top = st.reduce((a, b) => (b.mm > a.mm ? b : a));
       return { code, name, n: st.length, max: top.mm, maxAt: top.name, mean: st.reduce((a, b) => a + b.mm, 0) / st.length };
     });
-    return { items, basin, newest, msg: `${items.length} สถานี` };
+    return { items, edge, basin, newest, msg: `${items.length} สถานีใน กทม. + ${edge.length} สถานีรอบขอบ` };
   }
   const BASIN_PROVINCES = [['60', 'นครสวรรค์'], ['61', 'อุทัยธานี'], ['18', 'ชัยนาท'], ['17', 'สิงห์บุรี'], ['16', 'ลพบุรี'], ['15', 'อ่างทอง'],
     ['72', 'สุพรรณบุรี'], ['14', 'พระนครศรีอยุธยา'], ['13', 'ปทุมธานี'], ['12', 'นนทบุรี'], ['10', 'กรุงเทพมหานคร'], ['11', 'สมุทรปราการ']];
@@ -239,10 +243,10 @@ window.Flood = (function () {
     const arr = d && d.waterlevel_data && d.waterlevel_data.data;
     if (!Array.isArray(arr)) throw new Error('รูปแบบข้อมูลไม่ถูกต้อง');
     let newest = null;
-    const items = arr.filter((x) => x.geocode && String(x.geocode.province_code) === '10')
-      .map((x) => ({ x, t: bkkDate(x.waterlevel_datetime), la: num(x.station && x.station.tele_station_lat), lo: num(x.station && x.station.tele_station_long), pct: num(x.storage_percent), msl: num(x.waterlevel_msl), prev: num(x.waterlevel_msl_previous), bank: num(x.station && x.station.min_bank) }))
-      .filter((s) => s.la && s.lo && s.t)
-      .map((s) => ({ ...s, stale: Date.now() - s.t > WL_STALE_H * 36e5 }));
+    const toSt = (x) => ({ x, t: bkkDate(x.waterlevel_datetime), la: num(x.station && x.station.tele_station_lat), lo: num(x.station && x.station.tele_station_long), pct: num(x.storage_percent), msl: num(x.waterlevel_msl), prev: num(x.waterlevel_msl_previous), bank: num(x.station && x.station.min_bank) });
+    const fin = (s) => ({ ...s, stale: Date.now() - s.t > WL_STALE_H * 36e5 });
+    const items = arr.filter((x) => x.geocode && String(x.geocode.province_code) === '10').map(toSt).filter((s) => s.la && s.lo && s.t).map(fin);
+    const edge = arr.filter((x) => x.geocode && String(x.geocode.province_code) !== '10').map(toSt).filter((s) => s.la && s.lo && s.t && nearBkk(s.la, s.lo)).map(fin);
     items.forEach((s) => { if (!newest || s.t > newest) newest = s.t; });
     // น้ำเหนือ: สถานีสำคัญบนแม่น้ำเจ้าพระยา เรียงจากต้นน้ำลงมา
     const upstream = CPY_STATIONS.map(([code, label]) => {
@@ -253,7 +257,7 @@ window.Flood = (function () {
         msl: num(x.waterlevel_msl), prev: num(x.waterlevel_msl_previous), bank: num(x.station.min_bank), q: num(x.discharge),
         stale: !t || Date.now() - t > WL_STALE_H * 36e5 };
     });
-    return { items, upstream, newest, msg: `${items.length} สถานีใน กทม. · น้ำเหนือ ${upstream.filter((u) => !u.missing).length} สถานี` };
+    return { items, edge, upstream, newest, msg: `${items.length} สถานีใน กทม. + ${edge.length} รอบขอบ · น้ำเหนือ ${upstream.filter((u) => !u.missing).length} สถานี` };
   }
   const CPY_STATIONS = [
     ['C.2', 'นครสวรรค์ (ค่ายจิรประวัติ)'],
@@ -387,7 +391,7 @@ window.Flood = (function () {
 
   return {
     REFRESH_MS, TZ, RAIN_HEAVY_MM, URL,
-    $, esc, num, inBkk, th, fmtTime, fmtDT, ago, bkkDate, isoDate, distKm, getJSON, cssVar, store,
+    $, esc, num, inBkk, nearBkk, th, fmtTime, fmtDT, ago, bkkDate, isoDate, distKm, getJSON, cssVar, store,
     LEVEL, badge, sensorLevel, wlLevel, rainStep, SEV_LV, levelFromText,
     fetchSensors, fetchEvents, fetchTraffy, traffyRaw, fetchCams, fetchRadar, isFloodTicket, fetchWebReports, fetchTw, twBkkHeavy, reportEndpoint, deviceId, WEB_LEVEL, fetchRain, fetchWl, fetchNews, fetchTmd, errMsg,
     loadDistricts, districtAt, addLocate,

@@ -406,7 +406,13 @@ async function updateThaiwater(meta) {
         } catch (e) { log('thaiwater image failed:', m.filename, e.message); }
       }
     }
-    await writeJSON('thaiwater.json', { updated: now.toISOString(), dams, heavy, images });
+    // พายุ: เก็บดิบไว้ก่อน (โครงสร้างยังไม่ทราบแน่ชัด) และพิมพ์โครงสร้างลง log
+    let storm = dig(j, 'storm', 'data', 'data') || null;
+    const shape = (v, dp = 0) => Array.isArray(v) ? `[${v.length}]` + (v.length && dp < 3 ? shape(v[0], dp + 1) : '')
+      : v && typeof v === 'object' ? '{' + Object.keys(v).slice(0, 15).map((k) => k + (dp < 3 ? ':' + shape(v[k], dp + 1) : '')).join(',') + '}' : typeof v;
+    log('storm shape:', shape(storm).slice(0, 1500));
+    if (storm && JSON.stringify(storm).length > 300000) storm = null;
+    await writeJSON('thaiwater.json', { updated: now.toISOString(), dams, heavy, images, storm });
     meta.sources.thaiwater = { ok: true, dams: dams.length, heavy: heavy.length, images: images.length };
   } catch (e) { log('thaiwater failed:', e.message); meta.sources.thaiwater = { ok: false, error: e.message }; }
 }

@@ -187,20 +187,24 @@
     setFeed('rain', 'loading');
     try {
       const r = await Flood.fetchRain();
-      S.rain = r.items; S.basin = r.basin;
+      S.rain = r.items; S.rainEdge = (r.edge || []).map((x) => ({ ...x, edge: true })); S.basin = r.basin;
       setFeed('rain', 'ok', r.msg, r.newest);
     } catch (e) { S.rain = null; setFeed('rain', 'fail', Flood.errMsg('rain', e)); }
     drawRain();
   }
   function drawRain() {
     layers.rain.clearLayers();
-    if (!S.rain) { $('kRain').textContent = '–'; $('listRain').innerHTML = '<div class="muted small">ไม่มีข้อมูลฝน</div>'; return; }
-    for (const s of S.rain) {
+    if (!S.rain) { $('kRain').textContent = '–'; $('listRain').innerHTML = $('listRain1').innerHTML = '<div class="muted small">ไม่มีข้อมูลฝน</div>'; return; }
+    const all = [...S.rain, ...(S.rainEdge || [])];
+    for (const s of all) {
       const st = rainStep(s.mm);
       const html = `<div class="pp"><div class="m">สถานีวัดฝน · ${esc(th(s.x.agency && s.x.agency.agency_shortname))}</div><h3>${esc(th(s.x.station.tele_station_name))}</h3>
         ${s.mm > RAIN_HEAVY_MM ? badge(3, 'ฝน' + st[2]) : ''}
         <div><span class="big">${s.mm}</span> มม. / 24 ชม. (${st[2]})${s.mm1 != null ? ` · ${s.mm1} มม. ชั่วโมงล่าสุด` : ''}</div>
-        <div class="m">เขต${esc(th(s.x.geocode.amphoe_name))} · ${fmtDT(s.t)} (${ago(s.t)})</div></div>`;
+        ${s.mm1 >= 10 ? badge(3, 'ตอนนี้ฝน' + rain1(s.mm1)[1]) : ''}
+        <div class="m">${esc(loc(s))} · ${fmtDT(s.t)} (${ago(s.t)})</div></div>`;
+      // ฝนตกหนักในชั่วโมงล่าสุด: วงแดงรอบจุด ให้เห็นว่าตอนนี้ฝนกำลังหนัก
+      if (s.mm1 >= 10) L.circleMarker([s.la, s.lo], { radius: 9 + Math.min(8, s.mm1 / 5), color: cssVar('--critical'), weight: 2.5, fill: false, dashArray: '4 3', interactive: false }).addTo(layers.rain);
       // ฝนหนัก (> 35 มม./24 ชม.) ขอบสีแดง ให้เห็นชัดบนแผนที่
       const heavy = s.mm > RAIN_HEAVY_MM;
       // ฝนน้อย/ไม่มีฝน: จุดเล็กและจาง ไม่ให้แย่งสายตาจากจุดที่สำคัญ
@@ -219,8 +223,12 @@
     $('kRain').textContent = top.length ? top[0].mm.toFixed(0) : '–';
     $('kRainAt').textContent = top.length ? 'มม. · ' + th(top[0].x.station.tele_station_name) : 'มม.';
     listInto('listRain', top.filter((s) => s.mm > 0).slice(0, 6), (s) => ({
-      dot: s.mm > RAIN_HEAVY_MM ? heavyRed(s.mm) : rainStep(s.mm)[1], title: th(s.x.station.tele_station_name), sub: `เขต${th(s.x.geocode.amphoe_name)} · ${fmtTime(s.t)}`, right: s.mm + ' มม.', go: s,
+      dot: s.mm > RAIN_HEAVY_MM ? heavyRed(s.mm) : rainStep(s.mm)[1], title: th(s.x.station.tele_station_name), sub: `${loc(s)} · ${fmtTime(s.t)}`, right: s.mm + ' มม.', go: s,
     }), 'ไม่มีฝนใน 24 ชม. ที่ผ่านมา');
+    // ฝนตอนนี้: เรียงตามฝน 1 ชม. ล่าสุด (รวมสถานีรอบขอบ กทม.) เฉพาะค่าใน 2 ชม. ที่ผ่านมา
+    const now1 = all.filter((s) => s.mm1 > 0 && Date.now() - s.t < 2 * 36e5).sort((a, b) => b.mm1 - a.mm1).slice(0, 6);
+    listInto('listRain1', now1, (s) => ({ dot: LEVEL[rain1(s.mm1)[0]].color, title: th(s.x.station.tele_station_name), sub: `${loc(s)} · ${rain1(s.mm1)[1]} · ${fmtTime(s.t)}`, right: s.mm1 + ' มม./ชม.', go: s }),
+      'ชั่วโมงล่าสุดไม่มีฝนที่สถานีใน กทม. และรอบ ๆ');
     renderBasin();
   }
   // ฝนลุ่มเจ้าพระยา: แต่ละจังหวัดแสดงฝนสูงสุด (และเฉลี่ย) 24 ชม. เรียงจากต้นน้ำลงมา
@@ -265,12 +273,17 @@
     return 'rgb(' + from.map((v, i) => Math.round(v + (to[i] - v) * t)).join(',') + ')';
   }
 
+  // ความแรงฝนรายชั่วโมง (เกณฑ์กรมอุตุฯ โดยประมาณ)
+  const rain1 = (mm) => (mm >= 30 ? [3, 'หนักมาก'] : mm >= 10 ? [2, 'หนัก'] : mm >= 2.5 ? [1, 'ปานกลาง'] : [0, 'เล็กน้อย']);
+  // ตำแหน่ง: ใน กทม. บอกเขต, รอบขอบบอกอำเภอ/จังหวัด
+  const loc = (s) => (s.edge ? `อ.${th(s.x.geocode.amphoe_name)} จ.${th(s.x.geocode.province_name)} (นอก กทม.)` : `เขต${th(s.x.geocode.amphoe_name)}`);
+
   // ---------- 5) ThaiWater ระดับน้ำ ----------
   async function loadWl() {
     setFeed('wl', 'loading');
     try {
       const r = await Flood.fetchWl();
-      S.wl = r.items; S.cpy = r.upstream;
+      S.wl = r.items; S.wlEdge = (r.edge || []).map((x) => ({ ...x, edge: true })); S.cpy = r.upstream;
       setFeed('wl', 'ok', r.msg, r.newest);
     } catch (e) { S.wl = null; setFeed('wl', 'fail', Flood.errMsg('wl', e)); }
     drawWl();
@@ -306,16 +319,17 @@
   function drawWl() {
     layers.wl.clearLayers();
     if (!S.wl) { $('listWl').innerHTML = '<div class="muted small">ไม่มีข้อมูลระดับน้ำ</div>'; return; }
-    for (const s of S.wl) {
+    const allWl = [...S.wl, ...(S.wlEdge || [])];
+    for (const s of allWl) {
       const lv = s.pct != null ? wlLevel(s.pct) : 0;
       const html = `<div class="pp"><div class="m">สถานีวัดระดับน้ำ · ${esc(th(s.x.agency && s.x.agency.agency_shortname))}</div><h3>${esc(th(s.x.station.tele_station_name))}</h3>
         ${s.pct != null ? badge(lv, `${s.pct.toFixed(0)}% ของตลิ่ง`) : ''} ${s.stale ? '<span class="badge" style="--c:var(--stale)">ค่าเก่า</span>' : ''}
         <div style="margin-top:4px"><span class="big">${s.msl != null ? s.msl.toFixed(2) : '–'}</span> ม.รทก. <span class="m">${trend(s)}</span></div>
-        <div class="m">ตลิ่งต่ำสุด ${s.bank != null ? s.bank.toFixed(2) + ' ม.รทก.' : '–'} · เขต${esc(th(s.x.geocode.amphoe_name))}<br>${fmtDT(s.t)} (${ago(s.t)})</div></div>`;
+        <div class="m">ตลิ่งต่ำสุด ${s.bank != null ? s.bank.toFixed(2) + ' ม.รทก.' : '–'} · ${esc(loc(s))}<br>${fmtDT(s.t)} (${ago(s.t)})</div></div>`;
       s.marker = L.marker([s.la, s.lo], { icon: icon('wl', LEVEL[lv].color, '', 18, s.stale ? 'stale' : ''), zIndexOffset: 200 }).bindPopup(html).addTo(layers.wl);
     }
-    const hi = S.wl.filter((s) => !s.stale && s.pct != null).sort((a, b) => b.pct - a.pct).slice(0, 6);
-    listInto('listWl', hi, (s) => ({ dot: LEVEL[wlLevel(s.pct)].color, title: th(s.x.station.tele_station_name), sub: `${trend(s) || 'ไม่มีแนวโน้ม'} · ${fmtTime(s.t)}`, right: s.pct.toFixed(0) + '%', go: s }), 'ไม่มีสถานีที่มีค่าล่าสุด');
+    const hi = allWl.filter((s) => !s.stale && s.pct != null).sort((a, b) => b.pct - a.pct).slice(0, 6);
+    listInto('listWl', hi, (s) => ({ dot: LEVEL[wlLevel(s.pct)].color, title: th(s.x.station.tele_station_name), sub: `${s.edge ? loc(s) + ' · ' : ''}${trend(s) || 'ไม่มีแนวโน้ม'} · ${fmtTime(s.t)}`, right: s.pct.toFixed(0) + '%', go: s }), 'ไม่มีสถานีที่มีค่าล่าสุด');
     renderCpy();
   }
 
