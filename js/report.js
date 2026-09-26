@@ -41,38 +41,69 @@
         ${media(r)}
         <div class="m" style="margin-top:6px">แจ้งโดย ${esc(r.reporter)} · ${fmtDT(x.t)} (${ago(x.t)})<br>
         <a href="log.html?report=${encodeURIComponent(r.id)}">ประวัติของหมุดนี้ (${esc(r.id)})</a></div>
-        <button type="button" class="btn close-btn" data-id="${esc(r.id)}">✔ น้ำลดแล้ว / เอาหมุดออก</button></div>`;
-      L.marker([x.la, x.lo], { icon: icon('web', F.LEVEL[x.lv].color, '!', 18, F.LEVEL[x.lv].dark ? 'dark' : ''), zIndexOffset: 900 })
+        <button type="button" class="btn big ok close-btn" data-id="${esc(r.id)}">✔ น้ำลดแล้ว / เอาหมุดออก</button></div>`;
+      L.marker([x.la, x.lo], { icon: icon('web', F.LEVEL[x.lv].color, '!', 12, F.LEVEL[x.lv].dark ? 'dark' : ''), zIndexOffset: 900 })
         .bindPopup(html, { maxWidth: 320, minWidth: 240 })
-        .on('popupopen', (e) => { const b = e.popup.getElement().querySelector('.close-btn'); if (b) b.onclick = () => openClose(r); })
+        .on('click', () => { if (mode === 'close') { setMode(''); openClose(r); } })
+        .on('popupopen', (e) => {
+          if (mode === 'close') { map.closePopup(); return; }
+          const b = e.popup.getElement().querySelector('.close-btn'); if (b) b.onclick = () => openClose(r);
+        })
         .addTo(layers.web);
     }
   }
 
-  // ---------- ปุ่มแจ้ง + โหมดปักหมุด ----------
-  const fab = document.createElement('div');
-  fab.className = 'report-fab';
-  fab.innerHTML = '<button type="button" id="rpStart" class="btn primary">📍 แจ้งน้ำท่วม</button>';
-  $('map').appendChild(fab);
-  L.DomEvent.disableClickPropagation(fab);
+  // ---------- ปุ่มแจ้ง (ใหญ่) + โหมดปักหมุด / โหมดเลือกหมุดที่น้ำลด ----------
+  const box = map.getContainer();
+  // หน้าไหนมีปุ่มของตัวเอง (M.buttons) ใช้ปุ่มนั้น ไม่งั้นสร้างปุ่มลอยบนแผนที่
+  let btnReport = M.buttons && M.buttons.report, btnClose = M.buttons && M.buttons.close, fab = null;
+  if (!btnReport) {
+    fab = document.createElement('div');
+    fab.className = 'report-fab';
+    fab.innerHTML = '<button type="button" class="btn big primary">📍 แจ้งน้ำท่วม</button><button type="button" class="btn big ok">✔ แจ้งน้ำลด</button>';
+    box.appendChild(fab);
+    L.DomEvent.disableClickPropagation(fab);
+    [btnReport, btnClose] = fab.querySelectorAll('button');
+  }
   const bar = document.createElement('div');
   bar.className = 'pick-bar'; bar.hidden = true;
-  bar.innerHTML = `<span>แตะบนแผนที่ตรงจุดที่น้ำท่วม</span>
-    <button type="button" class="btn" id="rpGps">ใช้ตำแหน่งปัจจุบัน</button><button type="button" class="btn" id="rpCancel">ยกเลิก</button>`;
-  $('map').appendChild(bar);
+  box.appendChild(bar);
   L.DomEvent.disableClickPropagation(bar);
 
-  let picking = false, tempMarker = null;
+  let mode = '', tempMarker = null; // mode: 'pick' = เลือกจุดแจ้งน้ำท่วม, 'close' = เลือกหมุดที่น้ำลดแล้ว
+  function setMode(m) {
+    mode = m;
+    bar.hidden = !m;
+    if (fab) fab.hidden = !!m;
+    box.classList.toggle('picking', m === 'pick');
+    box.classList.toggle('closing', m === 'close');
+    if (m && M.minimizePanel) M.minimizePanel();
+    if (m === 'pick') {
+      bar.innerHTML = `<span>แตะบนแผนที่ตรงจุดที่น้ำท่วม</span>
+        <button type="button" class="btn" data-a="gps">ใช้ตำแหน่งปัจจุบัน</button><button type="button" class="btn" data-a="cancel">ยกเลิก</button>`;
+    } else if (m === 'close') {
+      bar.innerHTML = `<span>แตะหมุด <b class="ring">!</b> ที่น้ำลดแล้ว</span><button type="button" class="btn" data-a="cancel">ยกเลิก</button>`;
+    }
+    const g = bar.querySelector('[data-a=gps]'); if (g) g.onclick = useGps;
+    const c = bar.querySelector('[data-a=cancel]'); if (c) c.onclick = () => setMode('');
+  }
   function startPick() {
     if (!endpoint) { alert('ระบบแจ้งน้ำท่วมยังไม่เปิดใช้งาน'); return; }
-    picking = true; bar.hidden = false; fab.hidden = true;
-    map.getContainer().classList.add('picking');
-    if (M.minimizePanel) M.minimizePanel();
+    map.closePopup();
+    setMode('pick');
+    box.scrollIntoView({ behavior: 'smooth', block: 'center' });
   }
-  function stopPick() {
-    picking = false; bar.hidden = true; fab.hidden = false;
-    map.getContainer().classList.remove('picking');
+  function startClose() {
+    if (!endpoint) { alert('ระบบแจ้งน้ำท่วมยังไม่เปิดใช้งาน'); return; }
+    if (!reports.length) { alert('ยังไม่มีหมุดที่ประชาชนแจ้งไว้ในขณะนี้'); return; }
+    map.closePopup();
+    if (!map.hasLayer(layers.web)) map.addLayer(layers.web);
+    // ซูมให้เห็นหมุดที่เปิดอยู่ทั้งหมด
+    map.fitBounds(L.latLngBounds(reports.map((x) => [x.la, x.lo])).pad(0.2), { maxZoom: 16 });
+    setMode('close');
+    box.scrollIntoView({ behavior: 'smooth', block: 'center' });
   }
+  const stopPick = () => setMode('');
   function picked(latlng) {
     if (!F.inBkk(latlng.lat, latlng.lng)) { alert('ตำแหน่งต้องอยู่ในกรุงเทพมหานคร'); return; }
     stopPick();
@@ -81,17 +112,26 @@
     map.setView(latlng, Math.max(map.getZoom(), 16));
     openCreate(latlng);
   }
-  map.on('click', (e) => { if (picking) picked(e.latlng); });
-  $('rpStart').onclick = startPick;
-  $('rpCancel').onclick = stopPick;
-  $('rpGps').onclick = () => {
+  // จับการแตะที่ระดับกล่องแผนที่ (capture) เพราะชั้นข้อมูลบางชั้น (เช่นเส้นเขต/วงพื้นที่เสี่ยง) กินคลิกไว้ไม่ส่งต่อให้แผนที่
+  let downAt = null;
+  box.addEventListener('pointerdown', (e) => { downAt = [e.clientX, e.clientY]; }, true);
+  box.addEventListener('click', (e) => {
+    if (mode !== 'pick' || e.target.closest('.leaflet-control, .pick-bar, .report-fab')) return;
+    if (downAt && Math.hypot(e.clientX - downAt[0], e.clientY - downAt[1]) > 6) return; // เป็นการลากแผนที่
+    e.stopPropagation(); e.preventDefault();
+    picked(map.mouseEventToLatLng(e));
+  }, true);
+  btnReport.onclick = startPick;
+  if (btnClose) btnClose.onclick = startClose;
+  function useGps(ev) {
+    const b = ev.currentTarget;
     if (!navigator.geolocation) { alert('อุปกรณ์นี้ไม่รองรับการหาตำแหน่ง'); return; }
-    $('rpGps').textContent = 'กำลังหาตำแหน่ง…';
+    b.textContent = 'กำลังหาตำแหน่ง…';
     navigator.geolocation.getCurrentPosition(
-      (p) => { $('rpGps').textContent = 'ใช้ตำแหน่งปัจจุบัน'; picked(L.latLng(p.coords.latitude, p.coords.longitude)); },
-      () => { $('rpGps').textContent = 'ใช้ตำแหน่งปัจจุบัน'; alert('หาตำแหน่งไม่ได้ กรุณาแตะบนแผนที่แทน'); },
+      (p) => { b.textContent = 'ใช้ตำแหน่งปัจจุบัน'; picked(L.latLng(p.coords.latitude, p.coords.longitude)); },
+      () => { b.textContent = 'ใช้ตำแหน่งปัจจุบัน'; alert('หาตำแหน่งไม่ได้ กรุณาแตะบนแผนที่แทน'); },
       { enableHighAccuracy: true, timeout: 15000 });
-  };
+  }
 
   // ---------- ไฟล์: ย่อรูป / ตรวจวิดีโอ ----------
   async function shrinkImage(file) {
@@ -171,7 +211,7 @@
         msg.textContent = `ส่งแล้ว ขอบคุณครับ (รหัส ${res.id})`;
         if (tempMarker) tempMarker.remove();
         setTimeout(() => dlg.close(), 1200);
-        load();
+        changed();
       } catch (err) { msg.textContent = 'ส่งไม่สำเร็จ: ' + err.message; btn.disabled = false; }
     };
     dlg.showModal();
@@ -205,12 +245,13 @@
         await send({ action: 'close', id: r.id, name, device: F.deviceId(), ua: navigator.userAgent, reason: fd.get('reason'), photos, website: fd.get('website') });
         msg.textContent = 'บันทึกแล้ว ขอบคุณครับ';
         setTimeout(() => dlg.close(), 900);
-        load();
+        changed();
       } catch (err) { msg.textContent = 'ส่งไม่สำเร็จ: ' + err.message; btn.disabled = false; }
     };
     dlg.showModal();
   }
 
+  function changed() { load(); if (M.onChange) M.onChange(); }
   async function send(payload) {
     // text/plain เพื่อไม่ให้เบราว์เซอร์ต้องทำ CORS preflight กับ Apps Script
     const res = await F.getJSON(endpoint, 120000, { method: 'POST', body: JSON.stringify(payload), headers: { 'Content-Type': 'text/plain;charset=utf-8' } });
@@ -221,7 +262,7 @@
   // ---------- เริ่มทำงาน ----------
   F.reportEndpoint().then((ep) => {
     endpoint = ep;
-    if (!ep) { fab.querySelector('button').title = 'ระบบแจ้งยังไม่เปิดใช้งาน'; fab.classList.add('off'); }
+    if (!ep) [btnReport, btnClose].forEach((b) => { if (b) { b.title = 'ระบบแจ้งยังไม่เปิดใช้งาน'; b.classList.add('off'); } });
     load();
     if (new URLSearchParams(location.search).get('report') === '1' && ep) startPick();
   });

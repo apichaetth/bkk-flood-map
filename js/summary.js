@@ -105,7 +105,20 @@
     maxZoom: 19, className: 'basemap', attribution: '© <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors',
   }).addTo(map);
   map.createPane('roads').style.zIndex = 450;
-  const lyr = { districts: L.layerGroup().addTo(map), areas: L.layerGroup().addTo(map), roads: L.layerGroup().addTo(map), spots: L.layerGroup().addTo(map) };
+  const lyr = { districts: L.layerGroup().addTo(map), risk: L.layerGroup(), areas: L.layerGroup().addTo(map), roads: L.layerGroup().addTo(map), spots: L.layerGroup().addTo(map), web: L.layerGroup().addTo(map) };
+  // พื้นที่เสี่ยงซ่อนไว้ก่อน เปิดเมื่อผู้ใช้ติ๊ก
+  $('showRisk').onchange = (e) => { if (e.target.checked) map.addLayer(lyr.risk); else map.removeLayer(lyr.risk); };
+
+  // ให้ js/report.js ใช้แผนที่หน้านี้สำหรับปักหมุดแจ้งน้ำท่วม/น้ำลด (ไม่ต้องไปหน้าแผนที่ละเอียด)
+  const mkIcon = (cls, color, text = '', size = 18, extra = '') => L.divIcon({
+    className: '', iconSize: [size, size], iconAnchor: [size / 2, size / 2], popupAnchor: [0, -size / 2],
+    html: `<div class="mk ${cls} ${extra}" style="--c:${color};width:${size}px;height:${size}px">${text}</div>`,
+  });
+  window.FloodMap = {
+    map, layers: { web: lyr.web }, setFeed: () => {}, icon: mkIcon,
+    buttons: { report: $('btnReport'), close: $('btnClose') },
+    onChange: () => refresh(),
+  };
 
   const RED = () => ({ 3: cssVar('--flood3'), 2: cssVar('--flood2'), 1: cssVar('--flood1') });
   function drawDistricts(geo, dists) {
@@ -125,7 +138,7 @@
     }).addTo(lyr.districts);
   }
   function drawSpots(clusters) {
-    lyr.spots.clearLayers(); lyr.areas.clearLayers();
+    lyr.spots.clearLayers(); lyr.areas.clearLayers(); lyr.risk.clearLayers();
     const red = RED();
     for (const c of clusters) {
       const popup = `<div class="pp">${tag(c.tier)}<h3>${esc(c.name)}</h3><div class="m">เขต${esc(c.district || '–')} · ${c.t ? fmtDT(c.t) : ''}</div>
@@ -133,11 +146,13 @@
         <a href="${mapLink(c)}">ดูบนแผนที่ละเอียด →</a></div>`;
       if (c.tier === 1) {
         const r = Math.max(...c.members.map((m) => m.radius || 250));
-        L.circle([c.la, c.lo], { radius: r, color: red[3], weight: 1.5, dashArray: '5 5', fillColor: red[3], fillOpacity: 0.1 }).bindPopup(popup).addTo(lyr.areas);
+        L.circle([c.la, c.lo], { radius: r, color: red[3], weight: 1.5, dashArray: '5 5', fillColor: red[3], fillOpacity: 0.1 }).bindPopup(popup).addTo(lyr.risk);
       } else {
+        // หมุดที่ประชาชนปักอย่างเดียว วาดโดย report.js (มีปุ่มน้ำลดแล้ว) ไม่ต้องวาดซ้ำ
+        if (c.sources.length === 1 && c.sources[0] === 'web' && c.members.every((m) => m.src === 'web' || m.tier === 1)) continue;
         // บริเวณรอบจุด (เผื่อไม่มีข้อมูลถนน) + จุด
-        L.circle([c.la, c.lo], { radius: 250, stroke: false, fillColor: red[3], fillOpacity: c.tier === 3 ? 0.22 : 0.14, interactive: false }).addTo(lyr.areas);
-        L.circleMarker([c.la, c.lo], { radius: c.tier === 3 ? 8 : 6, color: '#fff', weight: 2, fillColor: red[c.tier], fillOpacity: 1 }).bindPopup(popup).addTo(lyr.spots);
+        L.circle([c.la, c.lo], { radius: 120, stroke: false, fillColor: red[3], fillOpacity: c.tier === 3 ? 0.18 : 0.12, interactive: false }).addTo(lyr.areas);
+        L.circleMarker([c.la, c.lo], { radius: c.tier === 3 ? 4.5 : 3.5, color: '#fff', weight: 1, fillColor: red[c.tier], fillOpacity: 1 }).bindPopup(popup).addTo(lyr.spots);
       }
     }
   }
@@ -259,6 +274,7 @@
     $('allCount').textContent = `${main.length} จุด`;
     $('spots').innerHTML = main.length ? main.map(card).join('') : '<p class="muted">ยังไม่มีจุดที่มีรายงานน้ำท่วม</p>';
     $('riskSpots').innerHTML = risk.length ? risk.map(card).join('') : '<p class="muted">ไม่มีพื้นที่เสี่ยงในขณะนี้</p>';
+    $('riskCount').textContent = risk.length;
   }
   async function renderTmd() {
     try {

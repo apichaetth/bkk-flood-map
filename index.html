@@ -47,13 +47,18 @@
 
     <section class="grid2">
       <div class="card mapcard">
-        <div class="card-h"><h2>แผนที่จุดน้ำท่วม</h2><span><a class="btn primary sm" href="map.html?report=1">📍 แจ้งน้ำท่วม</a> <a class="more" href="map.html">แผนที่ละเอียด →</a></span></div>
+        <div class="card-h"><h2>แผนที่จุดน้ำท่วม</h2><a class="more" href="map.html">แผนที่ละเอียด →</a></div>
+        <div class="actions-big">
+          <button type="button" id="btnReport" class="btn big primary">📍 แจ้งน้ำท่วม</button>
+          <button type="button" id="btnClose" class="btn big ok">✔ แจ้งน้ำลด</button>
+        </div>
         <div id="smap" role="region" aria-label="แผนที่สรุปจุดน้ำท่วม"></div>
         <div class="legend-row">
           <span><i class="lg-line t3"></i>ถนนน้ำท่วม (ยืนยัน)</span>
           <span><i class="lg-line t2"></i>ถนนที่มีรายงาน</span>
-          <span><i class="lg-area"></i>พื้นที่เสี่ยง (ฝนหนัก/น้ำสูง)</span>
+          <label class="lg-toggle"><input type="checkbox" id="showRisk"> <i class="lg-area"></i>แสดงพื้นที่เสี่ยง (ฝนหนัก/น้ำสูง)</label>
           <span><i class="lg-dot"></i>จุดที่มีรายงาน (กดดูรายละเอียด)</span>
+          <span><i class="lg-web">!</i>ประชาชนปักหมุด (กดหมุดเพื่อแจ้งน้ำลด)</span>
         </div>
         <p class="muted small" id="roadNote"></p>
       </div>
@@ -74,8 +79,10 @@
     <section class="card">
       <div class="card-h"><h2>จุดน้ำท่วมทั้งหมด</h2><span class="muted small" id="allCount"></span></div>
       <div id="spots" class="spots"></div>
-      <h3 class="subh">พื้นที่เสี่ยง (ยังไม่มีรายงานน้ำท่วม)</h3>
-      <div id="riskSpots" class="spots"></div>
+      <details class="risk-box">
+        <summary><span class="subh">พื้นที่เสี่ยง (ยังไม่มีรายงานน้ำท่วม)</span> <span class="tag t1" id="riskCount">0</span> <span class="muted small">กดเพื่อดู</span></summary>
+        <div id="riskSpots" class="spots"></div>
+      </details>
     </section>
 
     <section class="card how">
@@ -94,5 +101,6 @@
   <script src="https://cdn.jsdelivr.net/npm/leaflet@1.9.4/dist/leaflet.js"></script>
   <script src="js/core.js" defer></script>
   <script src="js/summary.js" defer></script>
+  <script src="js/report.js" defer></script>
 </body>
 </html>
