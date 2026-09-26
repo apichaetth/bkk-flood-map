@@ -8,6 +8,15 @@ window.Flood = (function () {
   'use strict';
 
   const REFRESH_MS = 15 * 60 * 1000;
+  // มือถือ: สัญลักษณ์บนแผนที่ขนาดครึ่งหนึ่ง (พื้นที่กดยังคงอย่างน้อย 22 px)
+  const MS = window.matchMedia && matchMedia('(max-width: 860px)').matches ? 0.5 : 1;
+  if (MS !== 1 && window.L && L.CircleMarker) {
+    L.CircleMarker.addInitHook(function () {
+      if (this instanceof L.Circle || this.options.keepSize) return; // วงรัศมีเป็นเมตร / จุดตำแหน่งตัวเอง ไม่ย่อ
+      this.options.radius = Math.max(2.5, this.options.radius * MS);
+      if (this.options.weight > 1.5) this.options.weight = Math.max(1.2, this.options.weight * 0.7);
+    });
+  }
   const TZ = 'Asia/Bangkok';
   const BBOX = { s: 13.48, n: 13.97, w: 100.32, e: 100.95 }; // กรอบ กทม.
   const TRAFFY_WINDOW_H = 24;
@@ -355,7 +364,7 @@ window.Flood = (function () {
             const ll = [p.coords.latitude, p.coords.longitude];
             if (marker) { marker.remove(); ring.remove(); }
             ring = L.circle(ll, { radius: Math.min(p.coords.accuracy || 50, 1000), color: '#1a73e8', weight: 1, fillColor: '#1a73e8', fillOpacity: 0.12, interactive: false }).addTo(map);
-            marker = L.circleMarker(ll, { radius: 7, color: '#fff', weight: 2.5, fillColor: '#1a73e8', fillOpacity: 1 }).bindTooltip('ตำแหน่งของฉัน').addTo(map);
+            marker = L.circleMarker(ll, { keepSize: true, radius: 7, color: '#fff', weight: 2.5, fillColor: '#1a73e8', fillOpacity: 1 }).bindTooltip('ตำแหน่งของฉัน').addTo(map);
             map.setView(ll, Math.max(map.getZoom(), 16));
             if (onLocated) onLocated(ll);
           }, (err) => {
@@ -394,7 +403,7 @@ window.Flood = (function () {
   }
 
   return {
-    REFRESH_MS, TZ, RAIN_HEAVY_MM, URL,
+    REFRESH_MS, MS, TZ, RAIN_HEAVY_MM, URL,
     $, esc, num, inBkk, nearBkk, th, fmtTime, fmtDT, ago, bkkDate, isoDate, distKm, getJSON, cssVar, store,
     LEVEL, badge, sensorLevel, wlLevel, rainStep, SEV_LV, levelFromText,
     fetchSensors, fetchEvents, fetchTraffy, traffyRaw, fetchCams, fetchRadar, isFloodTicket, fetchWebReports, fetchTw, twBkkHeavy, reportEndpoint, deviceId, WEB_LEVEL, fetchRain, fetchWl, fetchNews, fetchTmd, errMsg,

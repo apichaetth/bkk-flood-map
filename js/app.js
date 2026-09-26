@@ -59,6 +59,8 @@
 
   // พื้นที่กดอย่างน้อย 22 px รอบจุด (จุดเล็กก็ยังกดง่ายบนมือถือ) โดยขนาดที่มองเห็นเท่าเดิม
   const icon = (cls, color, text = '', size = 18, extra = '') => {
+    size = Math.max(5, Math.round(size * Flood.MS));
+    if (size < 14) text = ''; // เล็กเกินอ่านตัวเลข ดูได้ในป๊อปอัป
     const hit = Math.max(size, 22);
     return L.divIcon({
       className: '', iconSize: [hit, hit], iconAnchor: [hit / 2, hit / 2], popupAnchor: [0, -size / 2],

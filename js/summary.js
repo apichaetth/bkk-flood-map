@@ -165,10 +165,15 @@
   }
 
   // ให้ js/report.js ใช้แผนที่หน้านี้สำหรับปักหมุดแจ้งน้ำท่วม/น้ำลด (ไม่ต้องไปหน้าแผนที่ละเอียด)
-  const mkIcon = (cls, color, text = '', size = 18, extra = '') => L.divIcon({
-    className: '', iconSize: [size, size], iconAnchor: [size / 2, size / 2], popupAnchor: [0, -size / 2],
-    html: `<div class="mk ${cls} ${extra}" style="--c:${color};width:${size}px;height:${size}px">${text}</div>`,
-  });
+  const mkIcon = (cls, color, text = '', size = 18, extra = '') => {
+    size = Math.max(5, Math.round(size * F.MS));
+    if (size < 14) text = '';
+    const hit = Math.max(size, 22);
+    return L.divIcon({
+      className: '', iconSize: [hit, hit], iconAnchor: [hit / 2, hit / 2], popupAnchor: [0, -size / 2],
+      html: `<div class="mkhit" style="width:${hit}px;height:${hit}px"><div class="mk ${cls} ${extra}" style="--c:${color};width:${size}px;height:${size}px">${text}</div></div>`,
+    });
+  };
   window.FloodMap = {
     map, layers: { web: lyr.web }, setFeed: () => {}, icon: mkIcon,
     buttons: { report: $('btnReport'), close: $('btnClose') },

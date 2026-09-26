@@ -95,7 +95,7 @@
     for (const h of hots) {
       const k = h.items.length / max;
       L.circle([h.la, h.lo], { radius: 250 + 250 * k, color: red, weight: 1.5, fillColor: red, fillOpacity: 0.12 + 0.3 * k, interactive: false }).addTo(hotLayer);
-      L.marker([h.la, h.lo], { icon: L.divIcon({ className: '', iconSize: [28, 28], iconAnchor: [14, 14], html: `<div class="tf-count">${h.items.length}</div>` }), zIndexOffset: 1000 })
+      L.marker([h.la, h.lo], { icon: L.divIcon({ className: '', iconSize: [28, 28], iconAnchor: [14, 14], html: `<div class="tf-count${F.MS < 1 ? ' sm' : ''}">${h.items.length}</div>` }), zIndexOffset: 1000 })
         .bindPopup(`<div class="pp"><h3>มีคนแจ้ง ${h.items.length} เรื่องในบริเวณนี้</h3><div class="m">ยังไม่เสร็จ ${h.open} เรื่อง · ล่าสุด ${ago(h.items[0].t)}</div>
           <ul class="plist">${h.items.slice(0, 6).map((x) => `<li>${esc((x.r.description || '').slice(0, 70))}</li>`).join('')}</ul></div>`)
         .addTo(hotLayer);

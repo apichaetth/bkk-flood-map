@@ -42,7 +42,7 @@
         <div class="m" style="margin-top:6px">แจ้งโดย ${esc(r.reporter)} · ${fmtDT(x.t)} (${ago(x.t)})<br>
         <a href="log.html?report=${encodeURIComponent(r.id)}">ประวัติของหมุดนี้ (${esc(r.id)})</a></div>
         <button type="button" class="btn big ok close-btn" data-id="${esc(r.id)}">✔ น้ำลดแล้ว / เอาหมุดออก</button></div>`;
-      L.marker([x.la, x.lo], { icon: icon('web', F.LEVEL[x.lv].color, '!', 22, F.LEVEL[x.lv].dark ? 'dark' : ''), zIndexOffset: 900 })
+      L.marker([x.la, x.lo], { icon: icon('web', F.LEVEL[x.lv].color, '!', F.MS < 1 ? 32 : 22, F.LEVEL[x.lv].dark ? 'dark' : ''), zIndexOffset: 900 })
         .bindPopup(html, { maxWidth: 320, minWidth: 240 })
         .on('click', () => { if (mode === 'close') { setMode(''); openClose(r); } })
         .on('popupopen', (e) => {
@@ -108,7 +108,7 @@
     if (!F.inBkk(latlng.lat, latlng.lng)) { alert('ตำแหน่งต้องอยู่ในกรุงเทพมหานคร'); return; }
     stopPick();
     if (tempMarker) tempMarker.remove();
-    tempMarker = L.marker(latlng, { icon: icon('web', 'var(--critical)', '?', 22) }).addTo(map);
+    tempMarker = L.marker(latlng, { icon: icon('web', 'var(--critical)', '?', F.MS < 1 ? 32 : 22) }).addTo(map);
     map.setView(latlng, Math.max(map.getZoom(), 16));
     openCreate(latlng);
   }
