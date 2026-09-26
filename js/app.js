@@ -181,7 +181,7 @@
     setFeed('rain', 'loading');
     try {
       const r = await Flood.fetchRain();
-      S.rain = r.items;
+      S.rain = r.items; S.basin = r.basin;
       setFeed('rain', 'ok', r.msg, r.newest);
     } catch (e) { S.rain = null; setFeed('rain', 'fail', Flood.errMsg('rain', e)); }
     drawRain();
@@ -215,6 +215,15 @@
     listInto('listRain', top.filter((s) => s.mm > 0).slice(0, 6), (s) => ({
       dot: s.mm > RAIN_HEAVY_MM ? heavyRed(s.mm) : rainStep(s.mm)[1], title: th(s.x.station.tele_station_name), sub: `เขต${th(s.x.geocode.amphoe_name)} · ${fmtTime(s.t)}`, right: s.mm + ' มม.', go: s,
     }), 'ไม่มีฝนใน 24 ชม. ที่ผ่านมา');
+    renderBasin();
+  }
+  // ฝนลุ่มเจ้าพระยา: แต่ละจังหวัดแสดงฝนสูงสุด (และเฉลี่ย) 24 ชม. เรียงจากต้นน้ำลงมา
+  function renderBasin() {
+    const el = $('listBasin');
+    if (!S.basin) { el.innerHTML = '<div class="muted small">ไม่มีข้อมูลฝน</div>'; return; }
+    el.innerHTML = S.basin.map((b) => `<div class="row static"><span class="dot" style="--c:${b.n ? (b.max > RAIN_HEAVY_MM ? heavyRed(b.max) : rainStep(b.max)[1]) : 'var(--stale)'}"></span>
+      <div class="t"><div>${esc(b.name)}</div><div class="s">${b.n ? `เฉลี่ย ${b.mean.toFixed(1)} มม. · ${b.n} สถานี${b.max > 0 ? ' · สูงสุดที่ ' + esc(b.maxAt) : ''}` : 'ไม่มีข้อมูล'}</div></div>
+      <span class="n">${b.n ? b.max.toFixed(0) + ' มม.' : '–'}</span></div>`).join('');
   }
 
   // ฝนหนัก: แดงอ่อน (35 มม.) → แดงเข้ม (≥ 150 มม.) ไล่ตามปริมาณฝน
@@ -229,10 +238,33 @@
     setFeed('wl', 'loading');
     try {
       const r = await Flood.fetchWl();
-      S.wl = r.items;
+      S.wl = r.items; S.cpy = r.upstream;
       setFeed('wl', 'ok', r.msg, r.newest);
     } catch (e) { S.wl = null; setFeed('wl', 'fail', Flood.errMsg('wl', e)); }
     drawWl();
+  }
+  // น้ำเหนือ: สถานีบนแม่น้ำเจ้าพระยาเรียงจากต้นน้ำ กดแล้วไปที่สถานีบนแผนที่
+  function renderCpy() {
+    const el = $('listCpy');
+    if (!S.cpy) { el.innerHTML = '<div class="muted small">ไม่มีข้อมูลระดับน้ำ</div>'; return; }
+    const rows = S.cpy;
+    el.innerHTML = rows.map((c, i) => {
+      if (c.missing) return `<div class="row static"><span class="dot" style="--c:var(--stale)"></span><div class="t"><div>${esc(c.label)}</div><div class="s">ไม่มีข้อมูลสถานี ${esc(c.code)}</div></div></div>`;
+      const lv = c.pct != null ? wlLevel(c.pct) : 0;
+      const right = c.code === 'C.13' && c.q != null ? c.q.toLocaleString() + ' ลบ.ม./วิ' : c.pct != null ? c.pct.toFixed(0) + '%' : '–';
+      return `<div class="row" data-i="${i}" tabindex="0"><span class="dot" style="--c:${c.stale ? 'var(--stale)' : LEVEL[lv].color}"></span>
+        <div class="t"><div>${esc(c.label)}</div><div class="s">${c.pct != null ? c.pct.toFixed(0) + '% ของตลิ่ง · ' : ''}${trend(c) || 'ไม่มีแนวโน้ม'}${c.q != null ? ' · ไหล ' + c.q.toLocaleString() + ' ลบ.ม./วิ' : ''} · ${fmtTime(c.t)}${c.stale ? ' (ค่าเก่า)' : ''}</div></div>
+        <span class="n">${right}</span></div>`;
+    }).join('') + '<div class="muted small">C.13 = ปริมาณน้ำที่ปล่อยจากเขื่อนเจ้าพระยา ยิ่งมากน้ำจะมาถึง กทม. ใน 1–3 วัน · ระดับน้ำใน กทม. ขึ้นลงตามน้ำทะเลหนุนด้วย</div>';
+    el.querySelectorAll('.row[data-i]').forEach((r) => r.onclick = () => {
+      const c = rows[+r.dataset.i];
+      if (!c.la) return;
+      map.setView([c.la, c.lo], 13);
+      L.popup().setLatLng([c.la, c.lo]).setContent(`<div class="pp"><div class="m">น้ำเหนือ · ${esc(c.code)}</div><h3>${esc(c.label)}</h3>
+        <div><span class="big">${c.msl != null ? c.msl.toFixed(2) : '–'}</span> ม.รทก. <span class="m">${trend(c)}</span></div>
+        <div class="m">${c.pct != null ? c.pct.toFixed(0) + '% ของตลิ่ง · ' : ''}ตลิ่ง ${c.bank != null ? c.bank.toFixed(2) + ' ม.รทก.' : '–'}${c.q != null ? '<br>ปริมาณน้ำไหล ' + c.q.toLocaleString() + ' ลบ.ม./วินาที' : ''}<br>${fmtDT(c.t)}</div></div>`).openOn(map);
+      minimizePanel();
+    });
   }
   function trend(s) {
     if (s.msl == null || s.prev == null) return '';
@@ -252,6 +284,7 @@
     }
     const hi = S.wl.filter((s) => !s.stale && s.pct != null).sort((a, b) => b.pct - a.pct).slice(0, 6);
     listInto('listWl', hi, (s) => ({ dot: LEVEL[wlLevel(s.pct)].color, title: th(s.x.station.tele_station_name), sub: `${trend(s) || 'ไม่มีแนวโน้ม'} · ${fmtTime(s.t)}`, right: s.pct.toFixed(0) + '%', go: s }), 'ไม่มีสถานีที่มีค่าล่าสุด');
+    renderCpy();
   }
 
   // ---------- 6) ข่าว + สรุป AI (จาก GitHub Actions) ----------

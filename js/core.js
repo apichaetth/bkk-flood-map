@@ -208,8 +208,19 @@ window.Flood = (function () {
       .map((x) => ({ x, t: bkkDate(x.rainfall_datetime), la: num(x.station && x.station.tele_station_lat), lo: num(x.station && x.station.tele_station_long), mm: num(x.rain_24h), mm1: num(x.rain_1h) }))
       .filter((s) => s.la && s.lo && s.t && s.t >= cutoff && s.mm != null);
     items.forEach((s) => { if (!newest || s.t > newest) newest = s.t; });
-    return { items, newest, msg: `${items.length} สถานี` };
+    // ฝนลุ่มเจ้าพระยา: สรุปรายจังหวัดจากต้นน้ำลงมา (ฝนต้นน้ำจะกลายเป็นน้ำเหนือไหลลง กทม.)
+    const basin = BASIN_PROVINCES.map(([code, name]) => {
+      const st = d.data.filter((x) => x.geocode && String(x.geocode.province_code) === code)
+        .map((x) => ({ t: bkkDate(x.rainfall_datetime), mm: num(x.rain_24h), name: th(x.station && x.station.tele_station_name) }))
+        .filter((x) => x.t && x.t >= cutoff && x.mm != null);
+      if (!st.length) return { code, name, n: 0 };
+      const top = st.reduce((a, b) => (b.mm > a.mm ? b : a));
+      return { code, name, n: st.length, max: top.mm, maxAt: top.name, mean: st.reduce((a, b) => a + b.mm, 0) / st.length };
+    });
+    return { items, basin, newest, msg: `${items.length} สถานี` };
   }
+  const BASIN_PROVINCES = [['60', 'นครสวรรค์'], ['61', 'อุทัยธานี'], ['18', 'ชัยนาท'], ['17', 'สิงห์บุรี'], ['16', 'ลพบุรี'], ['15', 'อ่างทอง'],
+    ['72', 'สุพรรณบุรี'], ['14', 'พระนครศรีอยุธยา'], ['13', 'ปทุมธานี'], ['12', 'นนทบุรี'], ['10', 'กรุงเทพมหานคร'], ['11', 'สมุทรปราการ']];
 
   // 5) ThaiWater ระดับน้ำ
   async function fetchWl() {
@@ -222,8 +233,25 @@ window.Flood = (function () {
       .filter((s) => s.la && s.lo && s.t)
       .map((s) => ({ ...s, stale: Date.now() - s.t > WL_STALE_H * 36e5 }));
     items.forEach((s) => { if (!newest || s.t > newest) newest = s.t; });
-    return { items, newest, msg: `${items.length} สถานี` };
+    // น้ำเหนือ: สถานีสำคัญบนแม่น้ำเจ้าพระยา เรียงจากต้นน้ำลงมา
+    const upstream = CPY_STATIONS.map(([code, label]) => {
+      const x = arr.find((y) => y.station && String(y.station.tele_station_oldcode) === code);
+      if (!x) return { code, label, missing: true };
+      const t = bkkDate(x.waterlevel_datetime);
+      return { code, label, x, t, la: num(x.station.tele_station_lat), lo: num(x.station.tele_station_long), pct: num(x.storage_percent),
+        msl: num(x.waterlevel_msl), prev: num(x.waterlevel_msl_previous), bank: num(x.station.min_bank), q: num(x.discharge),
+        stale: !t || Date.now() - t > WL_STALE_H * 36e5 };
+    });
+    return { items, upstream, newest, msg: `${items.length} สถานีใน กทม. · น้ำเหนือ ${upstream.filter((u) => !u.missing).length} สถานี` };
   }
+  const CPY_STATIONS = [
+    ['C.2', 'นครสวรรค์ (ค่ายจิรประวัติ)'],
+    ['C.13', 'ท้ายเขื่อนเจ้าพระยา ชัยนาท'],
+    ['C.35', 'บ้านป้อม อยุธยา'],
+    ['CPY014', 'สะพานนวลฉวี นนทบุรี'],
+    ['C.12', 'กรมชลประทานสามเสน กทม.'],
+    ['CPY015', 'สะพานกรุงเทพ กทม.'],
+  ];
 
   // 6) ข่าว + คลิป (ไฟล์ที่ GitHub Actions สร้าง)
   async function fetchNews() {
