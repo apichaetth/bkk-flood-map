@@ -65,7 +65,7 @@ jobs:
           GEMINI_MODEL: ${{ vars.GEMINI_MODEL }}
           TMD_UID: ${{ secrets.TMD_UID }}
           TMD_UKEY: ${{ secrets.TMD_UKEY }}
-          TMD_TOKEN: ${{ secrets.TMD_TOKEN }}
+          TMD_TOKEN: ${{ secrets.TMD_TOKEN || secrets.TMD_API_KEY }}
           YOUTUBE_API_KEY: ${{ secrets.YOUTUBE_API_KEY }}
 
       - name: Save data cache
