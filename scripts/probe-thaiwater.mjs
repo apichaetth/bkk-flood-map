@@ -1,6 +1,7 @@
 // สำรวจ API สาธารณะของ ThaiWater (รันด้วยมือจาก workflow probe-thaiwater) พิมพ์โครงสร้างข้อมูลแต่ละ endpoint
 const TW = 'https://api-v3.thaiwater.net/api/v1/thaiwater30/';
-const EP = process.argv.slice(2).length ? process.argv.slice(2) : [
+const EP = process.argv.slice(2).length ? process.argv.slice(2) : ['public/thailand_main', 'public/rain_24h', 'public/warning', 'public/flow'];
+const OLD = [
   'public/thailand_main', 'public/rain_24h', 'public/rain_today', 'public/rain_yesterday', 'public/rain_3d', 'public/rain_7d', 'public/rain_1h',
   'public/waterlevel_load', 'public/waterlevel', 'public/dam_load', 'public/dam', 'public/dam_daily', 'public/waterquality_load', 'public/waterquality',
   'public/storm', 'public/storm_load', 'public/warning', 'public/warning_load', 'public/pre_rain', 'public/rain_forecast', 'public/tide', 'public/sea_level',
@@ -21,7 +22,11 @@ for (const ep of EP) {
     const r = await fetch(TW + ep, { headers: { Referer: 'https://www.thaiwater.net/' }, signal: ctl.signal });
     const txt = await r.text(); clearTimeout(t);
     let out = txt.slice(0, 200);
-    try { out = shape(JSON.parse(txt)).slice(0, 2500); } catch { /* ไม่ใช่ JSON */ }
+    try {
+      const j = JSON.parse(txt);
+      // ออบเจ็กต์ใหญ่ (เช่น thailand_main) พิมพ์ทีละคีย์ จะได้ไม่ถูกตัด
+      out = j && !Array.isArray(j) && txt.length > 500000 ? Object.entries(j).map(([k, v]) => `  - ${k}: ${shape(v, 1).slice(0, 900)}`).join('\n') : shape(j).slice(0, 2500);
+    } catch { /* ไม่ใช่ JSON */ }
     console.log(`\n### ${ep} HTTP ${r.status} ${(txt.length / 1024).toFixed(0)}KB\n${out}`);
   } catch (e) { console.log(`\n### ${ep} ERROR ${e.message}`); }
 }
