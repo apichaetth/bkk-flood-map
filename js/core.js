@@ -401,3 +401,28 @@ window.Flood = (function () {
     loadDistricts, districtAt, addLocate,
   };
 })();
+
+// ---------- เมนูหน้าบนมือถือ: พับเป็นปุ่ม "ชื่อหน้าปัจจุบัน ▾" กดเพื่อเปิด มีแถบจับด้านล่างสำหรับปิด ----------
+(function () {
+  const nav = document.querySelector('nav.pages');
+  if (!nav) return;
+  const cur = nav.querySelector('[aria-current="page"]');
+  const btn = document.createElement('button');
+  btn.type = 'button'; btn.className = 'nav-toggle'; btn.setAttribute('aria-expanded', 'false');
+  btn.innerHTML = `<span>${cur ? cur.textContent : 'เมนู'}</span><span class="caret">▾</span>`;
+  const grab = document.createElement('button');
+  grab.type = 'button'; grab.className = 'nav-grab'; grab.setAttribute('aria-label', 'ปิดเมนู');
+  grab.innerHTML = '<span></span>';
+  nav.before(btn); nav.append(grab);
+  const set = (open) => {
+    nav.classList.toggle('open', open); btn.setAttribute('aria-expanded', String(open));
+    btn.querySelector('.caret').textContent = open ? '▴' : '▾';
+    window.dispatchEvent(new Event('resize')); // ให้แผนที่ปรับขนาดตามพื้นที่ที่เปลี่ยน
+  };
+  btn.onclick = () => set(!nav.classList.contains('open'));
+  grab.onclick = () => set(false);
+  // ปัดขึ้นที่เมนูเพื่อปิด
+  let y = null;
+  nav.addEventListener('touchstart', (e) => { y = e.touches[0].clientY; }, { passive: true });
+  nav.addEventListener('touchend', (e) => { if (y != null && e.changedTouches[0].clientY - y < -30) set(false); y = null; }, { passive: true });
+})();

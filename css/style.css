@@ -430,3 +430,15 @@ table.log .thumbs img { width: 56px; height: 56px; object-fit: cover; border-rad
 .rchip { border: 1px solid var(--line); border-radius: 999px; padding: 2px 10px; font-size: 13px; color: var(--ink); text-decoration: none; background: var(--bg); }
 .rchip:hover { border-color: var(--accent); }
 @media (max-width: 600px) { .srow .chips { display: none; } .depth { width: 50px; height: 42px; font-size: 17px; } }
+
+/* ---------- เมนูหน้าบนมือถือ (พับได้) ---------- */
+.nav-toggle, .nav-grab { display: none; }
+@media (max-width: 860px) {
+  .nav-toggle { display: inline-flex; align-items: center; gap: 6px; order: 2; margin-left: auto; border: 1px solid var(--line); background: var(--bg); color: var(--ink); border-radius: 999px; padding: 5px 12px; font: inherit; font-size: 14px; font-weight: 600; }
+  .nav-toggle .caret { color: var(--muted); }
+  .top > .btn#refresh { order: 3; }
+  .pages { display: none !important; }
+  .pages.open { display: grid !important; order: 4; }
+  .pages.open .nav-grab { display: flex; grid-column: 1 / -1; justify-content: center; background: none; border: 0; padding: 6px 0 2px; }
+  .nav-grab span { width: 44px; height: 5px; border-radius: 3px; background: var(--line); }
+}
