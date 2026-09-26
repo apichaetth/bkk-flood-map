@@ -468,3 +468,9 @@ table.log .thumbs img { width: 56px; height: 56px; object-fit: cover; border-rad
 .drank .dv { font-size: 13.5px; font-weight: 600; text-align: right; }
 .drank .dv small { display: block; font-weight: 400; color: var(--muted); font-size: 12px; }
 @media (max-width: 600px) { .drank button { grid-template-columns: 1fr auto; } .drank .dbar { grid-column: 1 / -1; grid-row: 2; } #dmap { height: 50vh; } }
+
+/* ภาพคาดการณ์ฝน 3 ชม. (สนน. กทม.) */
+.nowcast { margin: 0 0 10px; }
+.nowcast[hidden] { display: none; }
+.nowcast img { width: 100%; height: auto; border-radius: 8px; border: 1px solid var(--line); background: var(--bg); display: block; }
+.nowcast figcaption { margin-top: 4px; }

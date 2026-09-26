@@ -453,3 +453,15 @@ window.Flood = (function () {
   check();
   document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'visible') check(); });
 })();
+
+// ---------- ภาพคาดการณ์ฝน 3 ชม. ของสำนักการระบายน้ำ กทม. (เปิดได้จากเครือข่ายในไทย ถ้าโหลดไม่ได้ซ่อนไว้) ----------
+(function () {
+  const fig = document.getElementById('nowcast');
+  if (!fig) return;
+  const img = fig.querySelector('img');
+  const load = () => { img.src = 'https://dds.bangkok.go.th/Line_data/picture/radar_rain.gif?t=' + Math.floor(Date.now() / 6e5); };
+  img.onerror = () => { fig.hidden = true; };
+  img.onload = () => { fig.hidden = false; };
+  load();
+  setInterval(load, 10 * 60e3); // ภาพต้นทางอัปเดตทุก ~10 นาที
+})();
