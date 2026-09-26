@@ -1,0 +1,19 @@
+name: check-endpoint
+# ตรวจ Apps Script deployment ใหม่ (apps-script/candidate-endpoint.txt) ก่อนนำไปใช้จริง
+on:
+  push:
+    branches: [main]
+    paths: ['apps-script/candidate-endpoint.txt']
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - run: node scripts/check-endpoint.mjs
