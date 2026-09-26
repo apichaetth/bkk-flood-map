@@ -4,7 +4,8 @@ name: update-data-and-deploy
 
 on:
   schedule:
-    - cron: "*/15 * * * *"   # GitHub อาจเลื่อนเวลารันได้ 5–15 นาทีช่วงคนใช้เยอะ
+    # เลี่ยงนาทีที่ 0/15/30/45 ซึ่งคิวของ GitHub แน่นที่สุด (รอบตรงนาทีเหล่านี้มักถูกเลื่อนหรือข้าม)
+    - cron: "4,19,34,49 * * * *"
   push:
     branches: [main]
   workflow_dispatch:
