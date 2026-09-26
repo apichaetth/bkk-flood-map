@@ -140,7 +140,7 @@ h2 { font-size: 14px; font-weight: 600; margin: 18px 0 6px; color: var(--ink2); 
 
 /* ---------- map markers & popups ---------- */
 .mk { display: flex; align-items: center; justify-content: center; font-size: 10.5px; font-weight: 700; color: #fff; background: var(--c); border: 2px solid #fff; box-shadow: 0 1px 4px rgba(0,0,0,.35); font-family: "IBM Plex Sans Thai", sans-serif; }
-.mk.sensor { border-radius: 50%; border-width: 1px; }
+.mk.sensor { border-radius: 50%; font-size: 9.5px; border-width: 1.5px; }
 .mk.dark { color: #1b2430; }
 .mk.event { border-radius: 1.5px; border-width: 1px; }
 .mk.traffy { border-radius: 50%; background: #fff; border: 2px solid var(--c); }
@@ -299,7 +299,7 @@ body.summary { overflow: auto; display: block; height: auto; }
   background: var(--surface); border: 2px solid var(--critical); border-radius: 12px; padding: 8px 12px; box-shadow: var(--shadow); max-width: calc(100% - 32px); font-size: 14px; }
 .pick-bar[hidden], .report-fab[hidden] { display: none; }
 .picking { cursor: crosshair !important; }
-.mk.web { border-radius: 50%; font-size: 8.5px; font-weight: 800; border-width: 1px; box-shadow: 0 0 0 1.5px var(--c), 0 1px 4px rgba(0,0,0,.4); }
+.mk.web { border-radius: 50%; font-size: 13px; font-weight: 800; border-width: 2px; box-shadow: 0 0 0 2px var(--c), 0 2px 6px rgba(0,0,0,.4); }
 .sym.web { border-radius: 50%; box-shadow: 0 0 0 2px var(--c); }
 .close-btn { margin-top: 10px; width: 100%; }
 .ph3 { display: grid; grid-template-columns: repeat(3, 1fr); gap: 4px; margin-top: 6px; }

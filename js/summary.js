@@ -152,7 +152,7 @@
         if (c.sources.length === 1 && c.sources[0] === 'web' && c.members.every((m) => m.src === 'web' || m.tier === 1)) continue;
         // บริเวณรอบจุด (เผื่อไม่มีข้อมูลถนน) + จุด
         L.circle([c.la, c.lo], { radius: 120, stroke: false, fillColor: red[3], fillOpacity: c.tier === 3 ? 0.18 : 0.12, interactive: false }).addTo(lyr.areas);
-        L.circleMarker([c.la, c.lo], { radius: c.tier === 3 ? 4.5 : 3.5, color: '#fff', weight: 1, fillColor: red[c.tier], fillOpacity: 1 }).bindPopup(popup).addTo(lyr.spots);
+        L.circleMarker([c.la, c.lo], { radius: c.tier === 3 ? 9 : 7, color: '#fff', weight: 2, fillColor: red[c.tier], fillOpacity: 1 }).bindPopup(popup).addTo(lyr.spots);
       }
     }
   }
