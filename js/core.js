@@ -152,7 +152,18 @@ window.Flood = (function () {
   }
 
   // 3) Traffy Fondue
-  const FLOOD_RE = /ท่วม|น้ำขัง|น้ำรอระบาย|รอการระบาย/;
+  // เอาเฉพาะเรื่องน้ำท่วมจริง:
+  // - ถ้าถูกจัดประเภทแล้ว (problem_type_abdul / type) ต้องมีประเภท "น้ำท่วม" (ตัดเรื่องท่อ/ถนน/ขยะ ฯลฯ ที่แค่เอ่ยคำว่าน้ำ)
+  // - ถ้ายังไม่ถูกจัดประเภท (เรื่องใหม่) ข้อความต้องพูดถึงน้ำท่วม/น้ำขังชัดเจน และไม่ใช่เรื่องประปา/ท่อแตก
+  const FLOOD_RE = /น้ำท่วม|ท่วมขัง|ท่วมถนน|น้ำขัง|น้ำรอระบาย|รอการระบาย|น้ำเจิ่ง/;
+  const NOT_FLOOD_RE = /ประปา|น้ำไม่ไหล|ท่อแตก|ท่อรั่ว|น้ำรั่ว|น้ำเสีย|กลิ่น|ยุง/;
+  function isFloodTicket(r) {
+    const types = [].concat(r.problem_type_abdul || [], r.type ? String(r.type).replace(/[{}]/g, '').split(',') : [])
+      .map((t) => String(t).trim()).filter(Boolean);
+    if (types.length) return types.includes('น้ำท่วม');
+    const d = String(r.description || '');
+    return FLOOD_RE.test(d) && !NOT_FLOOD_RE.test(d);
+  }
   async function fetchTraffy() {
     const d = await getJSON(URL.traffy, 90000);
     if (!Array.isArray(d.results)) throw new Error('รูปแบบข้อมูลไม่ถูกต้อง');
@@ -161,8 +172,7 @@ window.Flood = (function () {
     const items = d.results
       .map((r) => ({ r, t: isoDate(r.timestamp), lo: num(r.coords && r.coords[0]), la: num(r.coords && r.coords[1]) }))
       .filter((x) => x.la && x.lo && x.t && x.t >= cutoff && inBkk(x.la, x.lo) && x.r.state !== 'เสร็จสิ้น'
-        // เรื่องใหม่มักยังไม่ถูกจัดประเภท จึงดูทั้งประเภท (problem_type_abdul / type) และข้อความ
-        && (/น้ำท่วม/.test(String(x.r.problem_type_abdul || '') + String(x.r.type || '')) || FLOOD_RE.test(x.r.description || '')))
+        && isFloodTicket(x.r))
       .map((x) => ({ ...x, ...levelFromText(x.r.description) }))
       .filter((x) => x.lv > 0);
     items.forEach((x) => { if (!newest || x.t > newest) newest = x.t; });
@@ -239,7 +249,7 @@ window.Flood = (function () {
     REFRESH_MS, TZ, RAIN_HEAVY_MM, URL,
     $, esc, num, inBkk, th, fmtTime, fmtDT, ago, bkkDate, isoDate, distKm, getJSON, cssVar, store,
     LEVEL, badge, sensorLevel, wlLevel, rainStep, SEV_LV, levelFromText,
-    fetchSensors, fetchEvents, fetchTraffy, fetchRain, fetchWl, fetchNews, fetchTmd, errMsg,
+    fetchSensors, fetchEvents, fetchTraffy, isFloodTicket, fetchRain, fetchWl, fetchNews, fetchTmd, errMsg,
     loadDistricts, districtAt,
   };
 })();
