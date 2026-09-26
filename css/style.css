@@ -179,6 +179,11 @@ h2 { font-size: 14px; font-weight: 600; margin: 18px 0 6px; color: var(--ink2); 
   .layout { flex-direction: column; }
   .panel { position: absolute; left: 0; right: 0; bottom: 0; width: auto; height: 42%; border-left: 0; border-top: 1px solid var(--line); border-radius: 14px 14px 0 0; box-shadow: var(--shadow); z-index: 1000; transition: height .2s; }
   .panel.min { height: 92px; }
+  .panel.full { height: calc(100% - 6px); border-radius: 12px 12px 0 0; }
+  .panel.full .grab span::after { content: ''; }
+  .grab { position: relative; }
+  .grab::after { content: '▲'; position: absolute; right: 14px; top: 4px; font-size: 11px; color: var(--muted); }
+  .panel.full .grab::after { content: '▼'; }
   /* ปุ่มแจ้ง/แถบปักหมุดบนแผนที่ละเอียด: ยกให้อยู่เหนือแผงด้านล่าง ไม่ให้ถูกบัง */
   /* มือถือ: หน้าแผนที่ละเอียดไม่แสดงปุ่มแจ้ง (แจ้งที่หน้าสรุป) ไม่ให้บังแผนที่ */
   .layout .report-fab { display: none; }

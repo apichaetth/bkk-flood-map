@@ -584,12 +584,33 @@
 
   // ---------- UI ----------
   const panel = $('panel');
-  function minimizePanel() { if (isMobile) panel.classList.add('min'); }
-  $('grab').onclick = () => panel.classList.toggle('min');
+  // มือถือ: แผง 3 ระดับ ย่อ (min) → ปกติ → เต็มจอ (full) กดที่แถบจับหรือปัดขึ้น/ลง
+  const STATES = ['min', '', 'full'];
+  const stateNow = () => (panel.classList.contains('full') ? 2 : panel.classList.contains('min') ? 0 : 1);
+  function setPanel(i) {
+    i = Math.max(0, Math.min(2, i));
+    panel.classList.toggle('min', i === 0); panel.classList.toggle('full', i === 2);
+    $('grab').setAttribute('aria-label', i === 2 ? 'ย่อแผง' : 'ขยายแผง');
+    if (i !== 2) setTimeout(() => map.invalidateSize(), 250);
+  }
+  function minimizePanel() { if (isMobile) setPanel(0); }
+  $('grab').onclick = () => setPanel(stateNow() === 2 ? 1 : stateNow() + 1);
+  let touchY = null;
+  const head = panel.querySelector('.tabs');
+  [$('grab'), head].forEach((el) => {
+    el.addEventListener('touchstart', (e) => { touchY = e.touches[0].clientY; }, { passive: true });
+    el.addEventListener('touchend', (e) => {
+      if (touchY == null) return;
+      const dy = e.changedTouches[0].clientY - touchY; touchY = null;
+      if (Math.abs(dy) > 40) setPanel(stateNow() + (dy < 0 ? 1 : -1));
+    }, { passive: true });
+  });
   document.querySelectorAll('.tabs button').forEach((b) => b.onclick = () => {
     document.querySelectorAll('.tabs button').forEach((x) => x.classList.toggle('on', x === b));
     document.querySelectorAll('.tab').forEach((t) => t.classList.toggle('on', t.id === 'tab-' + b.dataset.tab));
-    panel.classList.remove('min');
+    // แท็บที่ต้องอ่านเยอะ (ข่าว Facebook แหล่งข้อมูล) เปิดเต็มจอบนมือถือ แท็บอื่นเปิดครึ่งจอ
+    if (isMobile) setPanel(['news', 'fb', 'src', 'cam'].includes(b.dataset.tab) ? 2 : Math.max(1, stateNow()));
+    else panel.classList.remove('min');
     if (b.dataset.tab === 'fb') openFacebook();
   });
   document.querySelectorAll('.kpi').forEach((k) => k.onclick = () => {
