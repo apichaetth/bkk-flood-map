@@ -100,6 +100,11 @@ jobs:
           # ติดเลขเวอร์ชันให้ css/js ทุกครั้งที่ deploy เบราว์เซอร์จะไม่ใช้ไฟล์เก่าที่ไม่เข้ากับหน้าใหม่
           V=$(date +%s)
           sed -i -E "s#(href=\"css/[a-z-]+\.css)\"#\1?v=$V\"#g; s#(src=\"js/[a-z-]+\.js)\"#\1?v=$V\"#g" _site/*.html
+          # เลขเวอร์ชันของหน้าเว็บ: หน้าเก่าที่ค้างในเครื่องจะเห็นว่าไม่ตรงกับ version.txt แล้วโหลดใหม่เอง
+          # (ใช้ commit ของโค้ด ไม่ใช่เวลา deploy เพื่อไม่ให้รีโหลดทุก 15 นาทีตอนอัปเดตข้อมูล)
+          B=$(git rev-parse --short HEAD)
+          sed -i "s#<meta charset=\"utf-8\">#<meta charset=\"utf-8\"><meta name=\"build\" content=\"$B\">#" _site/*.html
+          echo "$B" > _site/version.txt
           touch _site/.nojekyll
 
       - uses: actions/upload-pages-artifact@v3

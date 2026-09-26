@@ -432,3 +432,24 @@ window.Flood = (function () {
   btn.onclick = (e) => { e.stopPropagation(); menu.hidden = !menu.hidden; btn.setAttribute('aria-expanded', String(!menu.hidden)); };
   document.addEventListener('click', (e) => { if (!menu.hidden && !bar.contains(e.target)) { menu.hidden = true; btn.setAttribute('aria-expanded', 'false'); } });
 })();
+
+// ---------- หน้าเก่าค้างในเครื่อง: เทียบกับ version.txt ถ้าไม่ตรงโหลดใหม่ (ครั้งเดียวต่อเวอร์ชัน) ----------
+(function () {
+  const m = document.querySelector('meta[name="build"]');
+  if (!m) return; // เปิดจากเครื่องตัวเอง ไม่มีเลขเวอร์ชัน
+  const mine = m.content;
+  async function check() {
+    try {
+      const r = await fetch('version.txt?t=' + Date.now(), { cache: 'no-store' });
+      if (!r.ok) return;
+      const live = (await r.text()).trim();
+      if (!live || live === mine) return;
+      const key = 'bkkflood.reloadedFor';
+      if (sessionStorage.getItem(key) === live) return; // กันรีโหลดวน
+      sessionStorage.setItem(key, live);
+      location.reload();
+    } catch (e) { /* ออฟไลน์ ไม่เป็นไร */ }
+  }
+  check();
+  document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'visible') check(); });
+})();
