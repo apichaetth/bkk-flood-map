@@ -3,10 +3,13 @@ const UA = 'Mozilla/5.0 (compatible; bkk-flood-map probe)';
 async function get(u) {
   const ctl = new AbortController(); const t = setTimeout(() => ctl.abort(), 30000);
   try { const r = await fetch(u, { headers: { 'User-Agent': UA }, signal: ctl.signal, redirect: 'follow' }); const txt = await r.text(); return { status: r.status, type: r.headers.get('content-type'), cors: r.headers.get('access-control-allow-origin'), txt, url: r.url }; }
-  catch (e) { return { status: 'ERR ' + e.message, txt: '' }; } finally { clearTimeout(t); }
+  catch (e) { return { status: 'ERR ' + e.message + ' | cause: ' + (e.cause ? (e.cause.code || '') + ' ' + (e.cause.message || e.cause) : '-'), txt: '' }; } finally { clearTimeout(t); }
 }
-const start = 'https://dds.bangkok.go.th/index2.php';
-const home = await get(start);
+// แยกสาเหตุ: บล็อกต่างประเทศ (เชื่อมต่อไม่ได้) หรือใบรับรอง TLS ไม่ครบ
+for (const u of ['https://dds.bangkok.go.th/', 'http://dds.bangkok.go.th/', 'https://weather.bangkok.go.th/', 'https://www.bangkok.go.th/']) { const r = await get(u); console.log('TEST', u, r.status, r.txt.length); }
+let start = 'https://dds.bangkok.go.th/index2.php';
+let home = await get(start);
+if (!home.txt) { start = 'http://dds.bangkok.go.th/index2.php'; home = await get(start); }
 console.log('HOME', home.status, home.type, home.txt.length);
 const links = [...new Set([...home.txt.matchAll(/(?:href|src)\s*=\s*["']([^"'#]+)["']/gi)].map((m) => new URL(m[1], start).href))]
   .filter((u) => !/\.(css|png|jpe?g|gif|svg|ico|woff2?|ttf)(\?|$)/i.test(u) && !/facebook|twitter|youtube|google|line\.me/i.test(u));
