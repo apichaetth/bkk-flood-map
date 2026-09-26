@@ -16,8 +16,10 @@
   const TW = 'https://api-v3.thaiwater.net/api/v1/thaiwater30/public/';
   const BMA = 'https://floodbangkok.bangkok.go.th/bkk/dds/services/api/floods/v1/items/';
   const URL = {
-    sensors: BMA + 'sensor_profile?limit=-1',
-    notif: BMA + 'flood_notification?limit=1500&page=0&sort=-date_created&fields=sensor_profile,value,date_created',
+    sensors: BMA + 'sensor_profile?limit=-1&fields=id,code,name,road,district,lat,long',
+    // ขอเฉพาะค่าใน 3 ชม. ล่าสุด เพื่อลดภาระเซิร์ฟเวอร์ กทม. (ล่มบ่อยช่วงฝนตกหนัก)
+    notif: BMA + 'flood_notification?limit=600&sort=-date_created&fields=sensor_profile,value,date_created&filter[date_created][_gte]=' + encodeURIComponent('$NOW(-3 hours)'),
+    notifFallback: BMA + 'flood_notification?limit=600&sort=-date_created&fields=sensor_profile,value,date_created',
     events: 'https://event.longdo.com/feed/json',
     traffy: 'https://publicapi.traffy.in.th/share/teamchadchart/search?limit=500',
     rain: TW + 'rain_24h',
@@ -168,12 +170,21 @@
   }
 
   const S = {};
+  const SENSOR_CACHE = 'bkkflood.bmaSensors';
 
   // ---------- 1) เซ็นเซอร์น้ำท่วมถนน กทม. ----------
   async function loadSensors() {
     setFeed('sensor', 'loading');
     try {
-      const [sp, nt] = await Promise.all([getJSON(URL.sensors), getJSON(URL.notif)]);
+      // ตำแหน่งเซ็นเซอร์แทบไม่เปลี่ยน: เก็บไว้ในเบราว์เซอร์ 24 ชม. ลดการเรียกซ้ำ และใช้ต่อได้ตอนเซิร์ฟเวอร์ล่ม
+      let sp = null;
+      try { const c = JSON.parse(localStorage.getItem(SENSOR_CACHE) || 'null'); if (c && Date.now() - c.t < 864e5) sp = c.sp; } catch (e) { /* ไม่มี cache */ }
+      if (!sp) {
+        sp = await getJSON(URL.sensors, 30000);
+        try { localStorage.setItem(SENSOR_CACHE, JSON.stringify({ t: Date.now(), sp })); } catch (e) { /* เก็บไม่ได้ก็ไม่เป็นไร */ }
+      }
+      // บางเวอร์ชันของ API อาจไม่รองรับตัวกรองเวลา (ตอบ 4xx) ให้ลองแบบไม่กรอง
+      const nt = await getJSON(URL.notif, 30000).catch((e) => (/HTTP 4\d\d/.test(e.message) ? getJSON(URL.notifFallback, 30000) : Promise.reject(e)));
       const latest = new Map();
       for (const n of nt.data || []) if (!latest.has(n.sensor_profile)) latest.set(n.sensor_profile, n);
       let newest = null;
@@ -188,7 +199,11 @@
           return { s, la: num(s.lat), lo: num(s.long), cm, t, stale, lv: stale || cm == null ? 0 : sensorLevel(cm) };
         });
       setFeed('sensor', 'ok', `${S.sensor.length} จุด`, newest);
-    } catch (e) { S.sensor = null; setFeed('sensor', 'fail', e.message); }
+    } catch (e) {
+      S.sensor = null;
+      // เซิร์ฟเวอร์ กทม. ตอบ 503 "Under pressure" โดยไม่มี CORS header เบราว์เซอร์จึงเห็นเป็น Failed to fetch
+      setFeed('sensor', 'fail', (/fetch|HTTP 5/i.test(e.message) ? 'ระบบของ กทม. ไม่ตอบสนอง (มักเกิดช่วงมีผู้ใช้มาก) จะลองใหม่ทุก 15 นาที' : e.message));
+    }
     drawSensors();
   }
   function drawSensors() {
