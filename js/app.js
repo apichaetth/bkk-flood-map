@@ -85,6 +85,8 @@
   const sensorLevel = (cm) => (cm >= 15 ? 3 : cm >= 10 ? 2 : cm >= 5 ? 1 : 0);
   const wlLevel = (pct) => (pct >= 100 ? 3 : pct >= 90 ? 2 : pct >= 70 ? 1 : 0);
   const RAIN_STEPS = [[90, 'var(--rain4)', 'หนักมาก'], [35, 'var(--rain3)', 'หนัก'], [10, 'var(--rain2)', 'ปานกลาง'], [0.1, 'var(--rain1)', 'เล็กน้อย'], [-1, 'var(--rain0)', 'ไม่มีฝน']];
+  const RAIN_HEAVY_MM = 35;
+  const cssVar = (name) => getComputedStyle(document.documentElement).getPropertyValue(name).trim();
   const rainStep = (mm) => RAIN_STEPS.find((s) => mm > s[0]) || RAIN_STEPS[RAIN_STEPS.length - 1];
 
   // ประเมินความรุนแรงจากข้อความรายงาน (iTIC / Traffy)
@@ -315,9 +317,16 @@
     for (const s of S.rain) {
       const st = rainStep(s.mm);
       const html = `<div class="pp"><div class="m">สถานีวัดฝน · ${esc(th(s.x.agency && s.x.agency.agency_shortname))}</div><h3>${esc(th(s.x.station.tele_station_name))}</h3>
+        ${s.mm > RAIN_HEAVY_MM ? badge(3, 'ฝน' + st[2]) : ''}
         <div><span class="big">${s.mm}</span> มม. / 24 ชม. (${st[2]})${s.mm1 != null ? ` · ${s.mm1} มม. ชั่วโมงล่าสุด` : ''}</div>
         <div class="m">เขต${esc(th(s.x.geocode.amphoe_name))} · ${fmtDT(s.t)} (${ago(s.t)})</div></div>`;
-      s.marker = L.circleMarker([s.la, s.lo], { radius: s.mm > 35 ? 8 : 6, color: '#fff', weight: 1.5, fillColor: getComputedStyle(document.documentElement).getPropertyValue(st[1].slice(4, -1)).trim(), fillOpacity: 0.95 }).bindPopup(html).addTo(layers.rain);
+      // ฝนหนัก (> 35 มม./24 ชม.) ขอบสีแดง ให้เห็นชัดบนแผนที่
+      const heavy = s.mm > RAIN_HEAVY_MM;
+      s.marker = L.circleMarker([s.la, s.lo], {
+        radius: heavy ? 9 : 6, color: heavy ? cssVar('--critical') : '#fff', weight: heavy ? 3 : 1.5,
+        fillColor: cssVar(st[1].slice(4, -1)), fillOpacity: 0.95,
+      }).bindPopup(html).addTo(layers.rain);
+      if (heavy) s.marker.bringToFront();
     }
     const top = [...S.rain].sort((a, b) => b.mm - a.mm);
     $('kRain').textContent = top.length ? top[0].mm.toFixed(0) : '–';
