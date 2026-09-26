@@ -75,7 +75,7 @@ h2 { font-size: 14px; font-weight: 600; margin: 18px 0 6px; color: var(--ink2); 
 .panel { width: 380px; flex: none; background: var(--surface); border-left: 1px solid var(--line); display: flex; flex-direction: column; min-height: 0; }
 .grab { display: none; }
 .tabs { display: flex; border-bottom: 1px solid var(--line); flex: none; }
-.tabs button { flex: 1; background: none; border: 0; padding: 10px 4px; border-bottom: 2px solid transparent; color: var(--ink2); }
+.tabs button { flex: 1; background: none; border: 0; padding: 10px 2px; font-size: 14px; border-bottom: 2px solid transparent; color: var(--ink2); }
 .tabs button.on { border-bottom-color: var(--accent); color: var(--ink); font-weight: 600; }
 .tab { display: none; overflow-y: auto; padding: 4px 16px 24px; flex: 1; }
 .tab.on { display: block; }
@@ -119,6 +119,9 @@ h2 { font-size: 14px; font-weight: 600; margin: 18px 0 6px; color: var(--ink2); 
 .yt-thumb span { position: absolute; inset: 0; margin: auto; width: 54px; height: 38px; border-radius: 10px; background: var(--yt); color: #fff; display: flex; align-items: center; justify-content: center; font-size: 18px; }
 .yt-thumb:hover img { opacity: 1; }
 .yt-frame { width: 100%; aspect-ratio: 16 / 9; border: 0; border-radius: 8px; margin: 6px 0; }
+
+.fb-box { min-height: 200px; }
+.fb-box iframe { display: block; border: 0; margin: 0 auto; max-width: 100%; background: var(--surface); }
 
 /* ---------- legend ---------- */
 .legend > div { display: flex; align-items: center; gap: 10px; font-size: 13px; padding: 3px 0; }

@@ -28,6 +28,7 @@
     tmd: 'data/tmd.json',
     meta: 'data/meta.json',
     districts: 'data/districts.geojson',
+    fbPages: 'data/facebook-pages.json',
   };
 
   // ---------- helpers ----------
@@ -426,6 +427,41 @@
     });
   }
 
+  // ---------- Facebook Page Plugin ----------
+  // โหลด iframe เฉพาะตอนเปิดแท็บ (ไม่ให้ Facebook โหลดกับทุกคนที่เข้าเว็บ)
+  const FB_KEY = 'bkkflood.fbPage';
+  let fbPages = null, fbCurrent = null;
+  async function openFacebook() {
+    if (!fbPages) {
+      try { fbPages = ((await getJSON(URL.fbPages)).pages || []).filter((p) => /^https:\/\/(www\.)?facebook\.com\//.test(p.url)); }
+      catch (e) { $('fbBox').innerHTML = '<div class="muted small">โหลดรายชื่อเพจไม่ได้</div>'; return; }
+      let saved = null;
+      try { saved = localStorage.getItem(FB_KEY); } catch (e) { /* ใช้ค่าเริ่มต้น */ }
+      fbCurrent = fbPages.find((p) => p.url === saved) || fbPages[0];
+    }
+    if (!fbCurrent) { $('fbBox').innerHTML = '<div class="muted small">ยังไม่ได้ตั้งค่ารายชื่อเพจ</div>'; return; }
+    $('fbPages').innerHTML = fbPages.map((p, i) => `<button type="button" data-i="${i}" class="${p === fbCurrent ? 'on' : ''}" aria-pressed="${p === fbCurrent}">${esc(p.name)}</button>`).join('');
+    $('fbPages').querySelectorAll('button').forEach((b) => b.onclick = () => {
+      fbCurrent = fbPages[+b.dataset.i];
+      try { localStorage.setItem(FB_KEY, fbCurrent.url); } catch (e) { /* ไม่เป็นไร */ }
+      openFacebook();
+    });
+    const box = $('fbBox');
+    // Page Plugin รองรับความกว้าง 180–500 px
+    const w = Math.max(180, Math.min(500, Math.floor(box.clientWidth || 340)));
+    const h = Math.max(500, Math.floor(box.closest('.tab').clientHeight - box.offsetTop - 40));
+    const src = 'https://www.facebook.com/plugins/page.php?' + new URLSearchParams({
+      href: fbCurrent.url, tabs: 'timeline', width: w, height: h, small_header: 'true',
+      adapt_container_width: 'true', hide_cover: 'false', show_facepile: 'false', locale: 'th_TH',
+    });
+    if (box.dataset.src !== src) {
+      box.dataset.src = src;
+      box.innerHTML = `<iframe src="${esc(src)}" width="${w}" height="${h}" title="โพสต์จากเพจ ${esc(fbCurrent.name)}" loading="lazy"
+        scrolling="no" allowfullscreen allow="clipboard-write; encrypted-media; picture-in-picture; web-share"></iframe>`;
+    }
+    $('fbNote').innerHTML = `<a href="${esc(fbCurrent.url)}" target="_blank" rel="noopener">เปิดเพจ ${esc(fbCurrent.name)} ใน Facebook</a> · ถ้าไม่เห็นโพสต์ อาจเป็นเพราะเบราว์เซอร์หรือส่วนขยายบล็อกเนื้อหาจาก Facebook ให้กดลิงก์เพื่อเปิดเพจโดยตรง`;
+  }
+
   // ---------- 7) ประกาศกรมอุตุฯ ----------
   async function loadTmd() {
     setFeed('tmd', 'loading');
@@ -564,6 +600,7 @@
     document.querySelectorAll('.tabs button').forEach((x) => x.classList.toggle('on', x === b));
     document.querySelectorAll('.tab').forEach((t) => t.classList.toggle('on', t.id === 'tab-' + b.dataset.tab));
     panel.classList.remove('min');
+    if (b.dataset.tab === 'fb') openFacebook();
   });
   document.querySelectorAll('.kpi').forEach((k) => k.onclick = () => {
     const l = layers[k.dataset.layer];

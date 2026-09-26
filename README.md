@@ -14,6 +14,7 @@
 | เรดาร์ฝน | RainViewer | เบราว์เซอร์ | ไม่ |
 | ข่าว + สรุป/ปักหมุด | Google News RSS + Gemini + OpenStreetMap Nominatim | GitHub Actions | Gemini (ฟรี) |
 | คลิป + สรุป/ปักหมุด | YouTube Data API v3 + Gemini | GitHub Actions (ทุก 30 นาที) | YouTube (ฟรี) |
+| โพสต์เพจทางการ (Facebook) | Facebook Page Plugin: ศูนย์ป้องกันน้ำท่วม กทม., สนน., กทม., กรมอุตุฯ, ปภ., จส.100 | เบราว์เซอร์ (โหลดเมื่อเปิดแท็บ) | ไม่ |
 | ประกาศเตือนภัย | กรมอุตุนิยมวิทยา `data.tmd.go.th` | GitHub Actions | ใช้ demo ได้ |
 | ขอบเขต 50 เขต | [OpenGISData-Thailand](https://github.com/chingchai/OpenGISData-Thailand) | ไฟล์ในโปรเจกต์ | – |
 
@@ -41,6 +42,12 @@ data/                       districts.json/geojson (คงที่), news.json,
    - ถ้าไม่ใส่ จะข้ามส่วนคลิปไป
 4. **(ไม่บังคับ) key กรมอุตุฯ:** สมัครที่ https://data.tmd.go.th/api/index1.php แล้วใส่ secret `TMD_UID` และ `TMD_UKEY` (ถ้าไม่ใส่จะใช้ `demo`)
 5. ไปที่แท็บ Actions → `update-data-and-deploy` → **Run workflow** หนึ่งครั้ง เว็บจะอยู่ที่ `https://<user>.github.io/bkk-flood-map/`
+
+## เพิ่ม/แก้เพจ Facebook
+
+แก้ไฟล์ `data/facebook-pages.json` แล้ว push (ไม่ต้องแก้โค้ด) เพจต้องเป็นเพจสาธารณะ ใส่ URL แบบ `https://www.facebook.com/<ชื่อเพจ>` รายการแรกคือเพจที่แสดงเป็นค่าเริ่มต้น
+
+หมายเหตุ: Page Plugin แสดงเฉพาะโพสต์ ไม่ได้ดึงข้อมูลมาปักหมุดบนแผนที่ และอาจไม่แสดงในเบราว์เซอร์ที่บล็อกเนื้อหาจาก Facebook (เช่นโหมดป้องกันการติดตามบางแบบ) ในกรณีนั้นจะมีลิงก์ให้เปิดเพจโดยตรง
 
 ## รันบนเครื่อง
 
