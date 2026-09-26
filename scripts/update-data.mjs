@@ -150,15 +150,29 @@ async function analyzeWithGemini(batch, districtNames) {
 
 ข่าว:
 ${batch.map((n) => JSON.stringify({ id: n.id, title: n.title, snippet: n.snippet })).join('\n')}`;
-  const url = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent`;
-  const text = await fetchText(url, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json', 'x-goog-api-key': key },
-    body: JSON.stringify({
-      contents: [{ role: 'user', parts: [{ text: prompt }] }],
-      generationConfig: { temperature: 0.1, responseMimeType: 'application/json' },
-    }),
-  }, 90000);
+  const body = JSON.stringify({
+    contents: [{ role: 'user', parts: [{ text: prompt }] }],
+    generationConfig: { temperature: 0.1, responseMimeType: 'application/json' },
+  });
+  // free tier มักตอบ 503 (โมเดลคนใช้เยอะ) หรือ 429 (เกินโควต้าต่อนาที): ลองซ้ำ แล้วสลับไปรุ่นสำรอง
+  const models = [...new Set([model, 'gemini-2.5-flash', 'gemini-flash-lite-latest'])];
+  let text = null, lastErr = null;
+  for (const m of models) {
+    for (let attempt = 0; attempt < 3 && !text; attempt++) {
+      try {
+        text = await fetchText(`https://generativelanguage.googleapis.com/v1beta/models/${m}:generateContent`, {
+          method: 'POST', headers: { 'Content-Type': 'application/json', 'x-goog-api-key': key }, body,
+        }, 90000);
+      } catch (e) {
+        lastErr = e;
+        log(`gemini ${m} attempt ${attempt + 1} failed:`, e.message);
+        if (!/HTTP (429|500|502|503|504)|abort/i.test(e.message)) break; // เช่น 400/403/404 ลองซ้ำไม่ช่วย
+        await sleep(3000 * 2 ** attempt);
+      }
+    }
+    if (text) break;
+  }
+  if (!text) throw lastErr;
   const out = JSON.parse(text);
   const raw = out?.candidates?.[0]?.content?.parts?.map((p) => p.text || '').join('') || '[]';
   const arr = JSON.parse(raw.replace(/^```(?:json)?|```$/g, '').trim());
