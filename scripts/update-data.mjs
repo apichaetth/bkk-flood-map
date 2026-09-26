@@ -327,8 +327,9 @@ function isFloodTicket(r) {
 async function updateTraffy(meta) {
   const prev = await readJSON('traffy.json', { items: [] });
   let d = null, lastErr = null;
-  for (const lim of [1000, 500]) {
-    try { d = JSON.parse(await fetchText(`${TRAFFY_API}?limit=${lim}`, {}, 90000)); if (Array.isArray(d.results) && d.results.length) break; d = null; }
+  // 1000 เรื่องมักหมดเวลา (~90 วินาที) ใช้ 500 ต่อรอบก็พอ เพราะสะสมข้ามรอบอยู่แล้ว
+  for (const lim of [500, 300]) {
+    try { d = JSON.parse(await fetchText(`${TRAFFY_API}?limit=${lim}`, {}, 60000)); if (Array.isArray(d.results) && d.results.length) break; d = null; }
     catch (e) { lastErr = e; d = null; }
   }
   if (!d) { log('traffy failed:', lastErr && lastErr.message); meta.sources.traffy = { ok: false, error: lastErr ? lastErr.message : 'empty' }; return; }
