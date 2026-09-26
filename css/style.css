@@ -181,12 +181,12 @@ h2 { font-size: 14px; font-weight: 600; margin: 18px 0 6px; color: var(--ink2); 
 
 /* ---------- เมนูระหว่างหน้า ---------- */
 .pages { display: flex; gap: 4px; margin-left: auto; background: var(--bg); border: 1px solid var(--line); border-radius: 10px; padding: 3px; }
-.pages a { text-decoration: none; color: var(--ink2); padding: 4px 12px; border-radius: 7px; font-size: 14px; white-space: nowrap; }
+.pages a { text-decoration: none; color: var(--ink2); padding: 4px 10px; border-radius: 7px; font-size: 14px; white-space: nowrap; }
 .pages a[aria-current="page"] { background: var(--accent); color: #fff; font-weight: 600; }
 @media (max-width: 860px) {
   .top { flex-wrap: wrap; row-gap: 6px; }
   .pages { order: 3; width: 100%; margin-left: 0; }
-  .pages a { flex: 1; text-align: center; }
+  .pages a { flex: 1; text-align: center; padding: 4px 4px; font-size: 13px; }
 }
 
 /* ---------- หน้าสรุป ---------- */
