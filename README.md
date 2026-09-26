@@ -13,6 +13,7 @@
 | กล้อง CCTV สาธารณะ | iTIC / Longdo `camera.longdo.com` | เบราว์เซอร์ | ไม่ |
 | เรดาร์ฝน | RainViewer | เบราว์เซอร์ | ไม่ |
 | ข่าว + สรุป/ปักหมุด | Google News RSS + Gemini + OpenStreetMap Nominatim | GitHub Actions | Gemini (ฟรี) |
+| คลิป + สรุป/ปักหมุด | YouTube Data API v3 + Gemini | GitHub Actions (ทุก 30 นาที) | YouTube (ฟรี) |
 | ประกาศเตือนภัย | กรมอุตุนิยมวิทยา `data.tmd.go.th` | GitHub Actions | ใช้ demo ได้ |
 | ขอบเขต 50 เขต | [OpenGISData-Thailand](https://github.com/chingchai/OpenGISData-Thailand) | ไฟล์ในโปรเจกต์ | – |
 
@@ -35,8 +36,11 @@ data/                       districts.json/geojson (คงที่), news.json,
 2. **Gemini API key (ฟรี):** สร้างที่ https://aistudio.google.com/apikey แล้วใส่ใน Settings → Secrets and variables → Actions → New repository secret ชื่อ `GEMINI_API_KEY`
    - ถ้าไม่ใส่ เว็บยังทำงานได้ แต่ข่าวจะแสดงเฉพาะหัวข่าวและปักหมุดระดับเขตจากชื่อเขตในหัวข่าว
    - เปลี่ยนรุ่นโมเดลได้ด้วย Variable `GEMINI_MODEL` (ค่าเริ่มต้น `gemini-flash-latest`)
-3. **(ไม่บังคับ) key กรมอุตุฯ:** สมัครที่ https://data.tmd.go.th/api/index1.php แล้วใส่ secret `TMD_UID` และ `TMD_UKEY` (ถ้าไม่ใส่จะใช้ `demo`)
-4. ไปที่แท็บ Actions → `update-data-and-deploy` → **Run workflow** หนึ่งครั้ง เว็บจะอยู่ที่ `https://<user>.github.io/bkk-flood-map/`
+3. **YouTube API key (ฟรี):** ที่ https://console.cloud.google.com → สร้างโปรเจกต์ → APIs & Services → Library → เปิด **YouTube Data API v3** → Credentials → Create credentials → API key (แนะนำให้กด Restrict key ให้ใช้ได้เฉพาะ YouTube Data API v3) แล้วใส่เป็น secret ชื่อ `YOUTUBE_API_KEY`
+   - โควต้าฟรี 10,000 หน่วย/วัน การค้น 1 ครั้งใช้ 100 หน่วย สคริปต์จึงค้นทุก 30 นาที (≈ 4,800 หน่วย/วัน) รอบอื่นใช้ผลเดิม
+   - ถ้าไม่ใส่ จะข้ามส่วนคลิปไป
+4. **(ไม่บังคับ) key กรมอุตุฯ:** สมัครที่ https://data.tmd.go.th/api/index1.php แล้วใส่ secret `TMD_UID` และ `TMD_UKEY` (ถ้าไม่ใส่จะใช้ `demo`)
+5. ไปที่แท็บ Actions → `update-data-and-deploy` → **Run workflow** หนึ่งครั้ง เว็บจะอยู่ที่ `https://<user>.github.io/bkk-flood-map/`
 
 ## รันบนเครื่อง
 
@@ -59,6 +63,7 @@ npm run serve      # เปิด http://localhost:8080
 
 - GitHub Actions แบบ cron อาจรันช้ากว่ากำหนด 5–15 นาทีในช่วงที่มีผู้ใช้มาก
 - เซ็นเซอร์ กทม., iTIC และ Traffy ไม่มี API ทางการที่มีเอกสารรองรับ อาจเปลี่ยนรูปแบบได้โดยไม่แจ้ง ก่อนเปิดใช้งานสาธารณะในวงกว้างควรขออนุญาตจากหน่วยงาน
+- คลิป YouTube คัดด้วย AI จากชื่อและคำอธิบายคลิปเท่านั้น (ไม่ได้ดูเนื้อหาในคลิป) อาจมีคลิปเก่าที่เพิ่งอัปโหลดหลุดมาบ้าง
 - ตำแหน่งจากข่าวได้มาจาก AI และ geocode อาจคลาดเคลื่อน หมุดระดับเขตเป็นจุดกึ่งกลางเขตเท่านั้น
 - ไม่มีรายงานในจุดใด ≠ ไม่มีน้ำท่วมในจุดนั้น
 

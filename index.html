@@ -32,7 +32,7 @@
     <button class="kpi" data-layer="event" type="button"><span class="kv" id="kEvent">–</span><span class="kl">จุดรายงานน้ำท่วม<br><small>หน่วยงาน / iTIC</small></span></button>
     <button class="kpi" data-layer="traffy" type="button"><span class="kv" id="kTraffy">–</span><span class="kl">ประชาชนแจ้ง<br><small>Traffy 24 ชม.</small></span></button>
     <button class="kpi" data-layer="rain" type="button"><span class="kv" id="kRain">–</span><span class="kl">ฝนสูงสุด 24 ชม.<br><small id="kRainAt">มม.</small></span></button>
-    <button class="kpi" data-layer="news" type="button"><span class="kv" id="kNews">–</span><span class="kl">ข่าวที่เกี่ยวข้อง<br><small>48 ชม.</small></span></button>
+    <button class="kpi" data-layer="news" type="button"><span class="kv" id="kNews">–</span><span class="kl">ข่าว + คลิป<br><small>48 ชม.</small></span></button>
   </section>
 
   <main class="layout">
@@ -63,6 +63,7 @@
           <div><i class="sym wl" style="--c:var(--good)"></i>สถานีวัดระดับน้ำคลอง/แม่น้ำ</div>
           <div><i class="sym rain" style="--c:var(--rain3)"></i>สถานีวัดฝน (สีเข้ม = ฝนมาก)</div>
           <div><i class="sym news" style="--c:var(--news)"></i>ตำแหน่งจากข่าว (สรุปโดย AI)</div>
+          <div><i class="sym yt" style="--c:var(--yt)"></i>ตำแหน่งจากคลิป YouTube (สรุปโดย AI)</div>
           <div><i class="sym cam"></i>กล้อง CCTV สาธารณะ</div>
           <div class="scale">
             <span style="--c:var(--good)">ปกติ</span><span style="--c:var(--warning)">เล็กน้อย</span><span style="--c:var(--serious)">ท่วม</span><span style="--c:var(--critical)">ท่วมสูง</span>
@@ -73,6 +74,7 @@
 
       <div class="tab" id="tab-news">
         <p class="muted small" id="newsNote"></p>
+        <div id="newsFilter" class="chips" role="group" aria-label="กรองประเภท"></div>
         <div id="listNews" class="news"></div>
       </div>
 

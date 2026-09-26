@@ -6,6 +6,7 @@
 //   GEMINI_API_KEY  – key ฟรีจาก https://aistudio.google.com/apikey (ไม่มีก็ทำงานได้ แต่ไม่มีสรุปด้วย AI)
 //   GEMINI_MODEL    – ค่าเริ่มต้น gemini-flash-latest
 //   TMD_UID, TMD_UKEY – key กรมอุตุฯ จาก https://data.tmd.go.th/api/index1.php (ไม่มีจะใช้ demo)
+//   YOUTUBE_API_KEY – key ฟรีจาก Google Cloud (YouTube Data API v3) ไม่มีก็ข้ามส่วนคลิป
 
 import { readFile, writeFile, mkdir } from 'node:fs/promises';
 import { createHash } from 'node:crypto';
@@ -25,6 +26,10 @@ const NEWS_QUERIES = [
 ];
 const NEWS_WINDOW_H = 48;
 const MAX_AI_ITEMS_PER_RUN = 40;
+// YouTube search.list ใช้ 100 หน่วยต่อครั้ง โควต้าฟรี 10,000 หน่วย/วัน
+// ค้นทุก 30 นาที = 48 ครั้ง/วัน ≈ 4,800 หน่วย เหลือเผื่อการกดรันเอง
+const YT_QUERY = 'น้ำท่วม กรุงเทพ|น้ำท่วม กทม|น้ำท่วมขัง กทม|ฝนตกหนัก กรุงเทพ';
+const YT_MIN_INTERVAL_MIN = 29;
 // กรอบพิกัด กทม. (lng/lat) ใช้จำกัดผล geocode
 const BKK_VIEWBOX = [100.32, 13.96, 100.94, 13.49];
 
@@ -86,18 +91,57 @@ async function fetchNews() {
   return [...items.values()].sort((a, b) => b.published.localeCompare(a.published));
 }
 
+// ---------- คลิปจาก YouTube Data API v3 ----------
+async function fetchYoutube() {
+  const key = process.env.YOUTUBE_API_KEY;
+  if (!key) return { status: 'no-key', items: [] };
+  const state = await readJSON('yt-state.json', { lastFetch: null, items: [] });
+  const fresh = (items) => items.filter((v) => now - new Date(v.published) <= NEWS_WINDOW_H * 36e5);
+  // ยังไม่ครบรอบ 30 นาที ใช้ผลค้นครั้งก่อน เพื่อประหยัดโควต้า
+  if (state.lastFetch && now - new Date(state.lastFetch) < YT_MIN_INTERVAL_MIN * 60e3) {
+    return { status: 'ok', items: fresh(state.items), cachedAt: state.lastFetch };
+  }
+  const url = 'https://www.googleapis.com/youtube/v3/search?' + new URLSearchParams({
+    part: 'snippet', q: YT_QUERY, type: 'video', order: 'date', maxResults: '25',
+    publishedAfter: new Date(now - NEWS_WINDOW_H * 36e5).toISOString(),
+    regionCode: 'TH', relevanceLanguage: 'th', safeSearch: 'moderate', key,
+  });
+  try {
+    const json = JSON.parse(await fetchText(url, {}, 30000));
+    const items = (json.items || []).filter((v) => v.id && v.id.videoId).map((v) => ({
+      id: 'yt-' + v.id.videoId,
+      kind: 'youtube',
+      videoId: v.id.videoId,
+      title: decodeEntities(v.snippet.title),
+      source: decodeEntities(v.snippet.channelTitle),
+      link: 'https://www.youtube.com/watch?v=' + v.id.videoId,
+      published: new Date(v.snippet.publishedAt).toISOString(),
+      snippet: decodeEntities(v.snippet.description || '').slice(0, 300),
+      thumb: v.snippet.thumbnails?.medium?.url || v.snippet.thumbnails?.default?.url || '',
+      live: v.snippet.liveBroadcastContent === 'live',
+    }));
+    await writeJSON('yt-state.json', { lastFetch: now.toISOString(), items });
+    return { status: 'ok', items };
+  } catch (e) {
+    log('youtube failed:', e.message);
+    // ค้นไม่สำเร็จ (เช่นโควต้าหมด) ใช้ผลเดิมไปก่อน
+    return { status: 'error: ' + e.message, items: fresh(state.items || []) };
+  }
+}
+
 // ---------- สรุปข่าวด้วย Gemini (free tier) ----------
 async function analyzeWithGemini(batch, districtNames) {
   const key = process.env.GEMINI_API_KEY;
   if (!key || !batch.length) return {};
   const model = process.env.GEMINI_MODEL || 'gemini-flash-latest';
   const prompt = `คุณคือผู้ช่วยสรุปสถานการณ์น้ำท่วมในกรุงเทพมหานคร
-อ่านรายการข่าวต่อไปนี้ (หัวข่าว + ข้อความย่อ) แล้วตอบเป็น JSON array เท่านั้น หนึ่ง object ต่อข่าว ตามรูปแบบ:
+อ่านรายการข่าวและคลิปวิดีโอต่อไปนี้ (หัวข้อ + ข้อความย่อ/คำอธิบายคลิป) แล้วตอบเป็น JSON array เท่านั้น หนึ่ง object ต่อข่าว ตามรูปแบบ:
 {"id": string, "relevant": boolean, "summary": string, "severity": "สูง"|"กลาง"|"ต่ำ", "places": [{"name": string, "district": string}]}
 
 กติกา:
-- relevant = true เฉพาะข่าวที่รายงานน้ำท่วม/น้ำขัง/ฝนตกหนัก/ระดับน้ำ "ในพื้นที่กรุงเทพมหานคร" ที่เป็นสถานการณ์ปัจจุบัน
-- summary = สรุปภาษาไทยไม่เกิน 2 ประโยค ใช้เฉพาะข้อมูลที่อยู่ในข่าว ห้ามเดาตัวเลขหรือสถานที่
+- relevant = true เฉพาะข่าว/คลิปที่รายงานน้ำท่วม/น้ำขัง/ฝนตกหนัก/ระดับน้ำ "ในพื้นที่กรุงเทพมหานคร" ที่เป็นสถานการณ์ปัจจุบัน
+- summary = สรุปภาษาไทยไม่เกิน 2 ประโยค ใช้เฉพาะข้อมูลที่อยู่ในข้อความ ห้ามเดาตัวเลขหรือสถานที่
+- คลิปที่เป็นเพลง เกม รีวิว ละคร หรือเหตุการณ์ในอดีต ให้ relevant = false
 - severity: สูง = ถนนสัญจรไม่ได้/น้ำเข้าบ้าน/มีผู้ได้รับผลกระทบมาก, กลาง = น้ำท่วมขังผ่านได้ลำบาก, ต่ำ = เตือนภัย/เล็กน้อย/น้ำลดแล้ว
 - places = สถานที่ใน กทม. ที่ข่าวระบุชัดเจน (ถนน ซอย แยก ชุมชน) name ต้องเป็นชื่อที่ค้นบนแผนที่ได้ เช่น "ถนนสุขุมวิท ซอย 71"
 - district = ชื่อเขตโดยไม่มีคำว่า "เขต" ต้องเป็นหนึ่งใน: ${districtNames.join(', ')} ถ้าไม่ทราบให้เป็น ""
@@ -170,8 +214,17 @@ async function updateNews(meta) {
   const districts = await readJSON('districts.json', []);
   const cache = await readJSON('news-cache.json', {}); // ผลวิเคราะห์เดิม เพื่อไม่เรียก AI ซ้ำ
   const geo = await readJSON('geocache.json', {});
-  const items = await fetchNews();
-  log('news items:', items.length);
+  const prev = await readJSON('news.json', { items: [] });
+  let newsErr = null;
+  let newsItems = await fetchNews().catch((e) => { newsErr = e; return null; });
+  // Google News ล่มทั้งหมด: ใช้ข่าวรอบก่อนแทน (ผลวิเคราะห์ยังอยู่ใน cache)
+  if (!newsItems) newsItems = (prev.items || []).filter((n) => n.kind !== 'youtube' && now - new Date(n.published) <= NEWS_WINDOW_H * 36e5)
+    .map(({ summary, severity, ai, pins, ...n }) => n);
+  const yt = await fetchYoutube();
+  if (newsErr && !yt.items.length) throw newsErr;
+  const items = [...newsItems.map((n) => ({ kind: 'news', ...n })), ...yt.items]
+    .sort((a, b) => b.published.localeCompare(a.published));
+  log('news items:', newsItems.length, 'youtube items:', yt.items.length);
 
   const hasKey = !!process.env.GEMINI_API_KEY;
   const todo = items.filter((n) => !cache[n.id] || (hasKey && !cache[n.id].ai)).slice(0, MAX_AI_ITEMS_PER_RUN);
@@ -201,7 +254,8 @@ async function updateNews(meta) {
   await writeJSON('news.json', { updated: now.toISOString(), items: out });
   await writeJSON('news-cache.json', cache);
   await writeJSON('geocache.json', geo);
-  meta.sources.news = { ok: true, count: out.length, fetched: items.length, ai: aiStatus };
+  meta.sources.news = { ok: !newsErr, count: out.filter((n) => n.kind === 'news').length, fetched: newsItems.length, ai: aiStatus, ...(newsErr ? { error: newsErr.message } : {}) };
+  meta.sources.youtube = { ok: yt.status === 'ok', status: yt.status, count: out.filter((n) => n.kind === 'youtube').length, fetched: yt.items.length };
 }
 
 // ---------- ประกาศเตือนภัยกรมอุตุนิยมวิทยา ----------
@@ -239,7 +293,7 @@ async function updateTmd(meta) {
 // ---------- main ----------
 await mkdir(DATA, { recursive: true });
 const meta = { updated: now.toISOString(), sources: {} };
-await updateNews(meta).catch((e) => { log('news failed:', e); meta.sources.news = { ok: false, error: e.message }; });
+await updateNews(meta).catch((e) => { log('news failed:', e); meta.sources.news = { ok: false, error: e.message }; meta.sources.youtube ??= { ok: false, error: e.message }; });
 await updateTmd(meta);
 await writeJSON('meta.json', meta);
 log('done', JSON.stringify(meta));

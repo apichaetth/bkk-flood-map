@@ -41,6 +41,7 @@ jobs:
             data/news-cache.json
             data/geocache.json
             data/tmd.json
+            data/yt-state.json
           key: data-${{ github.run_id }}
           restore-keys: data-
 
@@ -51,6 +52,7 @@ jobs:
           GEMINI_MODEL: ${{ vars.GEMINI_MODEL }}
           TMD_UID: ${{ secrets.TMD_UID }}
           TMD_UKEY: ${{ secrets.TMD_UKEY }}
+          YOUTUBE_API_KEY: ${{ secrets.YOUTUBE_API_KEY }}
 
       - name: Save data cache
         if: always()
@@ -61,13 +63,14 @@ jobs:
             data/news-cache.json
             data/geocache.json
             data/tmd.json
+            data/yt-state.json
           key: data-${{ github.run_id }}
 
       - name: Prepare site
         run: |
           mkdir -p _site
           cp -r index.html css js data _site/
-          rm -f _site/data/news-cache.json
+          rm -f _site/data/news-cache.json _site/data/yt-state.json _site/data/geocache.json
           touch _site/.nojekyll
 
       - uses: actions/upload-pages-artifact@v3

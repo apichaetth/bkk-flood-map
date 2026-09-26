@@ -125,7 +125,7 @@
     'เซ็นเซอร์น้ำท่วมถนน กทม.': layers.sensor,
     'รายงานน้ำท่วม (หน่วยงาน/iTIC)': layers.event,
     'ประชาชนแจ้ง (Traffy 24 ชม.)': layers.traffy,
-    'ตำแหน่งจากข่าว': layers.news,
+    'ตำแหน่งจากข่าว / YouTube': layers.news,
     'ระดับน้ำคลอง/แม่น้ำ': layers.wl,
     'ปริมาณฝน 24 ชม.': layers.rain,
     'เรดาร์ฝน (RainViewer)': layers.radar,
@@ -147,6 +147,7 @@
     wl: { name: 'ระดับน้ำ – ThaiWater (สสน.)', link: 'https://www.thaiwater.net' },
     rain: { name: 'ปริมาณฝน – ThaiWater (สสน.)', link: 'https://www.thaiwater.net' },
     news: { name: 'ข่าว – Google News RSS + สรุปโดย Gemini', link: 'https://news.google.com' },
+    youtube: { name: 'คลิป – YouTube Data API + สรุปโดย Gemini', link: 'https://www.youtube.com/results?search_query=%E0%B8%99%E0%B9%89%E0%B8%B3%E0%B8%97%E0%B9%88%E0%B8%A7%E0%B8%A1+%E0%B8%81%E0%B8%A3%E0%B8%B8%E0%B8%87%E0%B9%80%E0%B8%97%E0%B8%9E' },
     tmd: { name: 'ประกาศเตือนภัย – กรมอุตุนิยมวิทยา', link: 'https://www.tmd.go.th' },
     cam: { name: 'กล้อง CCTV สาธารณะ – iTIC / Longdo', link: 'https://traffic.longdo.com/cameralist' },
     radar: { name: 'เรดาร์ฝน – RainViewer', link: 'https://www.rainviewer.com' },
@@ -348,44 +349,80 @@
 
   // ---------- 6) ข่าว + สรุป AI (จาก GitHub Actions) ----------
   const SEV_LV = { 'สูง': 3, 'กลาง': 2, 'ต่ำ': 1 };
+  let newsFilter = 'all';
+  const isYt = (n) => n.kind === 'youtube';
+  const ytThumb = (n) => /^https:\/\/i\.ytimg\.com\//.test(n.thumb || '') ? n.thumb : '';
   async function loadNews() {
-    setFeed('news', 'loading');
+    setFeed('news', 'loading'); setFeed('youtube', 'loading');
     try {
       const [d, meta] = await Promise.all([getJSON(URL.news + '?t=' + Date.now()), getJSON(URL.meta + '?t=' + Date.now()).catch(() => null)]);
       S.news = d.items || [];
-      const ai = meta && meta.sources && meta.sources.news && meta.sources.news.ai;
-      $('newsNote').textContent = `ข่าวที่เกี่ยวกับน้ำท่วมใน กทม. ช่วง 48 ชม. อัปเดตล่าสุด ${fmtDT(new Date(d.updated))}` +
-        (ai === 'ok' ? ' · สรุปและระบุตำแหน่งโดย AI (Gemini) อาจคลาดเคลื่อน โปรดอ่านข่าวต้นฉบับ' : ' · ยังไม่ได้เปิดใช้สรุปด้วย AI (แสดงเฉพาะหัวข่าว และปักหมุดระดับเขต)');
-      setFeed('news', 'ok', `${S.news.length} ข่าว`, new Date(d.updated));
-    } catch (e) { S.news = null; setFeed('news', 'fail', 'ยังไม่มีไฟล์ข่าว (' + e.message + ')'); }
+      const src = (meta && meta.sources) || {};
+      const ai = src.news && src.news.ai;
+      $('newsNote').textContent = `ข่าวและคลิปเกี่ยวกับน้ำท่วมใน กทม. ช่วง 48 ชม. อัปเดตล่าสุด ${fmtDT(new Date(d.updated))}` +
+        (ai === 'ok' ? ' · สรุปและระบุตำแหน่งโดย AI (Gemini) อาจคลาดเคลื่อน โปรดดูต้นฉบับ' : ' · ยังไม่ได้เปิดใช้สรุปด้วย AI (แสดงเฉพาะหัวข้อ และปักหมุดระดับเขต)');
+      const nNews = S.news.filter((n) => !isYt(n)).length, nYt = S.news.length - nNews;
+      if (src.news && src.news.ok === false) setFeed('news', 'fail', src.news.error || 'ดึงข่าวไม่สำเร็จ');
+      else setFeed('news', 'ok', `${nNews} ข่าว`, new Date(d.updated));
+      const yt = src.youtube;
+      if (!yt || yt.status === 'no-key') setFeed('youtube', 'fail', 'ยังไม่ได้ตั้งค่า YOUTUBE_API_KEY');
+      else if (!yt.ok) setFeed('youtube', 'fail', yt.status || yt.error || 'ค้นไม่สำเร็จ');
+      else setFeed('youtube', 'ok', `${nYt} คลิป`, new Date(d.updated));
+    } catch (e) { S.news = null; setFeed('news', 'fail', 'ยังไม่มีไฟล์ข่าว (' + e.message + ')'); setFeed('youtube', 'fail', 'ยังไม่มีไฟล์ข่าว'); }
     drawNews();
   }
   function drawNews() {
     layers.news.clearLayers();
     if (!S.news) { $('kNews').textContent = '–'; $('listNews').innerHTML = '<div class="muted small">ยังไม่มีข้อมูลข่าว</div>'; return; }
     $('kNews').textContent = S.news.length;
-    S.news.forEach((n, i) => {
+    S.news.forEach((n) => {
       const lv = SEV_LV[n.severity] || 2;
+      const th = ytThumb(n);
       n.markers = (n.pins || []).map((p) => {
-        const html = `<div class="pp">${badge(lv, 'ความรุนแรง' + (n.severity || ''))} <span class="m">${esc(n.source)} · ${fmtDT(new Date(n.published))}</span>
-          <h3>${esc(n.title)}</h3>${n.summary ? `<div>${esc(n.summary)}</div>` : ''}
+        const html = `<div class="pp">${badge(lv, 'ความรุนแรง' + (n.severity || ''))} <span class="m">${isYt(n) ? '▶ YouTube · ' : ''}${esc(n.source)} · ${fmtDT(new Date(n.published))}</span>
+          <h3>${esc(n.title)}</h3>
+          ${th ? `<a href="${esc(n.link)}" target="_blank" rel="noopener"><img loading="lazy" src="${esc(th)}" alt="ภาพตัวอย่างคลิป"></a>` : ''}
+          ${n.summary ? `<div>${esc(n.summary)}</div>` : ''}
           <div class="m" style="margin-top:6px">ตำแหน่ง: ${esc(p.label)}${p.precision === 'district' ? ' (โดยประมาณระดับเขต)' : ''}<br>
-          <a href="${esc(n.link)}" target="_blank" rel="noopener">อ่านข่าวต้นฉบับ</a></div></div>`;
-        return L.marker([p.lat, p.lng], { icon: icon('news', 'var(--news)', '', p.precision === 'district' ? 16 : 20), zIndexOffset: 300 }).bindPopup(html, { maxWidth: 320 }).addTo(layers.news);
+          <a href="${esc(n.link)}" target="_blank" rel="noopener">${isYt(n) ? 'ดูคลิปบน YouTube' : 'อ่านข่าวต้นฉบับ'}</a></div></div>`;
+        return L.marker([p.lat, p.lng], { icon: icon('news', isYt(n) ? 'var(--yt)' : 'var(--news)', isYt(n) ? '▶' : '', p.precision === 'district' ? 16 : 20, isYt(n) ? 'yt' : ''), zIndexOffset: 300 })
+          .bindPopup(html, { maxWidth: 320 }).addTo(layers.news);
       });
     });
-    $('listNews').innerHTML = S.news.length ? S.news.map((n, i) => {
+    renderNewsList();
+  }
+  function renderNewsList() {
+    const counts = { all: S.news.length, news: S.news.filter((n) => !isYt(n)).length, youtube: S.news.filter(isYt).length };
+    $('newsFilter').innerHTML = [['all', 'ทั้งหมด'], ['news', 'ข่าว'], ['youtube', 'YouTube']]
+      .map(([k, t]) => `<button type="button" data-f="${k}" class="${newsFilter === k ? 'on' : ''}" aria-pressed="${newsFilter === k}">${t} ${counts[k]}</button>`).join('');
+    $('newsFilter').querySelectorAll('button').forEach((b) => b.onclick = () => { newsFilter = b.dataset.f; renderNewsList(); });
+    const shown = S.news.map((n, i) => [n, i]).filter(([n]) => newsFilter === 'all' || (newsFilter === 'youtube') === isYt(n));
+    $('listNews').innerHTML = shown.length ? shown.map(([n, i]) => {
       const lv = SEV_LV[n.severity] || 2;
+      const th = ytThumb(n);
       return `<article>
-        <div class="meta">${badge(lv, 'ความรุนแรง' + (n.severity || ''))}<span>${esc(n.source)}</span><span>${fmtDT(new Date(n.published))}</span></div>
+        <div class="meta">${badge(lv, 'ความรุนแรง' + (n.severity || ''))}${isYt(n) ? `<span class="yt-tag">${n.live ? '● LIVE' : '▶ YouTube'}</span>` : ''}<span>${esc(n.source)}</span><span>${fmtDT(new Date(n.published))}</span></div>
         <h3><a href="${esc(n.link)}" target="_blank" rel="noopener">${esc(n.title)}</a></h3>
+        ${th ? `<button type="button" class="yt-thumb" data-v="${esc(n.videoId)}" aria-label="เล่นคลิป ${esc(n.title)}"><img loading="lazy" src="${esc(th)}" alt=""><span>▶</span></button>` : ''}
         ${n.summary ? `<p>${esc(n.summary)}</p>` : ''}
         ${(n.pins || []).length ? `<div class="pins">${n.pins.map((p, j) => `<button type="button" data-n="${i}" data-p="${j}">📍 ${esc(p.label)}</button>`).join('')}</div>` : ''}
       </article>`;
-    }).join('') : '<div class="muted small">ยังไม่พบข่าวน้ำท่วมใน กทม. ช่วง 48 ชม.</div>';
+    }).join('') : '<div class="muted small">ยังไม่พบข่าวหรือคลิปน้ำท่วมใน กทม. ช่วง 48 ชม.</div>';
     $('listNews').querySelectorAll('.pins button').forEach((b) => b.onclick = () => {
       const n = S.news[+b.dataset.n], m = n.markers[+b.dataset.p];
+      if (!map.hasLayer(layers.news)) map.addLayer(layers.news);
       map.setView(m.getLatLng(), 15); m.openPopup(); minimizePanel();
+    });
+    // กดภาพตัวอย่างแล้วเล่นคลิปในหน้า (โหมด privacy-enhanced ไม่ฝังคุกกี้จนกว่าจะเล่น)
+    $('listNews').querySelectorAll('.yt-thumb').forEach((b) => b.onclick = () => {
+      if (!/^[\w-]{6,20}$/.test(b.dataset.v)) return;
+      const f = document.createElement('iframe');
+      f.className = 'yt-frame';
+      f.src = `https://www.youtube-nocookie.com/embed/${b.dataset.v}?autoplay=1&rel=0`;
+      f.title = 'คลิป YouTube';
+      f.allow = 'autoplay; encrypted-media; picture-in-picture; fullscreen';
+      f.allowFullscreen = true;
+      b.replaceWith(f);
     });
   }
 

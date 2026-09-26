@@ -2,3 +2,4 @@ _site/
 node_modules/
 data/news-cache.json
 data/geocache.json
+data/yt-state.json
