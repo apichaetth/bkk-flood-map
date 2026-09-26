@@ -415,14 +415,25 @@ async function updateThaiwater(meta) {
         } catch (e) { log('thaiwater image failed:', m.filename, e.message); }
       }
     }
-    // พายุ: เก็บดิบไว้ก่อน (โครงสร้างยังไม่ทราบแน่ชัด) และพิมพ์โครงสร้างลง log
-    let storm = dig(j, 'storm', 'data', 'data') || null;
-    const shape = (v, dp = 0) => Array.isArray(v) ? `[${v.length}]` + (v.length && dp < 3 ? shape(v[0], dp + 1) : '')
-      : v && typeof v === 'object' ? '{' + Object.keys(v).slice(0, 15).map((k) => k + (dp < 3 ? ':' + shape(v[k], dp + 1) : '')).join(',') + '}' : typeof v;
-    log('storm shape:', shape(storm).slice(0, 1500));
-    if (storm && JSON.stringify(storm).length > 300000) storm = null;
-    await writeJSON('thaiwater.json', { updated: now.toISOString(), dams, heavy, images, storm });
-    meta.sources.thaiwater = { ok: true, dams: dams.length, heavy: heavy.length, images: images.length };
+    // พายุ: ThaiWater ให้เป็นภาพแผนที่ติดตามพายุจากหลายแหล่ง ดาวน์โหลดภาพล่าสุดของแต่ละแหล่ง
+    const storms = [];
+    const stormData = dig(j, 'storm', 'data', 'data') || {};
+    for (const key of ['typhoon', 'us', 'college']) {
+      const m = [].concat(stormData[key] || [])[0];
+      if (!m || !m.media_path) continue;
+      try {
+        const ctl = new AbortController(); const t = setTimeout(() => ctl.abort(), 45000);
+        const r = await fetch(TWI + 'shared/image?image=' + encodeURIComponent(m.media_path), { headers: { ...hdr, 'User-Agent': UA }, signal: ctl.signal });
+        clearTimeout(t);
+        const ct = r.headers.get('content-type') || '';
+        if (!r.ok || !/^image\//.test(ct)) continue;
+        const file = `tw/storm-${key}.${/png/.test(ct) ? 'png' : 'jpg'}`;
+        await writeFile(path.join(DATA, file), Buffer.from(await r.arrayBuffer()));
+        storms.push({ key, file: 'data/' + file, datetime: m.media_datetime, source: m.refer_source || '', name: m.filename });
+      } catch (e) { log('storm image failed:', key, e.message); }
+    }
+    await writeJSON('thaiwater.json', { updated: now.toISOString(), dams, heavy, images, storms });
+    meta.sources.thaiwater = { ok: true, dams: dams.length, heavy: heavy.length, images: images.length, storms: storms.length };
   } catch (e) { log('thaiwater failed:', e.message); meta.sources.thaiwater = { ok: false, error: e.message }; }
 }
 

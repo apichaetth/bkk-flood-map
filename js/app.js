@@ -255,7 +255,9 @@
     f.innerHTML = `<div class="tw-alert ${bkk ? 'on' : ''}">${bkk ? `⚠️ ThaiWater คาดว่า <b>กรุงเทพฯ</b> มีฝนตกหนัก (ระดับ ${esc(bkk.level)})` : 'ThaiWater ไม่ได้ระบุ กทม. ในจังหวัดที่คาดว่าฝนตกหนัก'}${near.length ? `<br><span class="small">จังหวัดรอบ ๆ ที่คาดว่าฝนหนัก: ${esc(near.join(', '))}</span>` : ''}</div>`
       + grp.map((g) => `<div class="tw-imgs"><div class="small muted">ภาพจำลองฝน ${esc(g)}</div><div class="tw-row">${imgs.filter((i) => i.group === g).map((i) =>
         `<a href="${esc(i.file)}" target="_blank" rel="noopener"><img src="${esc(i.file)}?v=${encodeURIComponent(i.datetime || '')}" alt="พยากรณ์ฝน${esc(g)} วันที่ ${i.day}" loading="lazy"><span>วันที่ ${i.day}</span></a>`).join('')}</div></div>`).join('')
-      + `<div class="muted small">แบบจำลองสภาพอากาศของ สสน. (ThaiWater) คาดการณ์ล่วงหน้า อัปเดตวันละครั้ง · ปรับเมื่อ ${imgs[0] ? esc(imgs[0].datetime) : '–'} · กดที่ภาพเพื่อดูขนาดเต็ม</div>`;
+      + `<div class="muted small">แบบจำลองสภาพอากาศของ สสน. (ThaiWater) คาดการณ์ล่วงหน้า อัปเดตวันละครั้ง · ปรับเมื่อ ${imgs[0] ? esc(imgs[0].datetime) : '–'} · กดที่ภาพเพื่อดูขนาดเต็ม</div>`
+      + (d.storms && d.storms.length ? `<div class="tw-imgs"><div class="small muted">🌀 ภาพติดตามพายุล่าสุด (รวบรวมโดย ThaiWater จากหลายแหล่ง)</div><div class="tw-row storm">${d.storms.map((m) =>
+        `<a href="${esc(m.file)}" target="_blank" rel="noopener"><img src="${esc(m.file)}?v=${encodeURIComponent(m.datetime || '')}" alt="ภาพติดตามพายุ ${esc(m.source || m.key)}" loading="lazy"><span>${esc(m.source || m.key)} · ${esc(String(m.datetime || '').slice(5, 16))}</span></a>`).join('')}</div></div>` : '');
     el.innerHTML = (d.dams || []).map((m) => {
       const lv = m.pct >= 100 ? 3 : m.pct >= 90 ? 2 : m.pct >= 80 ? 1 : 0;
       return `<div class="row static"><span class="dot" style="--c:${LEVEL[lv].color}"></span>
