@@ -131,7 +131,7 @@ h2 { font-size: 14px; font-weight: 600; margin: 18px 0 6px; color: var(--ink2); 
 .sym.traffy { border-radius: 50%; background: var(--surface); border: 3px solid var(--c); box-shadow: none; }
 .sym.wl { transform: rotate(45deg) scale(.85); border-radius: 2px; }
 .sym.rain { border-radius: 50%; width: 12px; height: 12px; margin: 0 2px; }
-.sym.rain.heavy { width: 16px; height: 16px; margin: 0; border: 3px solid var(--critical); box-shadow: none; }
+.sym.rain.heavy { width: 16px; height: 16px; margin: 0; }
 .sym.news { border-radius: 50% 50% 50% 0; transform: rotate(-45deg); }
 .sym.yt { border-radius: 4px; }
 .sym.cam { background: #1d2330; border-radius: 4px; }
