@@ -226,6 +226,30 @@
       <span class="n">${b.n ? b.max.toFixed(0) + ' มม.' : '–'}</span></div>`).join('');
   }
 
+  // ---------- ThaiWater: พยากรณ์ฝน + เขื่อน (GitHub Actions ดึงมาเก็บใน data/thaiwater.json) ----------
+  async function loadTw() {
+    let d = null;
+    try { d = await getJSON('data/thaiwater.json', 20000, { cache: 'no-cache' }); } catch (e) { /* ยังไม่มีไฟล์ */ }
+    const f = $('twFcst'), el = $('listDam');
+    if (!d) { f.innerHTML = el.innerHTML = '<div class="muted small">ยังไม่มีข้อมูล</div>'; return; }
+    const bkk = (d.heavy || []).find((p) => p.code === '10');
+    const near = (d.heavy || []).filter((p) => ['11', '12', '13', '73', '74'].includes(p.code)).map((p) => p.name);
+    const imgs = d.images || [];
+    const grp = [...new Set(imgs.map((i) => i.group))];
+    f.innerHTML = `<div class="tw-alert ${bkk ? 'on' : ''}">${bkk ? `⚠️ ThaiWater คาดว่า <b>กรุงเทพฯ</b> มีฝนตกหนัก (ระดับ ${esc(bkk.level)})` : 'ThaiWater ไม่ได้ระบุ กทม. ในจังหวัดที่คาดว่าฝนตกหนัก'}${near.length ? `<br><span class="small">จังหวัดรอบ ๆ ที่คาดว่าฝนหนัก: ${esc(near.join(', '))}</span>` : ''}</div>`
+      + grp.map((g) => `<div class="tw-imgs"><div class="small muted">ภาพจำลองฝน ${esc(g)}</div><div class="tw-row">${imgs.filter((i) => i.group === g).map((i) =>
+        `<a href="${esc(i.file)}" target="_blank" rel="noopener"><img src="${esc(i.file)}?v=${encodeURIComponent(i.datetime || '')}" alt="พยากรณ์ฝน${esc(g)} วันที่ ${i.day}" loading="lazy"><span>วันที่ ${i.day}</span></a>`).join('')}</div></div>`).join('')
+      + `<div class="muted small">แบบจำลองสภาพอากาศของ สสน. (ThaiWater) คาดการณ์ล่วงหน้า อัปเดตวันละครั้ง · ปรับเมื่อ ${imgs[0] ? esc(imgs[0].datetime) : '–'} · กดที่ภาพเพื่อดูขนาดเต็ม</div>`;
+    el.innerHTML = (d.dams || []).map((m) => {
+      const lv = m.pct >= 100 ? 3 : m.pct >= 90 ? 2 : m.pct >= 80 ? 1 : 0;
+      return `<div class="row static"><span class="dot" style="--c:${LEVEL[lv].color}"></span>
+        <div class="t"><div>เขื่อน${esc(m.name)} <span class="muted small">${esc(m.province)}</span></div>
+        <div class="s">น้ำไหลเข้า ${fmtN(m.inflow)} · ปล่อยออก ${fmtN(m.released)}${m.spilled ? ' · ล้นทางระบาย ' + fmtN(m.spilled) : ''} ล้าน ลบ.ม./วัน · ${esc(m.date)}</div></div>
+        <span class="n">${m.pct != null ? Number(m.pct).toFixed(0) + '%' : '–'}</span></div>`;
+    }).join('') + '<div class="muted small">% = ปริมาณน้ำในอ่างเทียบความจุ · เขื่อนปล่อยน้ำมากขึ้นจะส่งผลถึงแม่น้ำเจ้าพระยาช่วง กทม. ภายในหลายวัน</div>';
+  }
+  const fmtN = (v) => (v == null || isNaN(v) ? '–' : Number(v).toLocaleString('th-TH', { maximumFractionDigits: 2 }));
+
   // ฝนหนัก: แดงอ่อน (35 มม.) → แดงเข้ม (≥ 150 มม.) ไล่ตามปริมาณฝน
   function heavyRed(mm) {
     const t = Math.max(0, Math.min(1, (mm - RAIN_HEAVY_MM) / (150 - RAIN_HEAVY_MM)));
@@ -554,7 +578,7 @@
   function refresh() {
     last = Date.now();
     $('updated').textContent = 'กำลังอัปเดต…';
-    Promise.allSettled([loadSensors(), loadEvents(), loadTraffy(), loadRain(), loadWl(), loadNews(), loadTmd(), loadRadar(), S.cam ? null : loadCams()])
+    Promise.allSettled([loadSensors(), loadEvents(), loadTraffy(), loadRain(), loadWl(), loadTw(), loadNews(), loadTmd(), loadRadar(), S.cam ? null : loadCams()])
       .then(() => { $('updated').textContent = `อัปเดตหน้าเว็บ ${fmtTime(new Date(last))} · รีเฟรชอัตโนมัติทุก 15 นาที`; renderCams(); });
   }
   $('refresh').onclick = refresh;

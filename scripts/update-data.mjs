@@ -373,6 +373,44 @@ async function updateCamsRadar(meta) {
   } catch (e) { log('radar failed:', e.message); meta.sources.radar = { ok: false, error: e.message }; }
 }
 
+// ---------- ThaiWater: เขื่อนลุ่มเจ้าพระยา + พยากรณ์ฝน (thailand_main ไฟล์ใหญ่ ~8 MB จึงดึงที่นี่ ไม่ให้เบราว์เซอร์โหลด) ----------
+const CPY_DAMS = ['ภูมิพล', 'สิริกิติ์', 'แควน้อยบำรุงแดน', 'ป่าสักชลสิทธิ์', 'ทับเสลา', 'กระเสียว'];
+async function updateThaiwater(meta) {
+  const TWI = 'https://api-v3.thaiwater.net/api/v1/thaiwater30/';
+  const hdr = { Referer: 'https://www.thaiwater.net/' };
+  try {
+    const j = JSON.parse(await fetchText(TWI + 'public/thailand_main', { headers: hdr }, 120000));
+    const dig = (o, ...k) => k.reduce((a, x) => (a == null ? a : a[x]), o);
+    const dams = (dig(j, 'dam', 'data', 'data') || []).filter((d) => CPY_DAMS.includes(dig(d, 'dam', 'dam_name', 'th')))
+      .sort((a, b) => CPY_DAMS.indexOf(a.dam.dam_name.th) - CPY_DAMS.indexOf(b.dam.dam_name.th))
+      .map((d) => ({ name: d.dam.dam_name.th, date: d.dam_date, pct: d.dam_storage_percent, storage: d.dam_storage, max: d.dam.max_storage,
+        inflow: d.dam_inflow, released: d.dam_released, spilled: d.dam_spilled, uses: d.dam_uses_water, province: dig(d, 'geocode', 'province_name', 'th') || '' }));
+    const heavy = (dig(j, 'warning', 'temp_data2', 'data') || []).map((p) => ({ code: String(p.province_code), name: dig(p, 'province_name', 'th') || '', level: p.rainforecast_level }));
+    // ภาพพยากรณ์ฝน: ดาวน์โหลดมาเก็บในเว็บเรา (ลิงก์ของ ThaiWater อาจเปิดจากเว็บอื่นไม่ได้)
+    await mkdir(path.join(DATA, 'tw'), { recursive: true });
+    const images = [];
+    for (const [key, label] of [['pre_rain', 'ประเทศไทย'], ['pre_rain_basin', 'รายลุ่มน้ำ']]) {
+      const list = (dig(j, key, 'data', 'data') || []).slice(0, 3);
+      for (let i = 0; i < list.length; i++) {
+        const m = list[i];
+        if (!m.media_path) continue;
+        try {
+          const ctl = new AbortController(); const t = setTimeout(() => ctl.abort(), 45000);
+          const r = await fetch(TWI + 'shared/image?image=' + encodeURIComponent(m.media_path), { headers: { ...hdr, 'User-Agent': UA }, signal: ctl.signal });
+          clearTimeout(t);
+          if (!r.ok || !/^image\//.test(r.headers.get('content-type') || '')) continue;
+          const buf = Buffer.from(await r.arrayBuffer());
+          const file = `tw/${key}-${i + 1}.jpg`;
+          await writeFile(path.join(DATA, file), buf);
+          images.push({ group: label, file, name: m.filename, datetime: m.media_datetime, day: +((String(m.filename).match(/day0?(\d+)/) || [])[1] || i + 1) });
+        } catch (e) { log('thaiwater image failed:', m.filename, e.message); }
+      }
+    }
+    await writeJSON('thaiwater.json', { updated: now.toISOString(), dams, heavy, images });
+    meta.sources.thaiwater = { ok: true, dams: dams.length, heavy: heavy.length, images: images.length };
+  } catch (e) { log('thaiwater failed:', e.message); meta.sources.thaiwater = { ok: false, error: e.message }; }
+}
+
 // ---------- ประมาณการถนนที่มีแนวโน้มน้ำท่วม (ทดลอง) ดู scripts/risk.mjs ----------
 const bkkTime = (s) => { const m = String(s || '').match(/^(\d{4}-\d{2}-\d{2})[ T](\d{2}:\d{2})/); return m ? new Date(`${m[1]}T${m[2]}:00+07:00`).getTime() : NaN; };
 const utcTime = (s) => new Date(String(s || '').replace(' ', 'T').replace(/\+00$/, 'Z')).getTime();
@@ -419,12 +457,13 @@ async function updateRisk(meta) {
     for (const p of n.pins || []) if (p.precision === 'place') reports.push({ la: p.lat, lo: p.lng, t: Date.parse(n.published), src: 'news' });
   }
   // ThaiWater ฝน + ระดับน้ำ (กทม. และจังหวัดรอบ ๆ ช่วยประมาณฝนบริเวณขอบเมือง)
-  const PROV = new Set(['10', '11', '12', '13']);
+  // ใช้ทุกสถานีในกรอบรอบ กทม. (รวมนนทบุรี ปทุมธานี สมุทรปราการ นครปฐม สมุทรสาคร ที่อยู่ติดขอบเมือง)
+  const nearBkk = (la, lo) => la >= 13.35 && la <= 14.1 && lo >= 100.2 && lo <= 101.05;
   const TW = 'https://api-v3.thaiwater.net/api/v1/thaiwater30/public/';
   try {
     const d = JSON.parse(await fetchText(TW + 'rain_24h', { headers: { Referer: 'https://www.thaiwater.net/' } }, 90000));
     for (const x of d.data || []) {
-      if (!x.geocode || !PROV.has(String(x.geocode.province_code))) continue;
+      if (!x.station || !nearBkk(+x.station.tele_station_lat, +x.station.tele_station_long)) continue;
       const t = bkkTime(x.rainfall_datetime);
       if (isNaN(t) || now - t > 6 * 36e5) continue;
       rain.push({ la: +x.station.tele_station_lat, lo: +x.station.tele_station_long, mm1: +x.rain_1h || 0, mm24: +x.rain_24h || 0 });
@@ -434,7 +473,7 @@ async function updateRisk(meta) {
   try {
     const d = JSON.parse(await fetchText(TW + 'waterlevel_load', { headers: { Referer: 'https://www.thaiwater.net/' } }, 90000));
     for (const x of (d.waterlevel_data && d.waterlevel_data.data) || []) {
-      if (!x.geocode || String(x.geocode.province_code) !== '10') continue;
+      if (!x.station || !nearBkk(+x.station.tele_station_lat, +x.station.tele_station_long)) continue;
       const t = bkkTime(x.waterlevel_datetime);
       if (isNaN(t) || now - t > 6 * 36e5 || x.storage_percent == null) continue;
       wl.push({ la: +x.station.tele_station_lat, lo: +x.station.tele_station_long, pct: +x.storage_percent, name: (x.station.tele_station_name && x.station.tele_station_name.th) || '' });
@@ -478,6 +517,7 @@ await updateTmd(meta);
 await checkReports(meta);
 await updateTraffy(meta);
 await updateCamsRadar(meta);
+await updateThaiwater(meta);
 await updateRisk(meta).catch((e) => { log('risk failed:', e); meta.sources.risk = { ok: false, error: e.message }; });
 await writeJSON('meta.json', meta);
 log('done', JSON.stringify(meta));
