@@ -322,10 +322,13 @@
         <div class="m">เขต${esc(th(s.x.geocode.amphoe_name))} · ${fmtDT(s.t)} (${ago(s.t)})</div></div>`;
       // ฝนหนัก (> 35 มม./24 ชม.) ขอบสีแดง ให้เห็นชัดบนแผนที่
       const heavy = s.mm > RAIN_HEAVY_MM;
-      s.marker = L.circleMarker([s.la, s.lo], {
-        radius: heavy ? 9 : 6, color: heavy ? cssVar('--critical') : '#fff', weight: heavy ? 3 : 1.5,
-        fillColor: cssVar(st[1].slice(4, -1)), fillOpacity: 0.95,
-      }).bindPopup(html).addTo(layers.rain);
+      // ฝนน้อย/ไม่มีฝน: จุดเล็กและจาง ไม่ให้แย่งสายตาจากจุดที่สำคัญ
+      const style = heavy ? { radius: 9, color: cssVar('--critical'), weight: 3, fillOpacity: 0.95, opacity: 1 }
+        : s.mm > 10 ? { radius: 6, color: '#fff', weight: 1.5, fillOpacity: 0.85, opacity: 1 }
+        : s.mm > 0 ? { radius: 4, color: '#fff', weight: 1, fillOpacity: 0.5, opacity: 0.6 }
+        : { radius: 3, color: '#fff', weight: 0.5, fillOpacity: 0.3, opacity: 0.4 };
+      s.marker = L.circleMarker([s.la, s.lo], { ...style, fillColor: cssVar(st[1].slice(4, -1)) })
+        .bindPopup(html).addTo(layers.rain);
       if (heavy) s.marker.bringToFront();
     }
     const top = [...S.rain].sort((a, b) => b.mm - a.mm);
