@@ -90,14 +90,19 @@
       <div id="districtList" class="dlist"></div>
     </section>
 
-    <!-- 3) ทุกจุด -->
+    <!-- 3) ทุกจุด: แบ่งตามสภาพถนน -->
     <section class="card">
       <div class="card-h"><h2>จุดน้ำท่วมทั้งหมด</h2><span class="muted small" id="allCount"></span></div>
-      <div id="spots" class="spots"></div>
-      <details class="risk-box" open>
-        <summary><span class="subh">พื้นที่เสี่ยง (ยังไม่มีรายงานน้ำท่วม)</span> <span class="tag t1" id="riskCount">0</span> <span class="muted small">กดเพื่อดู</span></summary>
-        <div id="riskSpots" class="spots"></div>
-      </details>
+      <div class="sfilter">
+        <input id="spotQ" type="search" placeholder="ค้นหาถนนหรือเขต เช่น วิภาวดี, บางเขน" aria-label="ค้นหาถนนหรือเขต">
+        <button type="button" class="btn" id="spotNear">📍 ใกล้ฉัน</button>
+        <label class="small"><input type="checkbox" id="spotOld"> ซ่อนรายงานที่เก่าเกิน 3 ชม.</label>
+      </div>
+      <div id="spots"></div>
+      <div class="risk-box">
+        <h3 class="subh">พื้นที่เสี่ยง (ยังไม่มีรายงานน้ำท่วม) <span class="tag t1" id="riskCount">0</span></h3>
+        <div id="riskSpots"></div>
+      </div>
     </section>
 
     <section class="card how">

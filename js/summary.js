@@ -49,10 +49,10 @@
       }
     }
     for (const s of D.rain || []) if (s.mm > F.RAIN_HEAVY_MM) {
-      out.push({ la: s.la, lo: s.lo, src: 'rain', tier: 1, name: 'สถานีฝน ' + th(s.x.station.tele_station_name), detail: `ฝน ${s.mm} มม. ใน 24 ชม.`, cm: 0, t: s.t, radius: 350 });
+      out.push({ la: s.la, lo: s.lo, src: 'rain', tier: 1, name: 'สถานีฝน ' + th(s.x.station.tele_station_name), detail: `ฝน ${s.mm} มม. ใน 24 ชม.`, cm: 0, t: s.t, radius: 350, mm: s.mm, district: th(s.x.geocode && s.x.geocode.amphoe_name) });
     }
     for (const s of D.wl || []) if (!s.stale && s.pct != null && s.pct >= 90) {
-      out.push({ la: s.la, lo: s.lo, src: 'wl', tier: 1, name: th(s.x.station.tele_station_name), detail: `ระดับน้ำ ${s.pct.toFixed(0)}% ของตลิ่ง`, cm: 0, t: s.t, radius: 250 });
+      out.push({ la: s.la, lo: s.lo, src: 'wl', tier: 1, name: th(s.x.station.tele_station_name), detail: `ระดับน้ำ ${s.pct.toFixed(0)}% ของตลิ่ง`, cm: 0, t: s.t, radius: 250, pct: s.pct });
     }
     return out;
   }
@@ -334,23 +334,89 @@
         ${d.news ? `<li class="muted small">มีข่าวน้ำท่วมในเขตนี้ ${d.news} ข่าว (ไม่ระบุจุด) – ดูในแท็บข่าวของหน้าแผนที่ละเอียด</li>` : ''}</ul>
       </details>`).join('') : '<p class="muted">ยังไม่มีเขตที่มีรายงานน้ำท่วมหรือพื้นที่เสี่ยง</p>';
   }
-  function card(c) {
-    return `<article class="spot t${c.tier}">
-      <div class="t-row">${tag(c.tier)}<span class="muted small">${c.t ? fmtTime(c.t) + ' · ' + ago(c.t) : ''}</span></div>
-      <h3>${esc(c.name)}</h3>
-      <p class="muted small">เขต${esc(c.district || '–')}${c.cm ? ` · น้ำสูงประมาณ ${Math.round(c.cm)} ซม.` : ''}</p>
-      <p class="small">${esc(String(c.members[0].detail || '').slice(0, 140))}</p>
-      <div class="chips">${sourceChips(c)}</div>
-      <a class="go" href="${mapLink(c)}">ดูบนแผนที่ →</a>
-    </article>`;
+  // ---------- จุดน้ำท่วมทั้งหมด: แบ่งตามสภาพถนน รุนแรงก่อน ----------
+  const BLOCK_RE = /ผ่านไม่ได้|ไม่สามารถผ่าน|สัญจรไม่ได้|ปิดการจราจร|ปิดถนน/;
+  const HIGH_RE = /เข่า|เอว|ต้นขา|หน้าแข้ง/;
+  const LOW_RE = /ข้อเท้า|ตาตุ่ม/;
+  const GROUPS = [
+    { key: 'block', icon: '🚫', title: 'รถผ่านไม่ได้ / ปิดถนน', open: true },
+    { key: 'high', icon: '🌊', title: 'น้ำสูง 20 ซม. ขึ้นไป', open: true },
+    { key: 'flood', icon: '💧', title: 'น้ำท่วมขัง', open: false },
+    { key: 'unknown', icon: '❔', title: 'ไม่ระบุระดับน้ำ', open: false },
+  ];
+  const STALE_MS = 3 * 36e5, PER_GROUP = 8;
+  const spotUi = { q: '', hideOld: false, me: null, more: {} };
+  let lastClusters = [];
+  function groupOf(c) {
+    const text = c.members.map((m) => m.detail || '').join(' ');
+    if (BLOCK_RE.test(text) || c.cm >= 40) return 'block';
+    if (c.cm >= 20 || HIGH_RE.test(text)) return 'high';
+    if (c.cm > 0 || LOW_RE.test(text)) return 'flood';
+    return 'unknown';
+  }
+  const kmTo = (c) => (spotUi.me ? distKm(spotUi.me[0], spotUi.me[1], c.la, c.lo) : null);
+  function row(c) {
+    const old = c.t && Date.now() - c.t > STALE_MS;
+    const km = kmTo(c);
+    return `<a class="srow${old ? ' old' : ''}" href="${mapLink(c)}">
+      <span class="depth g-${c.group}">${c.cm ? Math.round(c.cm) + '<small>ซม.</small>' : c.group === 'block' ? '🚫' : '–'}</span>
+      <span class="sbody"><b>${esc(c.name)}</b>
+        <span class="muted small">เขต${esc(c.district || '–')}${c.t ? ' · ' + ago(c.t) : ''}${old ? ' (อาจลดแล้ว)' : ''}${km != null ? ` · ห่าง ${km < 1 ? Math.round(km * 1000) + ' ม.' : km.toFixed(1) + ' กม.'}` : ''}</span>
+        <span class="muted small sdetail">${esc(String(c.members[0].detail || '').slice(0, 90))}</span></span>
+      <span class="chips">${c.sources.length > 1 ? `<span class="chip">ยืนยัน ${c.sources.length} แหล่ง</span>` : sourceChips(c)}</span>
+    </a>`;
   }
   function renderSpots(clusters) {
-    const main = clusters.filter((c) => c.tier >= 2), risk = clusters.filter((c) => c.tier === 1);
-    $('allCount').textContent = `${main.length} จุด`;
-    $('spots').innerHTML = main.length ? main.map(card).join('') : '<p class="muted">ยังไม่มีจุดที่มีรายงานน้ำท่วม</p>';
-    $('riskSpots').innerHTML = risk.length ? risk.map(card).join('') : '<p class="muted">ไม่มีพื้นที่เสี่ยงในขณะนี้</p>';
-    $('riskCount').textContent = risk.length;
+    if (clusters) lastClusters = clusters;
+    const q = spotUi.q.trim().replace(/^(ถนน|ถ\.|เขต)\s*/, '');
+    let main = lastClusters.filter((c) => c.tier >= 2);
+    main.forEach((c) => { c.group = groupOf(c); });
+    const total = main.length;
+    if (q) main = main.filter((c) => (c.name + ' ' + (c.district || '') + ' ' + c.members.map((m) => m.detail || '').join(' ')).includes(q));
+    if (spotUi.hideOld) main = main.filter((c) => !c.t || Date.now() - c.t <= STALE_MS);
+    const sortFn = spotUi.me ? (a, b) => kmTo(a) - kmTo(b) : (a, b) => (b.cm || 0) - (a.cm || 0) || b.tier - a.tier || (b.t || 0) - (a.t || 0);
+    $('allCount').textContent = main.length === total ? `${total} จุด` : `แสดง ${main.length} จาก ${total} จุด`;
+    $('spots').innerHTML = !total ? '<p class="muted">ยังไม่มีจุดที่มีรายงานน้ำท่วม</p>' : !main.length ? '<p class="muted">ไม่พบจุดที่ตรงกับตัวกรอง</p>'
+      : GROUPS.map((g) => {
+        const list = main.filter((c) => c.group === g.key).sort(sortFn);
+        if (!list.length) return '';
+        const n = spotUi.more[g.key] ? list.length : PER_GROUP;
+        return `<details class="sgroup g-${g.key}"${g.open || q || spotUi.me ? ' open' : ''}>
+          <summary><span class="gicon">${g.icon}</span> ${g.title} <span class="gcount">${list.length}</span></summary>
+          <div class="slist">${list.slice(0, n).map(row).join('')}</div>
+          ${list.length > n ? `<button type="button" class="btn small smore" data-g="${g.key}">ดูอีก ${list.length - n} จุด ▾</button>` : ''}
+        </details>`;
+      }).join('');
+    $('spots').querySelectorAll('.smore').forEach((b) => b.onclick = () => { spotUi.more[b.dataset.g] = true; renderSpots(); });
+    renderRiskSummary(lastClusters.filter((c) => c.tier === 1));
   }
+  // พื้นที่เสี่ยง: สรุปสั้น 2 บรรทัด ฝนหนัก (เรียง มม.) และคลองใกล้เต็ม (เรียง %)
+  function renderRiskSummary(risk) {
+    const ms = risk.flatMap((c) => c.members.map((m) => ({ ...m, c })));
+    const pick = (src, val) => {
+      const best = new Map();
+      for (const m of ms.filter((x) => x.src === src)) { const k = m.name; if (!best.has(k) || val(m) > val(best.get(k))) best.set(k, m); }
+      return [...best.values()].sort((a, b) => val(b) - val(a));
+    };
+    const rain = pick('rain', (m) => m.mm || 0), wl = pick('wl', (m) => m.pct || 0);
+    const chip = (m, label) => `<a class="rchip" href="${mapLink(m.c)}">${esc(label)}</a>`;
+    const line = (icon, title, arr, fmt) => arr.length ? `<div class="rline"><span class="rhead">${icon} ${title} <b>${arr.length}</b></span>${arr.slice(0, 10).map(fmt).join('')}${arr.length > 10 ? `<span class="muted small">และอีก ${arr.length - 10}</span>` : ''}</div>` : '';
+    $('riskCount').textContent = risk.length;
+    $('riskSpots').innerHTML = (line('🌧', 'ฝนหนัก (24 ชม.)', rain, (m) => chip(m, `${m.district ? 'เขต' + m.district : m.name.replace(/^สถานีฝน\s*/, '')} ${Math.round(m.mm)} มม.`))
+      + line('🌊', 'คลอง/แม่น้ำใกล้เต็มตลิ่ง', wl, (m) => chip(m, `${m.name} ${Math.round(m.pct)}%`))) || '<p class="muted">ไม่มีพื้นที่เสี่ยงในขณะนี้</p>';
+  }
+  // ตัวกรอง
+  $('spotQ').oninput = (e) => { spotUi.q = e.target.value; renderSpots(); };
+  $('spotOld').onchange = (e) => { spotUi.hideOld = e.target.checked; renderSpots(); };
+  $('spotNear').onclick = () => {
+    const btn = $('spotNear');
+    if (spotUi.me) { spotUi.me = null; btn.classList.remove('on'); btn.textContent = '📍 ใกล้ฉัน'; renderSpots(); return; }
+    if (!navigator.geolocation) { alert('เบราว์เซอร์นี้ไม่รองรับการหาตำแหน่ง'); return; }
+    btn.textContent = 'กำลังหาตำแหน่ง…';
+    navigator.geolocation.getCurrentPosition((p) => {
+      spotUi.me = [p.coords.latitude, p.coords.longitude]; btn.classList.add('on'); btn.textContent = '📍 ใกล้ฉัน ✓'; renderSpots();
+    }, () => { btn.textContent = '📍 ใกล้ฉัน'; alert('หาตำแหน่งไม่ได้ กรุณาอนุญาตการเข้าถึงตำแหน่ง'); }, { enableHighAccuracy: true, timeout: 15000, maximumAge: 60000 });
+  };
   async function renderTmd() {
     try {
       const d = await F.fetchTmd();

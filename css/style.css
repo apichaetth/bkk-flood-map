@@ -180,8 +180,8 @@ h2 { font-size: 14px; font-weight: 600; margin: 18px 0 6px; color: var(--ink2); 
   .panel { position: absolute; left: 0; right: 0; bottom: 0; width: auto; height: 42%; border-left: 0; border-top: 1px solid var(--line); border-radius: 14px 14px 0 0; box-shadow: var(--shadow); z-index: 1000; transition: height .2s; }
   .panel.min { height: 92px; }
   /* ปุ่มแจ้ง/แถบปักหมุดบนแผนที่ละเอียด: ยกให้อยู่เหนือแผงด้านล่าง ไม่ให้ถูกบัง */
-  .layout .report-fab { bottom: calc(42% + 10px); transition: bottom .2s; }
-  .layout:has(.panel.min) .report-fab { bottom: 102px; }
+  /* มือถือ: หน้าแผนที่ละเอียดไม่แสดงปุ่มแจ้ง (แจ้งที่หน้าสรุป) ไม่ให้บังแผนที่ */
+  .layout .report-fab { display: none; }
   .grab { display: flex; justify-content: center; background: none; border: 0; padding: 8px 0 2px; flex: none; }
   .grab span { width: 44px; height: 5px; border-radius: 3px; background: var(--line); }
 }
@@ -392,3 +392,36 @@ table.log .thumbs img { width: 56px; height: 56px; object-fit: cover; border-rad
 .ol-imgs img { width: 100%; aspect-ratio: 3 / 4; object-fit: cover; object-position: top; border: 1px solid var(--line); border-radius: 6px; background: var(--bg); }
 @media (max-width: 860px) { .ol-grid { grid-template-columns: 1fr; } }
 .tw-row.storm img { aspect-ratio: 4 / 3; object-fit: contain; background: #fff; }
+
+/* ---------- จุดน้ำท่วมทั้งหมด (แบ่งตามสภาพถนน) ---------- */
+.sfilter { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; margin-bottom: 10px; }
+.sfilter input[type=search] { flex: 1 1 220px; min-width: 0; font: inherit; font-size: 15px; padding: 7px 10px; border: 1px solid var(--line); border-radius: 8px; background: var(--bg); color: var(--ink); }
+.sfilter .btn.on { background: var(--accent); border-color: var(--accent); color: #fff; }
+.sgroup { border: 1px solid var(--line); border-radius: 10px; margin-bottom: 10px; overflow: hidden; }
+.sgroup > summary { cursor: pointer; padding: 10px 12px; font-weight: 600; display: flex; align-items: center; gap: 8px; background: var(--bg); list-style: none; }
+.sgroup > summary::-webkit-details-marker { display: none; }
+.sgroup > summary::after { content: '▾'; margin-left: auto; color: var(--muted); }
+.sgroup:not([open]) > summary::after { content: '▸'; }
+.sgroup.g-block > summary { background: color-mix(in srgb, var(--critical) 14%, var(--surface)); }
+.sgroup.g-high > summary { background: color-mix(in srgb, var(--serious) 14%, var(--surface)); }
+.gcount { background: var(--surface); border: 1px solid var(--line); border-radius: 999px; padding: 0 9px; font-size: 13px; }
+.slist { display: flex; flex-direction: column; }
+.srow { display: flex; gap: 10px; align-items: center; padding: 9px 12px; border-top: 1px solid var(--line); color: var(--ink); text-decoration: none; }
+.srow:hover { background: color-mix(in srgb, var(--accent) 6%, transparent); }
+.srow.old { opacity: .55; }
+.depth { flex: none; width: 56px; height: 46px; border-radius: 8px; display: flex; flex-direction: column; align-items: center; justify-content: center; font-weight: 700; font-size: 19px; line-height: 1; color: #fff; background: var(--muted); }
+.depth small { font-size: 11px; font-weight: 500; margin-top: 2px; }
+.depth.g-block { background: var(--critical); }
+.depth.g-high { background: var(--serious); }
+.depth.g-flood { background: var(--warning); color: #3a2a00; }
+.depth.g-unknown { background: var(--bg); color: var(--muted); border: 1px solid var(--line); }
+.sbody { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 1px; }
+.sbody b { font-size: 15px; }
+.sdetail { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.srow .chips { flex: none; }
+.smore { margin: 6px 12px 10px; }
+.rline { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; margin: 6px 0; }
+.rhead { font-weight: 600; margin-right: 4px; }
+.rchip { border: 1px solid var(--line); border-radius: 999px; padding: 2px 10px; font-size: 13px; color: var(--ink); text-decoration: none; background: var(--bg); }
+.rchip:hover { border-color: var(--accent); }
+@media (max-width: 600px) { .srow .chips { display: none; } .depth { width: 50px; height: 42px; font-size: 17px; } }

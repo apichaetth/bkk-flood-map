@@ -21,7 +21,7 @@
   let via = '';
   async function fetchN() {
     const d = await F.traffyRaw();
-    via = d.via === 'file' ? `ข้อมูลที่ระบบดึงไว้เมื่อ ${fmtDT(d.updated)}` : 'ดึงตรงจาก Traffy';
+    via = d.via === 'file' ? `ข้อมูลที่ระบบดึงไว้เมื่อ ${fmtDT(d.updated)}${d.stale ? ' (Traffy ไม่ตอบสนอง กำลังแสดงข้อมูลล่าสุดที่มี)' : ''}` : 'ดึงตรงจาก Traffy';
     const times = d.results.map((r) => isoDate(r.timestamp)).filter(Boolean);
     return {
       raw: d.results.length,
