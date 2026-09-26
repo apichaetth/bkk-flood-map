@@ -360,7 +360,7 @@
     const bkk = F.twBkkHeavy(d);
     const near = (d.heavy || []).filter((p) => ['11', '12', '13', '73', '74'].includes(p.code)).map((p) => p.name);
     $('twLine').innerHTML = bkk ? `<p class="tmdline">🌧 <b>ThaiWater:</b> คาดว่ากรุงเทพฯ มีฝนตกหนัก (ระดับ ${esc(bkk.level)})</p>` : '';
-    const imgs = (d.images || []).filter((i) => i.group === 'ประเทศไทย');
+    const imgs = (d.images || []).filter((i) => i.group === 'ประเทศไทย').map((i) => ({ ...i, file: /^data\//.test(i.file) ? i.file : 'data/' + i.file }));
     $('olRain').classList.remove('muted', 'small');
     $('olRain').innerHTML = `<p class="ol-main">${bkk ? `<b class="tag t3">ฝนหนัก</b> กรุงเทพฯ อยู่ในรายชื่อจังหวัดที่คาดว่าฝนตกหนัก` : 'ไม่มีการพยากรณ์ฝนหนักใน กทม.'}</p>
       ${near.length ? `<p class="small muted">จังหวัดรอบ ๆ ที่คาดว่าฝนหนัก: ${esc(near.join(', '))}</p>` : ''}

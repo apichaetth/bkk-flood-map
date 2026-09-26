@@ -12,7 +12,8 @@ for (const [w, h, n] of [[390, 844, 'mobile'], [1280, 900, 'desktop']]) {
     const p = await b.newPage({ viewport: { width: w, height: h } });
     const errs = [];
     p.on('pageerror', (e) => errs.push('pageerror: ' + e.message));
-    p.on('console', (m) => { if (m.type() === 'error') errs.push('console: ' + m.text().slice(0, 200)); });
+    p.on('console', (m) => { if (m.type() === 'error' && !/^Failed to load resource/.test(m.text())) errs.push('console: ' + m.text().slice(0, 200)); });
+    p.on('response', (r) => { if (r.status() >= 400) errs.push(`HTTP ${r.status()}: ${r.url().slice(0, 140)}`); });
     p.on('requestfailed', (r) => { if (!/tile\.openstreetmap|google-analytics/.test(r.url())) errs.push('failed: ' + r.url().slice(0, 120) + ' ' + (r.failure() || {}).errorText); });
     const t0 = Date.now();
     try {

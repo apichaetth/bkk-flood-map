@@ -236,7 +236,7 @@
     // ฝนหนักใน กทม. แจ้งไว้บนสุดของแท็บสรุปด้วย
     $('twTop').innerHTML = bkk ? `<div class="tw-alert on">🌧 ThaiWater คาดว่า <b>กรุงเทพฯ</b> มีฝนตกหนัก (ระดับ ${esc(bkk.level)}) · ดูภาพพยากรณ์ด้านล่าง</div>` : '';
     const near = (d.heavy || []).filter((p) => ['11', '12', '13', '73', '74'].includes(p.code)).map((p) => p.name);
-    const imgs = d.images || [];
+    const imgs = (d.images || []).map((i) => ({ ...i, file: /^data\//.test(i.file) ? i.file : 'data/' + i.file }));
     const grp = [...new Set(imgs.map((i) => i.group))];
     f.innerHTML = `<div class="tw-alert ${bkk ? 'on' : ''}">${bkk ? `⚠️ ThaiWater คาดว่า <b>กรุงเทพฯ</b> มีฝนตกหนัก (ระดับ ${esc(bkk.level)})` : 'ThaiWater ไม่ได้ระบุ กทม. ในจังหวัดที่คาดว่าฝนตกหนัก'}${near.length ? `<br><span class="small">จังหวัดรอบ ๆ ที่คาดว่าฝนหนัก: ${esc(near.join(', '))}</span>` : ''}</div>`
       + grp.map((g) => `<div class="tw-imgs"><div class="small muted">ภาพจำลองฝน ${esc(g)}</div><div class="tw-row">${imgs.filter((i) => i.group === g).map((i) =>

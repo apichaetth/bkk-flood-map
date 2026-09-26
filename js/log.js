@@ -29,7 +29,10 @@
       rows = d.log || [];
       render();
       $('updated').textContent = `อัปเดต ${fmtDT(new Date())} · ${rows.length} รายการ`;
-    } catch (e) { $('rows').innerHTML = `<tr><td colspan="7">โหลดไม่สำเร็จ: ${esc(e.message)}</td></tr>`; }
+    } catch (e) {
+      $('rows').innerHTML = `<tr><td colspan="7">โหลดไม่สำเร็จ: ${esc(e.message)} · ระบบจะลองใหม่อัตโนมัติ หรือกด รีเฟรช</td></tr>`;
+      $('updated').textContent = 'โหลดไม่สำเร็จ ' + fmtDT(new Date());
+    }
   }
   if (report) { $('title').textContent = 'ประวัติของหมุด ' + report; $('all').hidden = false; }
   $('q').oninput = render; $('act').onchange = render; $('refresh').onclick = load;

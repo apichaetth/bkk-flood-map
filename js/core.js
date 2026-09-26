@@ -115,13 +115,20 @@ window.Flood = (function () {
 
   // 1) เซ็นเซอร์น้ำท่วมถนน กทม.
   async function fetchSensors() {
-    // ตำแหน่งเซ็นเซอร์แทบไม่เปลี่ยน: เก็บไว้ในเบราว์เซอร์ 24 ชม. ลดการเรียกซ้ำ และใช้ต่อได้ตอนเซิร์ฟเวอร์ล่ม
-    let sp = null;
-    const c = store.get(SENSOR_CACHE);
-    if (c && Date.now() - c.t < 864e5) sp = c.sp;
-    if (!sp) { sp = await getJSON(URL.sensors, 30000); store.set(SENSOR_CACHE, { t: Date.now(), sp }); }
-    // บางเวอร์ชันของ API อาจไม่รองรับตัวกรองเวลา (ตอบ 4xx) ให้ลองแบบไม่กรอง
-    const nt = await getJSON(URL.notif, 30000).catch((e) => (/HTTP 4\d\d/.test(e.message) ? getJSON(URL.notifFallback, 30000) : Promise.reject(e)));
+    // เซิร์ฟเวอร์ กทม. ไม่อนุญาตให้เว็บอื่นเรียกตรง (CORS) จึงใช้ไฟล์ที่ GitHub Actions ดึงไว้ทุก 15 นาทีก่อน
+    let sp = null, nt = null;
+    try {
+      const f = await getJSON('data/bma.json', 20000, { cache: 'no-cache' });
+      if (f.updated && Date.now() - new Date(f.updated) < 40 * 60000) { sp = f.sp; nt = f.nt; }
+    } catch (e) { /* ไม่มีไฟล์ */ }
+    if (!sp) {
+      // ตำแหน่งเซ็นเซอร์แทบไม่เปลี่ยน: เก็บไว้ในเบราว์เซอร์ 24 ชม. ลดการเรียกซ้ำ
+      const c = store.get(SENSOR_CACHE);
+      if (c && Date.now() - c.t < 864e5) sp = c.sp;
+      if (!sp) { sp = await getJSON(URL.sensors, 30000); store.set(SENSOR_CACHE, { t: Date.now(), sp }); }
+      // บางเวอร์ชันของ API อาจไม่รองรับตัวกรองเวลา (ตอบ 4xx) ให้ลองแบบไม่กรอง
+      nt = await getJSON(URL.notif, 30000).catch((e) => (/HTTP 4\d\d/.test(e.message) ? getJSON(URL.notifFallback, 30000) : Promise.reject(e)));
+    }
     const latest = new Map();
     for (const n of nt.data || []) if (!latest.has(n.sensor_profile)) latest.set(n.sensor_profile, n);
     let newest = null;
