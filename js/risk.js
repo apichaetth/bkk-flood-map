@@ -6,6 +6,27 @@
   const NAME = { 3: 'แนวโน้มสูง', 2: 'แนวโน้มกลาง', 1: 'เฝ้าระวัง' };
   const COLOR = () => ({ 3: cssVar('--rk3'), 2: cssVar('--rk2'), 1: cssVar('--rk1') });
   const show = { 1: true, 2: true, 3: true };
+  const SRC = ['หน่วยงาน/iTIC', 'Traffy', 'ประชาชนปักหมุด', 'ข่าว'];
+  // ไฟล์รูปแบบกะทัดรัด (v2): ถอดพิกัดแบบผลต่าง และสร้างข้อความเหตุผลจากตัวเลข
+  function unpack(d) {
+    if (d.v !== 2) return d;
+    const segments = d.s.map(([tier, sc, n, di, flat, x]) => {
+      const c = []; let a = 0, o = 0;
+      for (let i = 0; i < flat.length; i += 2) { a += flat[i]; o += flat[i + 1]; c.push([a / 1e5, o / 1e5]); }
+      const m = c[Math.floor(c.length / 2)];
+      return { tier, score: sc / 100, name: d.names[n], district: d.districts[di], c, la: m[0], lo: m[1], x, stations: d.stations };
+    });
+    return { ...d, segments };
+  }
+  function whyOf(s) {
+    if (s.why) return s.why;
+    const [src, dist, age, mm1, mm24, hc, pct, st] = s.x, w = [];
+    if (src >= 0) w.push(`มีรายงานน้ำท่วม (${SRC[src]}) ห่าง ${dist} ม. เมื่อ ${age} นาทีที่แล้ว`);
+    if (mm1 >= 0) w.push(`ฝนแถวนี้ประมาณ ${mm1} มม./ชม. · ${mm24} มม./24 ชม.`);
+    if (hc) w.push(`เคยมีคนแจ้งน้ำท่วมแถวนี้ ${hc} ครั้งในช่วงที่ผ่านมา`);
+    if (pct >= 0) w.push(`ระดับน้ำ${st >= 0 ? ' ' + s.stations[st] : ''} ${pct}% ของตลิ่ง`);
+    return w;
+  }
   let data = null, fitted = false;
 
   // วาดด้วย canvas: ถนนหลายพันช่วง SVG จะช้ามาก
@@ -23,7 +44,7 @@
     // เส้นขอบขาวเฉพาะระดับกลาง/สูง ส่วนป๊อปอัปสร้างตอนกดเท่านั้น
     const pop = (s) => `<div class="pp"><span class="badge" style="--c:${col[s.tier]}">${NAME[s.tier]}</span> <span class="m">คะแนน ${(s.score * 100).toFixed(0)}/100</span>
         <h3>${esc(s.name || 'ถนนไม่มีชื่อ')}</h3><div class="m">เขต${esc(s.district)}</div>
-        <ul class="plist">${(s.why || []).map((w) => `<li>${esc(w)}</li>`).join('') || '<li>คะแนนรวมจากหลายปัจจัยเล็กน้อย</li>'}</ul>
+        <ul class="plist">${whyOf(s).map((w) => `<li>${esc(w)}</li>`).join('') || '<li>คะแนนรวมจากหลายปัจจัยเล็กน้อย</li>'}</ul>
         <div class="m">ประมาณการ ไม่ใช่การยืนยัน</div></div>`;
     for (const s of segs) {
       if (s.tier > 1) L.polyline(s.c, { color: '#fff', weight: s.tier === 3 ? 11 : 9, opacity: 0.85, lineCap: 'round', interactive: false }).addTo(layer);
@@ -63,12 +84,14 @@
       <p class="small" style="margin-top:8px">รายงานน้ำท่วมใหม่ที่เกิดขึ้น <b>${a.recall.newReports}</b> ครั้ง อยู่บนถนนที่ทายไว้ล่วงหน้า <b>${a.recall.caught}</b> ครั้ง (${a.recall.pct != null ? a.recall.pct + '%' : '–'})</p></div>`
       : '<p class="muted">ต้องรอผลการทายอย่างน้อย 3 ชม. แรกก่อน จึงจะเริ่มวัดความแม่นได้</p>';
   }
-  // แสดงผลทันที: (1) ผลรอบก่อนที่เก็บในเครื่อง (2) ไฟล์เล็กเฉพาะระดับกลาง/สูง (3) ไฟล์เต็ม
-  const CACHE = 'risk-lite-cache';
+  // แสดงผลทันที: ผลรอบก่อนที่เก็บในเครื่อง แล้วค่อยแทนด้วยไฟล์ล่าสุด
+  const CACHE = 'risk-cache-v2';
+  try { localStorage.removeItem('risk-lite-cache'); } catch (e) { /* ไม่เป็นไร */ }
   const status = $('rkStatus');
   const note = (t) => { status.textContent = t; status.hidden = !t; };
   function show1(d, label) {
-    data = d; draw(); renderSide();
+    data = unpack(d); draw(); renderSide();
+    d = data;
     const src = d.sources || {};
     const bad = Object.entries(src).filter(([, v]) => typeof v === 'string' && v.startsWith('error')).map(([k]) => k);
     $('updated').textContent = `คำนวณเมื่อ ${fmtDT(new Date(d.updated))} · จากถนน ${d.roadSegments.toLocaleString()} ช่วง${bad.length ? ` · ข้อมูลบางแหล่งใช้ไม่ได้รอบนี้: ${bad.join(', ')}` : ''} · อัปเดตทุก 15 นาที`;
@@ -80,17 +103,14 @@
     loading = true;
     if (!data) {
       const c = F.store.get(CACHE);
-      if (c && c.segments) show1(c, `แสดงผลรอบก่อน (${fmtDT(new Date(c.updated))}) ระหว่างโหลดข้อมูลล่าสุด…`);
+      if (c && c.s) show1(c, `แสดงผลรอบก่อน (${fmtDT(new Date(c.updated))}) ระหว่างโหลดข้อมูลล่าสุด…`);
       else note('กำลังโหลดข้อมูลถนนเสี่ยง…');
     }
     try {
-      const lite = await F.getJSON('data/risk-lite.json?t=' + Date.now(), 45000).catch(() => null);
-      if (lite && (!data || new Date(lite.updated) >= new Date(data.updated))) {
-        show1(lite, 'แสดงระดับกลาง/สูงแล้ว กำลังโหลดระดับเฝ้าระวัง…');
-        F.store.set(CACHE, lite);
-      }
-      const full = await F.getJSON('data/risk-roads.json?t=' + Date.now(), 60000);
-      show1(full, '');
+      // no-cache = ถามเซิร์ฟเวอร์ว่าไฟล์เปลี่ยนไหม ถ้าไม่เปลี่ยนได้ 304 ใช้ของในเครื่องได้เลย
+      const d = await F.getJSON('data/risk-roads.json', 60000, { cache: 'no-cache' });
+      show1(d, '');
+      if (d.v === 2) F.store.set(CACHE, d);
     } catch (e) {
       if (data) note('โหลดข้อมูลล่าสุดไม่สำเร็จ (' + e.message + ') กำลังแสดงผลรอบก่อน จะลองใหม่อัตโนมัติ');
       else { note(''); $('updated').textContent = 'ยังไม่มีผลการคำนวณ (' + e.message + ') ระบบจะคำนวณในรอบอัปเดตถัดไป'; }

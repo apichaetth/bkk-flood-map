@@ -161,10 +161,27 @@ export function scoreRoads(roads, input, now = Date.now()) {
     if (mm1 >= 5 || mm24 >= 20) why.push(`ฝนแถวนี้ประมาณ ${mm1.toFixed(0)} มม./ชม. · ${mm24.toFixed(0)} มม./24 ชม.`);
     if (hc) why.push(`เคยมีคนแจ้งน้ำท่วมแถวนี้ ${hc} ครั้งในช่วงที่ผ่านมา`);
     if (wlSt) why.push(`ระดับน้ำ${wlSt.name ? ' ' + wlSt.name : ''} ${wlSt.pct.toFixed(0)}% ของตลิ่ง`);
+    // x = เหตุผลแบบตัวเลข (หน้าเว็บสร้างข้อความเอง ไฟล์จะเล็กกว่าเก็บข้อความ)
+    const x = [bestE && E >= 0.1 ? ['itic', 'traffy', 'web', 'news'].indexOf(bestE.src) : -1, bestE ? bestE.d : 0, bestE ? bestE.ageMin : 0,
+      mm1 >= 5 || mm24 >= 20 ? Math.round(mm1) : -1, Math.round(mm24), hc, wlSt ? Math.round(wlSt.pct) : -1, wlSt ? wlSt.name || '' : ''];
     out.push({ id: s.id, name: s.name, cls: s.cls, district: s.district, c: s.c, la: s.la, lo: s.lo, score: +score.toFixed(3), tier,
-      f: { E: +E.toFixed(2), R: +R.toFixed(2), H: +H.toFixed(2), W: +W.toFixed(2) }, why });
+      f: { E: +E.toFixed(2), R: +R.toFixed(2), H: +H.toFixed(2), W: +W.toFixed(2) }, why, x });
   }
   return out.sort((a, b) => b.score - a.score);
+}
+
+// ---------- ไฟล์สำหรับหน้าเว็บแบบกะทัดรัด ----------
+// s = [tier, คะแนน×100, ดัชนีชื่อถนน, ดัชนีเขต, พิกัด (จุดแรก ×1e5 แล้วต่อด้วยผลต่าง), เหตุผล x (ชื่อสถานีเป็นดัชนี)]
+export function packSegments(segs) {
+  const names = [], ni = new Map(), dists = [], di = new Map(), stns = [], si = new Map();
+  const idx = (arr, m, v) => { if (!m.has(v)) { m.set(v, arr.length); arr.push(v); } return m.get(v); };
+  const s = segs.map((g) => {
+    const flat = []; let pa = 0, po = 0;
+    for (const [a, o] of g.c) { const A = Math.round(a * 1e5), O = Math.round(o * 1e5); flat.push(A - pa, O - po); pa = A; po = O; }
+    const x = g.x.slice(0, 7); x.push(g.x[7] ? idx(stns, si, g.x[7]) : -1);
+    return [g.tier, Math.round(g.score * 100), idx(names, ni, g.name || ''), idx(dists, di, g.district || ''), flat, x];
+  });
+  return { v: 2, names, districts: dists, stations: stns, s };
 }
 
 // ---------- วัดความแม่น ----------

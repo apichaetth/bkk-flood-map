@@ -11,7 +11,7 @@
 import { readFile, writeFile, mkdir } from 'node:fs/promises';
 import { createHash } from 'node:crypto';
 import path from 'node:path';
-import { loadRoads, scoreRoads, evaluate, PARAMS as RISK_PARAMS } from './risk.mjs';
+import { loadRoads, scoreRoads, evaluate, packSegments, PARAMS as RISK_PARAMS } from './risk.mjs';
 import { fileURLToPath } from 'node:url';
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
@@ -451,11 +451,7 @@ async function updateRisk(meta) {
   const accuracy = evaluate(hist, roads, evalReports, now.getTime());
   const counts = { 3: 0, 2: 0, 1: 0 };
   segs.forEach((s) => counts[s.tier]++);
-  const out = { updated: now.toISOString(), roadSegments: roads.segments.length, sources: src, counts, accuracy, params: RISK_PARAMS,
-    segments: segs.slice(0, 2500).map((x) => ({ name: x.name, district: x.district, c: x.c, la: x.la, lo: x.lo, score: x.score, tier: x.tier, why: x.why })) };
-  await writeJSON('risk-roads.json', out);
-  // ไฟล์เล็กเฉพาะระดับกลาง/สูง ให้หน้าเว็บแสดงได้ทันทีระหว่างรอไฟล์เต็ม
-  await writeJSON('risk-lite.json', { ...out, lite: true, segments: out.segments.filter((x) => x.tier >= 2) });
+  await writeJSON('risk-roads.json', { updated: now.toISOString(), roadSegments: roads.segments.length, sources: src, counts, accuracy, ...packSegments(segs.slice(0, 4000)) });
   meta.sources.risk = { ok: true, segments: segs.length, counts, sources: src };
 }
 
