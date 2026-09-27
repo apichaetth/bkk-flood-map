@@ -394,6 +394,22 @@
       <div class="tmd-bars" role="img" aria-label="ฝนสูงสุดรายชั่วโมงใน กทม. 24 ชม. ข้างหน้า">${hours.map((h, i) => `<span title="${hh(h.t)}:00 น. สูงสุด ${h.mm.toFixed(1)} มม."><i style="height:${Math.round((h.mm / maxMm) * 100)}%"></i>${i % 6 === 0 ? `<em>${hh(h.t)}</em>` : ''}</span>`).join('')}</div>
       <p class="muted small">ฝนสูงสุดรายชั่วโมงใน กทม. 24 ชม. ข้างหน้า${peak && peak.mm >= 0.5 ? ` · หนักสุดราว ${hh(peak.t)}:00 น. (${peak.mm.toFixed(1)} มม./ชม.)` : ''} · กรมอุตุนิยมวิทยา</p>`;
   }
+  // คลอง/อุโมงค์/ฝนจากสำนักการระบายน้ำ กทม. (มีเมื่อเครื่องในไทยส่งข้อมูล)
+  async function renderCity() {
+    const b = await F.fetchBmaRelay();
+    const box = $('olCity');
+    if (!b || !(b.canal || []).length) { box.hidden = true; return; }
+    box.hidden = false;
+    const cn = (b.canal || []), crit = cn.filter((c) => c.st === 2), warn = cn.filter((c) => c.st === 1);
+    const worst = [...crit, ...warn].sort((x, y) => y.st - x.st || (y.wl - y.crit) - (x.wl - x.crit)).slice(0, 5);
+    const tun = (b.road || []).filter((r) => r.tunnel), tunWet = tun.filter((r) => r.cm >= 5);
+    const rain = (b.rain || []).filter((r) => r.t && Date.now() - r.t < 2 * 36e5 && r.r1 != null).sort((x, y) => y.r1 - x.r1);
+    const top = rain[0];
+    $('olCityBody').innerHTML = `<p class="ol-main">${crit.length ? `<b class="tag t3">วิกฤต ${crit.length}</b> ` : ''}${warn.length ? `<b class="tag t2">เตือนภัย ${warn.length}</b> ` : ''}คลองจาก ${cn.length} สถานี${!crit.length && !warn.length ? ' อยู่ในระดับปกติ' : ''}</p>
+      <div class="ol-cols">${worst.map((c) => `<div class="ol-row">${lvDot(c.st === 2 ? 3 : 2)}<span>${esc(c.n)}<small>เขต${esc(c.d)}</small></span><b>${c.wl != null ? fmt(c.wl, 2) + '<small> ม.</small>' : ''}</b></div>`).join('')}</div>
+      <p class="small">${tun.length ? `อุโมงค์ทางลอด: ${tunWet.length ? `<b>มีน้ำ ${tunWet.length} แห่ง</b> (${tunWet.map((r) => esc(r.n)).join(', ')})` : `ปกติทั้ง ${tun.filter((r) => r.st !== 'off').length} แห่ง`}` : ''}${top && top.r1 > 0 ? ` · ฝนหนักสุดชั่วโมงล่าสุด ${fmt(top.r1, 1)} มม. ที่${esc(top.n)}` : ''}</p>
+      <p class="muted small">อัปเดต ${F.fmtTime(new Date(b.updated))} · <a href="map.html">ดูบนแผนที่ →</a></p>`;
+  }
   let upstream = null, dams = null;
   function renderOutlookWl(up) { upstream = up || []; renderRiver(); renderNorth(); }
   function renderRiver() {
@@ -429,6 +445,7 @@
     $('updated').textContent = 'กำลังอัปเดต…';
     renderTmd();
     renderOutlookTw();
+    renderCity();
     renderTmdFcst();
     loadRadar();
     if (!lyr.cam.getLayers().length) loadCams();

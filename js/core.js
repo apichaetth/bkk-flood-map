@@ -126,19 +126,33 @@ window.Flood = (function () {
   const SENSOR_CACHE = 'bkkflood.bmaSensors';
 
   // 1) เซ็นเซอร์น้ำท่วมถนน กทม.
+  // ข้อมูลที่เครื่องในไทยส่งขึ้นมา (scripts/bma-fetch.mjs): sensors, rain, canal, road · null ถ้าไม่มีหรือเก่ากว่า 90 นาที
+  let relayP = null, relayAt = 0;
+  function fetchBmaRelay() {
+    if (!relayP || Date.now() - relayAt > 6e4) {
+      relayAt = Date.now();
+      relayP = getJSON('data/bma-sensors.json', 20000).then((b) => (b && Date.now() - new Date(b.updated) < 90 * 6e4 ? b : null)).catch(() => null);
+    }
+    return relayP;
+  }
   async function fetchSensors() {
     try { return await fetchSensorsDirect(); }
     catch (e) {
-      // สำรอง: ไฟล์ที่เครื่องในไทยส่งขึ้นมา (scripts/bma-fetch.mjs) ใช้เมื่อเปิดเว็บจากต่างประเทศหรือระบบ กทม. ไม่ตอบ
-      const b = await getJSON('data/bma-sensors.json', 20000).catch(() => null);
-      if (!b || !(Date.now() - new Date(b.updated) < 90 * 6e4)) throw e;
+      // สำรอง: ใช้ไฟล์จากเครื่องในไทย เมื่อเปิดเว็บจากต่างประเทศหรือระบบ กทม. ไม่ตอบ
+      const b = await fetchBmaRelay();
+      if (!b) throw e;
       let newest = null;
-      const items = (b.sensors || []).map((x) => {
-        const t = x.t ? new Date(x.t) : null;
+      const mk = (s, la, lo, cm, tms, off) => {
+        const t = tms ? new Date(tms) : null;
         if (t && (!newest || t > newest)) newest = t;
-        const stale = !t || Date.now() - t > SENSOR_STALE_H * 36e5;
-        return { s: { id: x.id, code: x.code, name: x.name, road: x.road, district: x.district }, la: x.la, lo: x.lo, cm: x.cm, t, stale, lv: stale || x.cm == null ? 0 : sensorLevel(x.cm) };
-      });
+        const stale = off || !t || Date.now() - t > SENSOR_STALE_H * 36e5;
+        return { s, la, lo, cm, t, stale, lv: stale || cm == null ? 0 : sensorLevel(cm) };
+      };
+      // ระบบ DDS มีสถานะปัจจุบันของทุกจุด ใช้ก่อน ถ้าไม่มีใช้ระบบแจ้งเตือน floodbangkok
+      const items = (b.road || []).length
+        ? b.road.filter((x) => !x.tunnel).map((x) => mk({ code: x.c, name: x.n, road: x.road, district: x.d }, x.la, x.lo, x.cm, x.t, x.st === 'off'))
+        : (b.sensors || []).map((x) => mk({ id: x.id, code: x.code, name: x.name, road: x.road, district: x.district }, x.la, x.lo, x.cm, x.t, false));
+      if (!items.length) throw e;
       return { items, newest, msg: `${items.length} จุด (ผ่านเครื่องสำรองในไทย)` };
     }
   }
@@ -425,7 +439,7 @@ window.Flood = (function () {
     REFRESH_MS, MS, TZ, RAIN_HEAVY_MM, URL,
     $, esc, num, inBkk, nearBkk, th, fmtTime, fmtDT, ago, bkkDate, isoDate, distKm, getJSON, cssVar, store,
     LEVEL, badge, sensorLevel, wlLevel, rainStep, SEV_LV, levelFromText,
-    fetchSensors, fetchEvents, fetchTraffy, traffyRaw, fetchCams, fetchRadar, isFloodTicket, fetchWebReports, fetchTw, fetchTmdFcst, twBkkHeavy, reportEndpoint, deviceId, WEB_LEVEL, fetchRain, fetchWl, fetchNews, fetchTmd, errMsg,
+    fetchSensors, fetchBmaRelay, fetchEvents, fetchTraffy, traffyRaw, fetchCams, fetchRadar, isFloodTicket, fetchWebReports, fetchTw, fetchTmdFcst, twBkkHeavy, reportEndpoint, deviceId, WEB_LEVEL, fetchRain, fetchWl, fetchNews, fetchTmd, errMsg,
     loadDistricts, districtAt, addLocate,
   };
 })();

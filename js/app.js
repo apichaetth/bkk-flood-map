@@ -37,6 +37,8 @@
     radar: L.layerGroup().addTo(map),
     rain: L.layerGroup().addTo(map),
     wl: L.layerGroup().addTo(map),
+    canal: L.layerGroup().addTo(map),
+    bmaRain: L.layerGroup(),
     news: L.layerGroup().addTo(map),
     traffy: L.layerGroup().addTo(map),
     event: L.layerGroup().addTo(map),
@@ -50,8 +52,10 @@
     'ประชาชนแจ้งผ่านเว็บนี้': layers.web,
     'ประชาชนแจ้ง (Traffy 24 ชม.)': layers.traffy,
     'ตำแหน่งจากข่าว / YouTube': layers.news,
-    'ระดับน้ำคลอง/แม่น้ำ': layers.wl,
-    'ปริมาณฝน 24 ชม.': layers.rain,
+    'ระดับน้ำคลอง/แม่น้ำ (ThaiWater)': layers.wl,
+    'ระดับน้ำคลอง กทม. (312 สถานี)': layers.canal,
+    'ปริมาณฝน 24 ชม. (ThaiWater)': layers.rain,
+    'ฝน – สถานี กทม.': layers.bmaRain,
     'เรดาร์ฝน (RainViewer)': layers.radar,
     'กล้อง CCTV สาธารณะ': layers.cam,
     'ขอบเขตเขต': layers.districts,
@@ -76,6 +80,7 @@
     web: { name: 'ประชาชนแจ้งผ่านเว็บนี้ (ปักหมุด)', link: 'log.html' },
     wl: { name: 'ระดับน้ำ – ThaiWater (สสน.)', link: 'https://www.thaiwater.net' },
     rain: { name: 'ปริมาณฝน – ThaiWater (สสน.)', link: 'https://www.thaiwater.net' },
+    relay: { name: 'ระดับน้ำคลอง / ฝน / อุโมงค์ – สำนักการระบายน้ำ กทม. (ผ่านเครื่องในไทย)', link: 'https://weather.bangkok.go.th/water' },
     news: { name: 'ข่าว – Google News RSS + สรุปโดย Gemini', link: 'https://news.google.com' },
     youtube: { name: 'คลิป – YouTube Data API + สรุปโดย Gemini', link: 'https://www.youtube.com/results?search_query=%E0%B8%99%E0%B9%89%E0%B8%B3%E0%B8%97%E0%B9%88%E0%B8%A7%E0%B8%A1+%E0%B8%81%E0%B8%A3%E0%B8%B8%E0%B8%87%E0%B9%80%E0%B8%97%E0%B8%9E' },
     tmd: { name: 'ประกาศเตือนภัย – กรมอุตุนิยมวิทยา', link: 'https://www.tmd.go.th' },
@@ -335,6 +340,62 @@
     const hi = allWl.filter((s) => !s.stale && s.pct != null).sort((a, b) => b.pct - a.pct).slice(0, 6);
     listInto('listWl', hi, (s) => ({ dot: LEVEL[wlLevel(s.pct)].color, title: th(s.x.station.tele_station_name), sub: `${s.edge ? loc(s) + ' · ' : ''}${trend(s) || 'ไม่มีแนวโน้ม'} · ${fmtTime(s.t)}`, right: s.pct.toFixed(0) + '%', go: s }), 'ไม่มีสถานีที่มีค่าล่าสุด');
     renderCpy();
+  }
+
+  // ---------- 5b) สำนักการระบายน้ำ กทม. ผ่านเครื่องในไทย: คลอง 312 สถานี, ฝน, อุโมงค์ทางลอด ----------
+  const CANAL = { 2: ['วิกฤต', 3], 1: ['เตือนภัย', 2], 0: ['ปกติ', 0], '-1': ['ขัดข้อง', -1] };
+  async function loadRelay() {
+    setFeed('relay', 'loading');
+    const b = await Flood.fetchBmaRelay();
+    S.relay = b;
+    if (!b) setFeed('relay', 'off', 'ต้องมีเครื่องในไทยส่งข้อมูล (ข้อมูลเก่ากว่า 90 นาทีจะไม่แสดง)');
+    else {
+      const crit = (b.canal || []).filter((c) => c.st === 2).length;
+      setFeed('relay', 'ok', `คลอง ${(b.canal || []).length} สถานี (วิกฤต ${crit}) · ฝน ${(b.rain || []).length} สถานี · อุโมงค์ ${(b.road || []).filter((r) => r.tunnel).length} แห่ง`, new Date(b.updated));
+    }
+    drawRelay();
+  }
+  function drawRelay() {
+    layers.canal.clearLayers(); layers.bmaRain.clearLayers();
+    const b = S.relay;
+    for (const id of ['secCanal', 'secTunnel', 'secBmaRain']) $(id).hidden = !b;
+    if (!b) return;
+    // คลอง: ปกติ/ขัดข้องจุดเล็ก เตือนภัย/วิกฤตจุดใหญ่
+    for (const c of b.canal || []) {
+      const [label, lv] = CANAL[c.st] || CANAL['-1'];
+      const color = lv < 0 ? 'var(--stale)' : LEVEL[lv].color;
+      const html = `<div class="pp"><div class="m">ระดับน้ำคลอง · สำนักการระบายน้ำ กทม.</div><h3>${esc(c.n)}</h3>
+        <span class="badge" style="--c:${color}">${label}</span>
+        ${c.wl != null && lv >= 0 ? `<div style="margin-top:4px"><span class="big">${c.wl.toFixed(2)}</span> ม.</div>` : ''}
+        <div class="m">${c.warn != null ? `เกณฑ์เตือนภัย ${c.warn} · วิกฤต ${c.crit} · ` : ''}${c.river ? esc(c.river) + ' · ' : ''}เขต${esc(c.d)}${c.t ? `<br>${fmtDT(new Date(c.t))} (${ago(new Date(c.t))})` : ''}</div></div>`;
+      const size = c.st >= 1 ? 13 : 7;
+      c.marker = L.marker([c.la, c.lo], { icon: icon('wl', color, '', size, lv < 0 ? 'stale' : ''), zIndexOffset: c.st * 100 }).bindPopup(html).addTo(layers.canal);
+    }
+    const hot = (b.canal || []).filter((c) => c.st >= 1).sort((x, y) => y.st - x.st || (y.wl - y.crit) - (x.wl - x.crit));
+    listInto('listCanal', hot.slice(0, 8), (c) => ({ dot: LEVEL[CANAL[c.st][1]].color, title: c.n, sub: `${CANAL[c.st][0]} · เขต${c.d}${c.t ? ' · ' + fmtTime(new Date(c.t)) : ''}`, right: c.wl != null ? c.wl.toFixed(2) + ' ม.' : '', go: c }),
+      'ไม่มีคลองที่อยู่ในระดับเตือนภัยหรือวิกฤต');
+    $('canalSum').textContent = `วิกฤต ${hot.filter((c) => c.st === 2).length} · เตือนภัย ${hot.filter((c) => c.st === 1).length} · ปกติ ${(b.canal || []).filter((c) => c.st === 0).length} · ขัดข้อง ${(b.canal || []).filter((c) => c.st < 0).length} สถานี`;
+    // อุโมงค์ทางลอด
+    const tun = (b.road || []).filter((r) => r.tunnel).sort((x, y) => (y.cm || 0) - (x.cm || 0));
+    for (const r of tun) r.marker = null;
+    listInto('listTunnel', tun, (r) => ({
+      dot: r.st === 'off' ? 'var(--stale)' : r.cm >= 5 ? LEVEL[Flood.sensorLevel(r.cm) || 1].color : LEVEL[0].color,
+      title: r.n + (r.dir ? ` (${r.dir})` : ''), sub: `${r.st === 'off' ? 'เซ็นเซอร์ขัดข้อง' : r.cm >= 5 ? 'มีน้ำ' : 'ปกติ'} · เขต${r.d}${r.t ? ' · ' + fmtTime(new Date(r.t)) : ''}`,
+      right: r.st === 'off' ? '–' : (r.cm || 0) + ' ซม.', go: r,
+    }), 'ไม่มีข้อมูลอุโมงค์');
+    // ฝนสถานี กทม.
+    for (const r of b.rain || []) {
+      if (r.r24 == null) continue;
+      const st = rainStep(r.r24), heavy = r.r24 > RAIN_HEAVY_MM;
+      const html = `<div class="pp"><div class="m">สถานีวัดฝน · สำนักการระบายน้ำ กทม.</div><h3>${esc(r.n)}</h3>
+        <div><span class="big">${r.r24}</span> มม. / 24 ชม.</div><div>15 นาที ${r.r15 ?? '–'} · 1 ชม. ${r.r1 ?? '–'} · 3 ชม. ${r.r3 ?? '–'} มม.</div>
+        <div class="m">เขต${esc(r.d)}${r.t ? ' · ' + fmtDT(new Date(r.t)) : ''}</div></div>`;
+      r.marker = L.circleMarker([r.la, r.lo], { radius: Math.min(11, 2 + Math.sqrt(Math.max(0, r.r24)) * 0.7), color: '#fff', weight: 1, fillOpacity: r.r24 > 0 ? 0.85 : 0.3,
+        fillColor: heavy ? heavyRed(r.r24) : cssVar(st[1].slice(4, -1)) }).bindPopup(html).addTo(layers.bmaRain);
+    }
+    const now = (b.rain || []).filter((r) => r.r1 > 0 && r.t && Date.now() - r.t < 2 * 36e5).sort((x, y) => y.r1 - x.r1 || y.r15 - x.r15);
+    listInto('listBmaRain', now.slice(0, 6), (r) => ({ dot: LEVEL[rain1(r.r1)[0]].color, title: r.n, sub: `เขต${r.d} · 15 นาที ${r.r15 ?? 0} มม. · ${fmtTime(new Date(r.t))}`, right: r.r1 + ' มม./ชม.', go: r }),
+      'ชั่วโมงล่าสุดไม่มีฝนที่สถานีของ กทม.');
   }
 
   // ---------- 6) ข่าว + สรุป AI (จาก GitHub Actions) ----------
@@ -626,7 +687,7 @@
   function refresh() {
     last = Date.now();
     $('updated').textContent = 'กำลังอัปเดต…';
-    Promise.allSettled([loadSensors(), loadEvents(), loadTraffy(), loadRain(), loadWl(), loadTw(), loadNews(), loadTmd(), loadRadar(), S.cam ? null : loadCams()])
+    Promise.allSettled([loadSensors(), loadEvents(), loadTraffy(), loadRain(), loadWl(), loadRelay(), loadTw(), loadNews(), loadTmd(), loadRadar(), S.cam ? null : loadCams()])
       .then(() => { $('updated').textContent = `อัปเดตหน้าเว็บ ${fmtTime(new Date(last))} · รีเฟรชอัตโนมัติทุก 15 นาที`; renderCams(); });
   }
   $('refresh').onclick = refresh;

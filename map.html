@@ -56,6 +56,10 @@
         <div id="listFlood" class="list"></div>
         <h2>คลอง/แม่น้ำ ระดับน้ำสูง</h2>
         <div id="listWl" class="list"></div>
+        <div id="secCanal" hidden><h2>คลอง กทม. ระดับเตือนภัย/วิกฤต</h2>
+          <p id="canalSum" class="muted small"></p><div id="listCanal" class="list"></div>
+          <p class="muted small">สถานะตามเกณฑ์ของสำนักการระบายน้ำ กทม. แต่ละคลอง</p></div>
+        <div id="secTunnel" hidden><h2>อุโมงค์ทางลอด กทม.</h2><div id="listTunnel" class="list"></div></div>
         <h2>น้ำเหนือ – แม่น้ำเจ้าพระยา (ต้นน้ำ → กทม.)</h2>
         <div id="listCpy" class="list"></div>
         <h2>ฝนลุ่มเจ้าพระยา 24 ชม. (รายจังหวัด)</h2>
@@ -69,6 +73,7 @@
         <div id="listDam" class="list"></div>
         <h2>ฝนตกหนักตอนนี้ (1 ชม. ล่าสุด)</h2>
         <div id="listRain1" class="list"></div>
+        <div id="secBmaRain" hidden><h2>ฝนตอนนี้ – สถานีของ กทม.</h2><div id="listBmaRain" class="list"></div></div>
         <h2>ฝนสะสม 24 ชม. สูงสุด</h2>
         <div id="listRain" class="list"></div>
         <h2>ความหมายของสัญลักษณ์</h2>
@@ -77,7 +82,7 @@
           <div><i class="sym event" style="--c:var(--serious)"></i>รายงานน้ำท่วมจากหน่วยงาน / iTIC</div>
           <div><i class="sym web" style="--c:var(--critical)"></i>ประชาชนปักหมุดแจ้งผ่านเว็บนี้ (ยังไม่ยืนยัน)</div>
           <div><i class="sym traffy" style="--c:var(--warning)"></i>ประชาชนแจ้งผ่าน Traffy Fondue (ยังไม่ยืนยัน)</div>
-          <div><i class="sym wl" style="--c:var(--good)"></i>สถานีวัดระดับน้ำคลอง/แม่น้ำ</div>
+          <div><i class="sym wl" style="--c:var(--good)"></i>สถานีวัดระดับน้ำคลอง/แม่น้ำ (จุดใหญ่ = คลอง กทม. ระดับเตือนภัย/วิกฤต)</div>
           <div><i class="sym rain" style="--c:var(--rain2)"></i>สถานีวัดฝน (ขนาดวงตามปริมาณฝน ยิ่งใหญ่/เข้ม = ฝนยิ่งมาก)</div>
           <div><i class="sym rain heavy" style="--c:rgb(245,150,146)"></i><i class="sym rain heavy" style="--c:rgb(184,82,78)"></i><i class="sym rain heavy" style="--c:rgb(122,14,10)"></i>ฝนหนัก &gt; 35 มม. = จุดเสี่ยงน้ำท่วม (แดงอ่อน → เข้ม = ฝนยิ่งมาก)</div>
           <div><i class="sym news" style="--c:var(--critical)"></i>ข่าวรายงานว่ามีน้ำท่วม (สรุปโดย AI)</div>

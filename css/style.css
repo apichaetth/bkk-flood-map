@@ -384,6 +384,8 @@ table.log .thumbs img { width: 56px; height: 56px; object-fit: cover; border-rad
 .ol-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px; margin-bottom: 8px; }
 .ol-box { border: 1px solid var(--line); border-radius: 10px; padding: 10px 12px; min-width: 0; }
 .ol-box h3 { margin: 0 0 6px; font-size: 15px; }
+.ol-box.wide { grid-column: 1 / -1; }
+.ol-box.wide .ol-cols { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 0 16px; }
 .ol-box p { margin: 4px 0; }
 .ol-main { font-size: 14px; }
 .ol-row { display: flex; align-items: center; gap: 8px; padding: 5px 0; border-bottom: 1px solid var(--line); font-size: 14px; }

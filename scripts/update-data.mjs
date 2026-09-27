@@ -498,14 +498,34 @@ async function updateRisk(meta) {
     const age = now - Date.parse(b.updated);
     if (!(age <= 60 * 6e4)) throw new Error(`ข้อมูลเก่า ${Math.round(age / 6e4)} นาที (เครื่องในไทยอาจปิดอยู่)`);
     await writeJSON('bma-sensors.json', b);
+    // เซ็นเซอร์ถนน: ใช้ระบบ DDS (มีสถานะปัจจุบัน) เป็นหลัก ระบบ floodbangkok เสริมจุดที่ DDS ไม่มี
+    const lvOf = (cm) => (cm >= 15 ? 3 : cm >= 10 ? 2 : 1);
+    const fresh = (t, h) => t && now - t <= h * 36e5;
+    const seenCode = new Set();
     let flooded = 0;
-    for (const x of b.sensors || []) {
-      if (x.cm == null || x.cm < 5 || !x.t || now - x.t > 3 * 36e5) continue;
+    for (const x of b.road || []) {
+      if (x.st === 'off') continue;
+      seenCode.add(x.c);
+      if (x.st !== 'flood' || !(x.cm >= 5) || !fresh(x.t, 3)) continue;
       flooded++;
-      reports.push({ la: x.la, lo: x.lo, t: x.t, src: 'bma', lv: x.cm >= 15 ? 3 : x.cm >= 10 ? 2 : 1 });
+      reports.push({ la: x.la, lo: x.lo, t: x.t, src: 'bma', lv: lvOf(x.cm) });
     }
-    src.bma = (b.sensors || []).length;
-    meta.sources.bma = { ok: true, sensors: src.bma, flooded, ageMin: Math.round(age / 6e4) };
+    for (const x of b.sensors || []) {
+      if (seenCode.has(x.code) || x.cm == null || x.cm < 5 || !fresh(x.t, 3)) continue;
+      flooded++;
+      reports.push({ la: x.la, lo: x.lo, t: x.t, src: 'bma', lv: lvOf(x.cm) });
+    }
+    // ฝนจากสถานี กทม. (ถี่และใหม่กว่า) รวมกับ ThaiWater
+    for (const x of b.rain || []) if (x.ok !== false && fresh(x.t, 1.5) && x.r1 != null) rain.push({ la: x.la, lo: x.lo, mm1: x.r1, mm24: x.r24 || 0 });
+    // คลองตามสถานะของ กทม.: วิกฤต/เตือนภัย ส่งผลในรัศมีแคบ (300 ม.) และไม่พอทำให้ติดระดับได้เอง ต้องมีฝนหรือรายงานประกอบ
+    for (const x of b.canal || []) {
+      if (x.st < 1 || !fresh(x.t, 3)) continue;
+      wl.push({ la: x.la, lo: x.lo, pct: x.st === 2 ? 100 : 90, W: x.st === 2 ? 0.6 : 0.3, r: 300, name: x.n });
+    }
+    src.bma = (b.sensors || []).length + (b.road || []).length;
+    meta.sources.bma = { ok: true, sensors: (b.sensors || []).length, road: (b.road || []).length, flooded,
+      rain: (b.rain || []).length, canal: (b.canal || []).length, canalCritical: (b.canal || []).filter((x) => x.st === 2).length,
+      ageMin: Math.round(age / 6e4), ...(b.errors && Object.keys(b.errors).length ? { partial: Object.keys(b.errors) } : {}) };
   } catch (e) {
     const msg = /HTTP 404/.test(e.message) ? 'ยังไม่มีเครื่องในไทยส่งข้อมูล' : e.message;
     src.bma = 'off: ' + msg;

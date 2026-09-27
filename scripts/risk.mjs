@@ -228,8 +228,9 @@ export function scoreRoads(roads, input, now = Date.now()) {
     // W: คลองใกล้ล้นตลิ่ง
     let W = 0, wlSt = null;
     for (const st of wl) {
-      if (distM(s.la, s.lo, st.la, st.lo) > P.wlRadiusM) continue;
-      const v = Math.max(0, Math.min(1, (st.pct - 80) / 20));
+      if (distM(s.la, s.lo, st.la, st.lo) > (st.r || P.wlRadiusM)) continue;
+      // st.W = ค่าที่กำหนดมาแล้ว (คลอง กทม. ตามสถานะ) ไม่งั้นคิดจาก % ตลิ่ง
+      const v = st.W ?? Math.max(0, Math.min(1, (st.pct - 80) / 20));
       if (v > W) { W = v; wlSt = st; }
     }
     const partR = R * (0.3 + 0.7 * H), partW = 0.5 * W;

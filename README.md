@@ -70,7 +70,7 @@ data/                       districts.json/geojson (คงที่), news.json,
 ## เครื่องในไทยช่วยดึงเซ็นเซอร์น้ำท่วมถนน กทม. (ไม่บังคับ)
 
 เซิร์ฟเวอร์ กทม. ปฏิเสธเครื่องนอกประเทศ (รวม GitHub Actions) ถ้ามีเครื่องในไทยเปิดทิ้งไว้ (NAS, Raspberry Pi, มือถือ Android + Termux)
-ให้รัน `scripts/bma-fetch.mjs` ทุก 15 นาที สคริปต์จะส่งไฟล์ `bma-sensors.json` ขึ้น branch `bma-data`
+ให้รัน `scripts/bma-fetch.mjs` ทุก 15 นาที สคริปต์จะดึงเซ็นเซอร์น้ำท่วมถนน/อุโมงค์ ฝน 125 สถานี และระดับน้ำคลอง 312 สถานีของสำนักการระบายน้ำ แล้วส่งไฟล์ `bma-sensors.json` ขึ้น branch `bma-data`
 แล้วรอบอัปเดตถัดไปจะใช้ข้อมูลนี้ในการทายถนนเสี่ยง วัดความแม่น และเป็นสำรองให้หน้าแผนที่ (ข้อมูลเก่ากว่า 1 ชม. จะไม่ใช้)
 
 1. สร้าง fine-grained token: เลือกเฉพาะ repo นี้ · Repository permissions → Contents: Read and write
