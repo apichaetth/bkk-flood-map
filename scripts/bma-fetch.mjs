@@ -38,16 +38,28 @@ async function get(url, opts = {}, ms = 30000) {
 const toMs = (s) => { if (!s) return null; const x = String(s).replace(' ', 'T'); return Date.parse(/Z$|[+-]\d\d(:?\d\d)?$/.test(x) ? x.replace(/\+00$/, 'Z') : x + '+07:00') || null; };
 const num = (v) => (v == null || v === '' || isNaN(+v) ? null : +v);
 
+// เซิร์ฟเวอร์ กทม. ตอบ 503 "Under pressure" บ่อยช่วงมีคนใช้มาก: รอแล้วลองใหม่อีก 2 ครั้ง
+async function bmaGet(url) {
+  for (let i = 0; ; i++) {
+    try { return await get(url, {}, 45000); }
+    catch (e) {
+      const busy = !e.status || e.status >= 500;
+      if (!busy || i >= 2) throw e;
+      log(`เซิร์ฟเวอร์ กทม. ไม่ว่าง (${e.status || e.message}) รอ ${20 * (i + 1)} วินาทีแล้วลองใหม่…`);
+      await new Promise((r) => setTimeout(r, 20000 * (i + 1)));
+    }
+  }
+}
 let profiles = null, profilesAt = 0;
 async function collect() {
   // ตำแหน่งเซ็นเซอร์แทบไม่เปลี่ยน ดึงใหม่วันละครั้ง
   if (!profiles || Date.now() - profilesAt > 864e5) {
-    profiles = (await get(API + 'sensor_profile?limit=-1&fields=id,code,name,road,district,lat,long', {}, 45000)).data || [];
+    profiles = (await bmaGet(API + 'sensor_profile?limit=-1&fields=id,code,name,road,district,lat,long')).data || [];
     profilesAt = Date.now();
   }
   const q = 'flood_notification?limit=1000&sort=-date_created&fields=sensor_profile,value,date_created';
-  const nt = await get(API + q + '&filter[date_created][_gte]=' + encodeURIComponent('$NOW(-3 hours)'), {}, 45000)
-    .catch((e) => (e.status >= 400 && e.status < 500 ? get(API + q, {}, 45000) : Promise.reject(e)));
+  const nt = await bmaGet(API + q + '&filter[date_created][_gte]=' + encodeURIComponent('$NOW(-3 hours)'))
+    .catch((e) => (e.status >= 400 && e.status < 500 ? bmaGet(API + q) : Promise.reject(e)));
   const latest = new Map();
   for (const n of (nt && nt.data) || []) if (!latest.has(n.sensor_profile)) latest.set(n.sensor_profile, n);
   const sensors = profiles
@@ -91,14 +103,17 @@ async function once() {
     log(`ส่งแล้ว: ${d.sensors.length} จุด มีค่าล่าสุด ${withData} จุด น้ำ ≥5 ซม. ${wet} จุด`);
     return true;
   } catch (e) {
-    log('ไม่สำเร็จ:', e.message, e.status === 403 && /bangkok/.test(e.message) ? '(เครื่องนี้อาจไม่ได้อยู่ในไทย หรือใช้ VPN อยู่)' : '');
+    const hint = e.status === 403 && /bangkok/.test(e.message) ? '(เครื่องนี้อาจไม่ได้อยู่ในไทย หรือใช้ VPN อยู่)'
+      : e.status === 503 ? '(เซิร์ฟเวอร์ กทม. ไม่ว่าง ไม่ใช่ปัญหาที่เครื่องนี้)' : '';
+    log('ไม่สำเร็จ:', e.message, hint);
     return false;
   }
 }
 
 if (LOOP) {
   log(`เริ่มวนทุก ${LOOP} นาที (กด Ctrl+C เพื่อหยุด)`);
-  for (;;) { await once(); await new Promise((r) => setTimeout(r, LOOP * 6e4)); }
+  // รอบที่ไม่สำเร็จ ลองใหม่ใน 3 นาที ไม่ต้องรอครบรอบ
+  for (;;) { const ok = await once(); await new Promise((r) => setTimeout(r, (ok ? LOOP : 3) * 6e4)); }
 } else {
   process.exitCode = (await once()) ? 0 : 1;
 }
