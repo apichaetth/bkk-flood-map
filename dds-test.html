@@ -1,0 +1,68 @@
+<!doctype html>
+<html lang="th">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="robots" content="noindex">
+  <title>ทดสอบแหล่งข้อมูล กทม.</title>
+  <style>
+    :root { --bg: #f4f6f8; --ink: #1b2430; --muted: #6b7686; --ok: #1a8a3a; --bad: #b3261e; --line: #dfe4ea; }
+    @media (prefers-color-scheme: dark) { :root { --bg: #111416; --ink: #eceff3; --muted: #939cab; --line: #2d3238; } }
+    body { margin: 0; padding: 16px; font: 15px/1.5 system-ui, -apple-system, "Sukhumvit Set", sans-serif; background: var(--bg); color: var(--ink); }
+    h1 { font-size: 19px; margin: 0 0 6px; }
+    p { margin: 0 0 12px; color: var(--muted); }
+    button { font: inherit; font-size: 16px; padding: 10px 16px; border-radius: 10px; border: 0; background: #0f5ea8; color: #fff; margin: 0 8px 12px 0; }
+    ol { padding-left: 20px; margin: 0; }
+    li { padding: 6px 0; border-bottom: 1px solid var(--line); word-break: break-all; }
+    .ok { color: var(--ok); font-weight: 700; } .bad { color: var(--bad); } .muted { color: var(--muted); font-size: 13px; }
+    code { font-size: 12.5px; }
+  </style>
+</head>
+<body>
+  <h1>ทดสอบแหล่งข้อมูลของ สำนักการระบายน้ำ กทม.</h1>
+  <p>เปิดหน้านี้จากเครือข่ายในประเทศไทย แล้วกด เริ่มทดสอบ รอจนครบ แล้วกด คัดลอกผล ส่งให้ผู้ดูแลเว็บ (อ่านข้อมูลสาธารณะอย่างเดียว ไม่ส่งข้อมูลของคุณ)</p>
+  <button id="run">เริ่มทดสอบ</button><button id="copy" disabled>คัดลอกผล</button>
+  <ol id="out"></ol>
+  <script>
+  const B = 'https://floodbangkok.bangkok.go.th/bkk/dds/services/api/floods/v1/';
+  const W = 'https://weather.bangkok.go.th/';
+  const tests = [
+    [B + 'collections'], [B + 'server/info'],
+    ...['rain_profile', 'rain_notification', 'rain_sensor', 'rainfall', 'rain', 'water_profile', 'water_notification', 'water_level',
+      'waterlevel_profile', 'canal_profile', 'canal', 'wl_profile', 'station', 'stations', 'pump_station', 'pump', 'gate', 'sensor_profile', 'flood_notification']
+      .map((n) => [B + 'items/' + n + '?limit=2']),
+    [W + 'rain/PageMap/GetDataForUpdate', { method: 'POST' }],
+    [W + 'water/PageMap/GoogleMap', { method: 'POST', headers: { 'Content-Type': 'application/x-www-form-urlencoded' }, body: 'payload=TEST_DATA_GOES_HERE' }],
+  ];
+  const out = document.getElementById('out'), lines = [];
+  document.getElementById('run').onclick = async (e) => {
+    e.target.disabled = true; out.innerHTML = ''; lines.length = 0;
+    for (const [url, opt] of tests) {
+      const li = document.createElement('li'); li.textContent = '… ' + url.replace(B, 'dds-api/').replace(W, 'weather/'); out.append(li);
+      let line;
+      try {
+        const ctl = new AbortController(); const t = setTimeout(() => ctl.abort(), 20000);
+        const r = await fetch(url, { ...(opt || {}), signal: ctl.signal }); clearTimeout(t);
+        const txt = (await r.text()).replace(/\s+/g, ' ').slice(0, 140);
+        line = `${r.status === 200 ? '✅' : '·'} ${r.status} ${url.replace(B, 'dds-api/').replace(W, 'weather/')} ${txt}`;
+        li.innerHTML = `<span class="${r.status === 200 ? 'ok' : 'bad'}">${r.status === 200 ? '✅' : '·'} ${r.status}</span> <code></code><div class="muted"></div>`;
+        li.querySelector('code').textContent = url.replace(B, 'dds-api/').replace(W, 'weather/');
+        li.querySelector('.muted').textContent = txt;
+      } catch (err) {
+        line = `❌ ${url.replace(B, 'dds-api/').replace(W, 'weather/')} ${err.name === 'AbortError' ? 'timeout' : err.message}`;
+        li.innerHTML = `<span class="bad">❌</span> <code></code><div class="muted"></div>`;
+        li.querySelector('code').textContent = url.replace(B, 'dds-api/').replace(W, 'weather/');
+        li.querySelector('.muted').textContent = err.name === 'AbortError' ? 'หมดเวลา' : err.message;
+      }
+      lines.push(line);
+    }
+    e.target.disabled = false; document.getElementById('copy').disabled = false;
+  };
+  document.getElementById('copy').onclick = async () => {
+    const text = lines.join('\n');
+    try { await navigator.clipboard.writeText(text); alert('คัดลอกแล้ว วางในแชทได้เลย'); }
+    catch (e) { prompt('กดค้างเพื่อคัดลอก', text); }
+  };
+  </script>
+</body>
+</html>
