@@ -1,0 +1,25 @@
+/* หน้าหาเส้นทางเลี่ยงน้ำท่วม */
+.rt-form { display: grid; grid-template-columns: minmax(0, 1fr); gap: 8px; }
+.rt-row .btn { flex: none; white-space: nowrap; }
+.rt-row { display: flex; gap: 8px; align-items: center; }
+.rt-row input { flex: 1; min-width: 0; font: inherit; padding: 9px 10px; border: 1px solid var(--line); border-radius: 8px; background: var(--bg, #fff); color: inherit; }
+.rt-dot { flex: none; width: 24px; height: 24px; border-radius: 50%; color: #fff; font-weight: 700; font-size: 13px; display: grid; place-items: center; }
+.rt-dot.a { background: #1a9850; } .rt-dot.b { background: #c0392b; }
+.rt-sug { border: 1px solid var(--line); border-radius: 8px; max-height: 220px; overflow: auto; }
+.rt-sug button { display: block; width: 100%; text-align: left; padding: 8px 10px; border: 0; border-bottom: 1px solid var(--line); background: none; color: inherit; font: inherit; font-size: 14px; cursor: pointer; }
+.rt-sug button:last-child { border-bottom: 0; }
+.rt-opts { display: flex; flex-wrap: wrap; gap: 4px 16px; font-size: 14px; }
+.btn.primary { background: #0f5ea8; color: #fff; border-color: #0f5ea8; font-weight: 600; padding: 10px; }
+.btn.primary:disabled { opacity: .5; }
+#rmap { height: 62vh; min-height: 360px; border-radius: 10px; }
+.rt-line { display: inline-block; width: 26px; height: 0; border-top: 5px solid #0f5ea8; vertical-align: middle; margin-right: 6px; }
+.rt-line.normal { border-top: 4px dashed #7a8594; }
+.rt-pt { display: inline-block; width: 10px; height: 10px; border-radius: 50%; margin-right: 6px; vertical-align: middle; }
+.rt-pt.f { background: #c0392b; } .rt-pt.r { background: #f39c12; }
+.rt-res { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 10px; margin-top: 10px; }
+.rt-res .tile { padding: 10px 12px; border: 1px solid var(--line); border-radius: 10px; }
+.rt-res .tile b.big { font-size: 20px; }
+.rt-warn { background: color-mix(in srgb, #f39c12 16%, transparent); padding: 8px 10px; border-radius: 8px; font-size: 14px; }
+.rt-gmaps { display: inline-block; margin-top: 10px; }
+@media (max-width: 860px) { #rmap { height: 55vh; } }
+@media (max-width: 420px) { #meA { font-size: 0; } #meA::before { content: "📍"; font-size: 16px; } }

@@ -95,7 +95,7 @@ jobs:
       - name: Prepare site
         run: |
           mkdir -p _site
-          cp -r index.html districts.html map.html log.html traffy.html risk.html about.html dds-test.html css js data _site/
+          cp -r index.html districts.html map.html log.html traffy.html risk.html route.html about.html dds-test.html css js data _site/
           rm -f _site/data/news-cache.json _site/data/yt-state.json _site/data/geocache.json _site/data/roads.json _site/data/risk-history.json
           # ติดเลขเวอร์ชันให้ css/js ทุกครั้งที่ deploy เบราว์เซอร์จะไม่ใช้ไฟล์เก่าที่ไม่เข้ากับหน้าใหม่
           V=$(date +%s)

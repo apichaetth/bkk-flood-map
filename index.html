@@ -22,7 +22,7 @@
         <p id="updated" class="sub">กำลังโหลดข้อมูล…</p>
       </div>
     </div>
-    <nav class="pages" aria-label="หน้า"><a href="./" aria-current="page">ภาพรวม</a><a href="districts.html">เขต</a><a href="map.html">แผนที่ละเอียด</a><a href="traffy.html">Traffy Fondue</a><a href="risk.html">ถนนเสี่ยง</a><a href="log.html">บันทึกการแจ้ง</a><a href="about.html">เกี่ยวกับ</a></nav>
+    <nav class="pages" aria-label="หน้า"><a href="./" aria-current="page">ภาพรวม</a><a href="districts.html">เขต</a><a href="map.html">แผนที่ละเอียด</a><a href="traffy.html">Traffy Fondue</a><a href="risk.html">ถนนเสี่ยง</a><a href="route.html">เส้นทางเลี่ยงน้ำ</a><a href="log.html">บันทึกการแจ้ง</a><a href="about.html">เกี่ยวกับ</a></nav>
     <button id="refresh" class="btn" type="button" title="โหลดข้อมูลใหม่">↻ รีเฟรช</button>
   </header>
 
@@ -78,6 +78,7 @@
     <section class="card" id="trendCard" hidden>
       <div class="card-h"><h2>แนวโน้มน้ำ 1 ชม.</h2><a class="more" href="map.html">ดูบนแผนที่ →</a></div>
       <p id="trendRiver" class="small"></p>
+      <div id="trendWarn"></div>
       <div class="tr-grid">
         <div class="tr-col"><h3>⬆ กำลังเพิ่ม <span class="tag t3" id="trUpN">0</span></h3><div id="trUp"></div></div>
         <div class="tr-col"><h3>⏸ ใกล้จุดสูงสุด <span class="tag t2" id="trPeakN">0</span></h3><div id="trPeak"></div></div>

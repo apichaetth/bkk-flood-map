@@ -48,9 +48,10 @@
         <h3>${esc(s.name || 'ถนนไม่มีชื่อ')}</h3><div class="m">เขต${esc(s.district)}</div>
         <ul class="plist">${whyOf(s).map((w) => `<li>${esc(w)}</li>`).join('') || '<li>คะแนนรวมจากหลายปัจจัยเล็กน้อย</li>'}</ul>
         <div class="m">ประมาณการ ไม่ใช่การยืนยัน</div></div>`;
+    // วาดขอบขาวของทุกช่วงก่อน แล้วค่อยวาดเส้นสีทับทั้งหมด ช่วงที่ต่อกันจะเป็นเส้นเดียวไม่มีรอยขาวคั่น
+    for (const s of segs) if (s.tier > 1) L.polyline(s.c, { color: '#fff', weight: s.tier === 3 ? 11 : 9, opacity: 0.85, lineCap: 'round', lineJoin: 'round', interactive: false }).addTo(layer);
     for (const s of segs) {
-      if (s.tier > 1) L.polyline(s.c, { color: '#fff', weight: s.tier === 3 ? 11 : 9, opacity: 0.85, lineCap: 'round', interactive: false }).addTo(layer);
-      L.polyline(s.c, { color: col[s.tier], weight: s.tier === 3 ? 7 : s.tier === 2 ? 6 : 4, opacity: s.tier === 1 ? 0.8 : 1, dashArray: s.tier === 1 ? '8 6' : null, lineCap: 'round' })
+      L.polyline(s.c, { color: col[s.tier], weight: s.tier === 3 ? 7 : s.tier === 2 ? 6 : 4, opacity: 1, dashArray: s.tier === 1 ? '8 6' : null, lineCap: 'round', lineJoin: 'round' })
         .bindPopup(() => pop(s), { maxWidth: 320 }).addTo(layer);
     }
     if (!fitted && segs.length) { map.fitBounds(L.latLngBounds(segs.flatMap((s) => s.c)).pad(0.1), { maxZoom: 14 }); fitted = true; }
@@ -95,6 +96,7 @@
     $('acc').textContent = pcs(t3[1], t3[0]);
     $('accSub').textContent = `(${nDays} วัน · ${n0(T.runs)} รอบ)`;
     $('rec').textContent = pcs(recAll[1], recAll[0]);
+    $('recSub').textContent = recAll[0] ? `(พลาด ${n0(recAll[0] - recAll[1])} จาก ${n0(recAll[0])} เรื่อง)` : '';
     const p3 = pc(t3[1], t3[0]), pb = pc(T.base[1], T.base[0]);
     let verdict = '';
     if (p3 != null && pb != null && t3[0] >= 200) {
@@ -123,6 +125,11 @@
       ${recRow('บนถนนสายหลัก/รอง', rec.main)}${recRow('ในซอย', rec.soi)}${recRow('ไม่อยู่ใกล้ถนนที่ระบบดู', rec.off)}
       ${recRow('<b>รวม</b>', recAll)}
       </tbody></table>
+      ${(a.missTop || []).length ? `<h3>พลาดบ่อยที่สุด (7 วัน)</h3>
+      <p class="muted small">น้ำท่วมจริงแต่ไม่ได้ทายไว้ล่วงหน้า รวม ${n0(a.miss7)} เรื่อง · ใช้ดูว่าต้องปรับตรงไหน</p>
+      <table><thead><tr><th>ถนน/บริเวณ</th><th class="n">พลาด</th><th>อยู่บน</th></tr></thead><tbody>
+      ${a.missTop.map((m) => `<tr><td>${esc(m.name)}<br><span class="muted small">เขต${esc(m.district || '–')}</span></td><td class="n"><b>${n0(m.n)}</b></td><td class="small">${Object.entries(m.kinds).map(([k, v]) => `${{ main: 'ถนนหลัก', soi: 'ซอย', off: 'นอกถนนที่ระบบดู' }[k]} ${v}`).join(' · ')}</td></tr>`).join('')}
+      </tbody></table>` : ''}
       <h3>รายวัน</h3>
       <table><thead><tr><th>วัน</th><th class="n">ฝนสูงสุด<br>มม./ชม.</th><th class="n">ควรระวังมาก<br>ถูก</th><th class="n">ตัวเทียบ<br>ถูก</th><th class="n">ทายไว้ก่อน</th></tr></thead><tbody>
       ${a.days.slice(0, 14).map((d) => {

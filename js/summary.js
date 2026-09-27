@@ -54,10 +54,22 @@
       $('radarSt').textContent = `(ภาพเวลา ${fmtTime(new Date(f.time * 1000))} · มีสีเฉพาะที่ฝนตก)`;
     } catch (e) { $('radarSt').textContent = '(โหลดไม่ได้: ' + e.message + ')'; }
   }
-  let hls = null;
-  const stopStream = () => { if (hls) { try { hls.destroy(); } catch (e) { /* ignore */ } hls = null; } };
+  let hls = null, stillTimer = null;
+  const stopStream = () => { if (hls) { try { hls.destroy(); } catch (e) { /* ignore */ } hls = null; } clearInterval(stillTimer); stillTimer = null; };
+  const isVideo = (c) => /^https:\/\//.test(c.hls_url || '') && !/tempsus/.test(c.hls_url);
+  const isStill = (c) => /^https:\/\//.test(c.imgurl || '') && !/X\.X\.X\.X/.test(c.imgurl);
   function startStream(el, c) {
     stopStream();
+    if (!isVideo(c)) {
+      // กล้องภาพนิ่ง: โหลดภาพใหม่ทุก 60 วินาทีระหว่างเปิดป๊อปอัป
+      const st = el.querySelector('.camst'), img = new Image();
+      img.referrerPolicy = 'no-referrer'; img.alt = 'ภาพนิ่งจากกล้อง';
+      const load = () => { img.src = c.imgurl + (c.imgurl.includes('?') ? '&' : '?') + '_t=' + Date.now(); };
+      img.onload = () => { st.textContent = 'ภาพนิ่ง (โหลดใหม่ทุก 1 นาที) · ' + fmtTime(new Date()); };
+      img.onerror = () => { st.textContent = 'ไม่สามารถแสดงภาพจากกล้องนี้ได้ขณะนี้'; };
+      st.before(img); load(); stillTimer = setInterval(load, 60000);
+      return;
+    }
     const v = el.querySelector('video'), st = el.querySelector('.camst');
     const fail = (why) => { v.remove(); st.textContent = 'ภาพสดใช้ไม่ได้ขณะนี้ (' + why + ')'; };
     if (window.Hls && Hls.isSupported()) {
@@ -77,16 +89,16 @@
       // เฉพาะกล้องที่เผยแพร่สาธารณะผ่าน HTTPS และยังไม่ถูกระงับ
       for (const c of d) {
         const la = F.num(c.latitude), lo = F.num(c.longitude);
-        if (!la || !lo || !F.inBkk(la, lo) || !/^https:\/\//.test(c.hls_url || '') || /tempsus/.test(c.hls_url)) continue;
-        L.marker([la, lo], { icon: mkIcon('cam', '#1d2330', '▶', F.MS < 1 ? 20 : 12), zIndexOffset: -100 })
+        if (!la || !lo || !F.inBkk(la, lo) || !(isVideo(c) || isStill(c))) continue;
+        L.marker([la, lo], { icon: mkIcon('cam', isVideo(c) ? '#1d2330' : '#4a5568', isVideo(c) ? '▶' : '◻', F.MS < 1 ? 20 : 12), zIndexOffset: -100 })
           .bindPopup(() => `<div class="pp" style="width:290px;max-width:100%"><div class="m">${esc(c.organization || '')} · ${esc(c.camid)}</div><h3>${esc(c.title)}</h3>
-            <video muted autoplay playsinline controls></video><div class="m camst">กำลังเชื่อมต่อ…</div>
+            ${isVideo(c) ? '<video muted autoplay playsinline controls></video>' : ''}<div class="m camst">กำลังเชื่อมต่อ…</div>
             <div class="m">ภาพจาก ${esc(c.sponsertext || c.organization || 'iTIC')} ผ่าน iTIC / Longdo</div></div>`, { maxWidth: 310, minWidth: 250 })
           .on('popupopen', (e) => startStream(e.popup.getElement(), c))
           .on('popupclose', stopStream)
           .addTo(lyr.cam);
       }
-      $('camSt').textContent = `(${lyr.cam.getLayers().length} กล้อง · กดดูภาพสด)`;
+      $('camSt').textContent = `(${lyr.cam.getLayers().length} กล้อง · ▶ วิดีโอสด ◻ ภาพนิ่ง)`;
     } catch (e) { $('camSt').textContent = '(โหลดไม่ได้: ' + e.message + ')'; }
   }
 
@@ -446,6 +458,11 @@
       $('trendRiver').innerHTML = `🌊 <b>เจ้าพระยา (ท่าเรือกรุงเทพ):</b> ` + (left > 0 && left <= 180 ? `น้ำกำลังขึ้น สูงสุดราว ${fmt(st.max, 2)} ม. เวลา ${esc(st.maxAt)} น. (อีก ${left >= 60 ? Math.floor(left / 60) + ' ชม. ' : ''}${left % 60} นาที)`
         : left > 180 ? `น้ำขึ้นสูงสุดวันนี้ราว ${fmt(st.max, 2)} ม. เวลา ${esc(st.maxAt)} น.` : `ผ่านช่วงน้ำขึ้นสูงสุดวันนี้แล้ว (${esc(st.maxAt)} น. ${fmt(st.max, 2)} ม.)`);
     } else $('trendRiver').innerHTML = '';
+    // ข้อความ "ล้นตลิ่งแล้ว" จาก ThaiWater: กทม. ก่อน แล้วจังหวัดรอบ ๆ
+    const w = await F.getJSON('data/tw-warn.json', 20000, { cache: 'no-cache' }).catch(() => null);
+    const wi = (w && Date.now() - new Date(w.updated) < 3 * 36e5 && w.items) || [];
+    const bkk = wi.filter((x) => x.near === 0), near = wi.filter((x) => x.near > 0);
+    $('trendWarn').innerHTML = wi.length ? `<p class="small">⚠️ <b>ล้นตลิ่ง (ThaiWater 24 ชม.):</b> ${bkk.length ? bkk.slice(0, 4).map((x) => `${esc(x.name)}${x.cm != null ? ` ${fmt(x.cm)} ซม.` : ''}${x.at ? ` <span class="muted">[${esc(x.at)}]</span>` : ''}`).join(' · ') : 'ไม่มีใน กทม.'}${near.length ? ` · จังหวัดรอบ ๆ ${near.length} สถานี (${esc([...new Set(near.map((x) => x.prov))].join(', '))})` : ''}</p>` : '';
   }
   let upstream = null, dams = null;
   function renderOutlookWl(up) { upstream = up || []; renderRiver(); renderNorth(); }

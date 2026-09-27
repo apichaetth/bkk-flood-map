@@ -1,0 +1,69 @@
+<!doctype html>
+<html lang="th">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <title>หาเส้นทางเลี่ยงน้ำท่วม</title>
+  <meta name="description" content="หาเส้นทางรถยนต์ในกรุงเทพฯ ที่หลบจุดน้ำท่วมจากเซ็นเซอร์ กทม. รายงานน้ำท่วม และถนนเสี่ยง แล้วเปิดนำทางต่อใน Google Maps">
+  <meta name="theme-color" content="#0f5ea8">
+  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Cpath d='M16 3C11 11 7 15.5 7 20a9 9 0 0 0 18 0c0-4.5-4-9-9-17z' fill='%230f5ea8'/%3E%3C/svg%3E">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+Thai:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/leaflet@1.9.4/dist/leaflet.css">
+  <link rel="stylesheet" href="css/style.css">
+  <link rel="stylesheet" href="css/route.css">
+</head>
+<body class="summary">
+  <header class="top">
+    <div class="brand">
+      <svg viewBox="0 0 32 32" aria-hidden="true"><path d="M16 3C11 11 7 15.5 7 20a9 9 0 0 0 18 0c0-4.5-4-9-9-17z"/></svg>
+      <div>
+        <h1>หาเส้นทางเลี่ยงน้ำท่วม <span class="beta">ทดลอง</span></h1>
+        <p id="updated" class="sub">กำลังโหลดข้อมูลจุดน้ำท่วม…</p>
+      </div>
+    </div>
+    <nav class="pages" aria-label="หน้า"><a href="./">ภาพรวม</a><a href="districts.html">เขต</a><a href="map.html">แผนที่ละเอียด</a><a href="traffy.html">Traffy Fondue</a><a href="risk.html">ถนนเสี่ยง</a><a href="route.html" aria-current="page">เส้นทางเลี่ยงน้ำ</a><a href="log.html">บันทึกการแจ้ง</a><a href="about.html">เกี่ยวกับ</a></nav>
+  </header>
+  <main class="sum">
+    <section class="card rt-form" aria-label="เลือกต้นทางและปลายทาง">
+      <div class="rt-row"><span class="rt-dot a">A</span>
+        <input id="qA" type="search" placeholder="ต้นทาง: ค้นหาสถานที่ หรือแตะบนแผนที่" autocomplete="off" aria-label="ต้นทาง">
+        <button type="button" class="btn" id="meA" title="ใช้ตำแหน่งของฉัน">📍 ตำแหน่งฉัน</button></div>
+      <div id="sugA" class="rt-sug" hidden></div>
+      <div class="rt-row"><span class="rt-dot b">B</span>
+        <input id="qB" type="search" placeholder="ปลายทาง: ค้นหาสถานที่ หรือแตะบนแผนที่" autocomplete="off" aria-label="ปลายทาง">
+        <button type="button" class="btn" id="swap" title="สลับต้นทาง/ปลายทาง">⇅</button></div>
+      <div id="sugB" class="rt-sug" hidden></div>
+      <div class="rt-opts">
+        <label><input type="radio" name="mode" value="flood" checked> หลบจุดน้ำท่วมจริง + ถนนควรระวังมาก</label>
+        <label><input type="radio" name="mode" value="strict"> หลบเข้ม (รวมถนนควรระวัง)</label>
+      </div>
+      <button type="button" class="btn primary" id="go" disabled>หาเส้นทางเลี่ยงน้ำ</button>
+      <p id="rtStatus" class="small" role="status"></p>
+    </section>
+    <section class="card rt-mapcard">
+      <div id="rmap" role="region" aria-label="แผนที่เส้นทาง"></div>
+      <div class="legend-row">
+        <span><i class="rt-line safe"></i>เส้นทางเลี่ยงน้ำ</span><span><i class="rt-line normal"></i>เส้นทางปกติ</span>
+        <span><i class="rt-pt f"></i>น้ำท่วม</span><span><i class="rt-pt r"></i>ควรระวังมาก</span>
+      </div>
+      <div id="result"></div>
+    </section>
+    <section class="card how">
+      <h2>ใช้อย่างไร / ข้อควรรู้</h2>
+      <ul>
+        <li>เลือกต้นทางและปลายทาง (ค้นหา, ใช้ตำแหน่งของฉัน หรือแตะบนแผนที่) แล้วกด "หาเส้นทางเลี่ยงน้ำ" เฉพาะรถยนต์</li>
+        <li>ระบบจะหลบ: เซ็นเซอร์น้ำท่วมถนน กทม. ที่วัดได้ตั้งแต่ 10 ซม., รายงานจากหน่วยงาน/iTIC, Traffy และประชาชนใน 3 ชม. และถนน "ควรระวังมาก" จากหน้าถนนเสี่ยง</li>
+        <li>กด "เปิดใน Google Maps" เพื่อนำทางต่อ (ส่งจุดผ่านไปด้วย แต่ Google อาจปรับเส้นทางเล็กน้อย)</li>
+        <li><b>หลบได้เฉพาะจุดที่ระบบรู้</b> จุดที่ท่วมแต่ไม่มีเซ็นเซอร์และไม่มีคนแจ้งจะไม่รู้ ข้อมูลช้าได้ถึง ~15 นาที</li>
+        <li><b>ใช้ประกอบการตัดสินใจเท่านั้น ห้ามขับรถฝ่าน้ำที่ไม่รู้ความลึก</b> ถ้าเจอน้ำท่วมให้เลี่ยงหรือจอดรอในที่ปลอดภัย</li>
+        <li>หาเส้นทางโดย openrouteservice จากแผนที่ © OpenStreetMap · ค้นหาสถานที่โดย Nominatim</li>
+      </ul>
+    </section>
+  </main>
+  <script src="https://cdn.jsdelivr.net/npm/leaflet@1.9.4/dist/leaflet.js"></script>
+  <script src="js/core.js" defer></script>
+  <script src="js/route.js" defer></script>
+</body>
+</html>

@@ -12,6 +12,8 @@
  *   POST {action:'create', ...} แจ้งน้ำท่วม
  *   POST {action:'close', ...}  แจ้งว่าน้ำลดแล้ว (เอาหมุดออก)
  *   POST {action:'feedback', ...} ข้อความจากหน้าเกี่ยวกับ → ชีต Feedback + ส่งอีเมลถึงเจ้าของสคริปต์
+ *   POST {action:'route', start:[lng,lat], end:[lng,lat], avoid:[[[[lng,lat],...]]]}
+ *        หาเส้นทางรถยนต์หลบน้ำท่วมผ่าน openrouteservice (key เก็บใน Script Properties ชื่อ ORS_KEY)
  * POST ส่งเป็น Content-Type: text/plain เพื่อไม่ให้เบราว์เซอร์ต้องทำ CORS preflight
  */
 
@@ -27,6 +29,9 @@ const CFG = {
   GLOBAL_LIMIT: 150, // รวมทุกคน ต่อ 10 นาที
   FEEDBACK_GLOBAL_LIMIT: 30, // ข้อความจากหน้าเกี่ยวกับ รวมทุกคน ต่อชั่วโมง (กันโควตาอีเมลหมด)
   CLOSED_VISIBLE_H: 24,
+  ROUTE_RATE_LIMIT: 20, // หาเส้นทาง ต่ออุปกรณ์ ต่อ 10 นาที
+  ROUTE_GLOBAL_LIMIT: 250, // รวมทุกคน ต่อ 10 นาที (โควตาฟรีของ openrouteservice 2,000 ครั้ง/วัน)
+  ROUTE_MAX_POLYGONS: 400,
 };
 const LEVELS = ['ข้อเท้า', 'ครึ่งแข้ง', 'เข่า', 'เอว', 'สูงกว่าเอว', 'ไม่ระบุ'];
 
@@ -84,6 +89,8 @@ function doPost(e) {
   let body;
   try { body = JSON.parse((e && e.postData && e.postData.contents) || '{}'); } catch (err) { return json_({ ok: false, error: 'ข้อมูลไม่ถูกต้อง' }); }
   if (body.website) return json_({ ok: true }); // ช่องดักบอท (ผู้ใช้จริงไม่เห็นช่องนี้)
+  // หาเส้นทางไม่แตะชีต ไม่ต้องรอ lock (ไม่งั้นผู้ใช้หลายคนต้องต่อคิวกัน)
+  if (body.action === 'route') { try { return json_(route_(body)); } catch (err) { return json_({ ok: false, error: String(err.message || err) }); } }
   const lock = LockService.getScriptLock();
   try {
     lock.waitLock(20000);
@@ -94,6 +101,45 @@ function doPost(e) {
   } catch (err) {
     return json_({ ok: false, error: String(err.message || err) });
   } finally { try { lock.releaseLock(); } catch (e2) { /* ไม่ได้ถือ lock */ } }
+}
+
+// ---------- หาเส้นทางหลบน้ำท่วม (openrouteservice) ----------
+function route_(b) {
+  const key = PropertiesService.getScriptProperties().getProperty('ORS_KEY');
+  if (!key) return { ok: false, error: 'ยังไม่ได้ตั้งค่าบริการหาเส้นทาง', code: 'no-key' };
+  const c = CacheService.getScriptCache(), dev = 'rt_' + device_(b.device);
+  const n = Number(c.get(dev) || 0), g = Number(c.get('rt_all') || 0);
+  if (n >= CFG.ROUTE_RATE_LIMIT) throw new Error('หาเส้นทางถี่เกินไป กรุณารอสักครู่');
+  if (g >= CFG.ROUTE_GLOBAL_LIMIT) throw new Error('ขณะนี้มีผู้ใช้หาเส้นทางมาก กรุณารอสักครู่แล้วลองใหม่');
+  c.put(dev, String(n + 1), 600); c.put('rt_all', String(g + 1), 600);
+  // รับเฉพาะพิกัดใน กทม. และปริมณฑลใกล้ ๆ
+  const pt = (p) => {
+    if (!Array.isArray(p) || p.length !== 2) throw new Error('พิกัดไม่ถูกต้อง');
+    const lng = Number(p[0]), lat = Number(p[1]);
+    if (!(lat > 13.3 && lat < 14.15 && lng > 100.15 && lng < 101.1)) throw new Error('รองรับเฉพาะเส้นทางใน กทม. และปริมณฑล');
+    return [round_(lng), round_(lat)];
+  };
+  const start = pt(b.start), end = pt(b.end);
+  const polys = (Array.isArray(b.avoid) ? b.avoid : []).slice(0, CFG.ROUTE_MAX_POLYGONS)
+    .filter((poly) => Array.isArray(poly) && Array.isArray(poly[0]) && poly[0].length >= 4 && poly[0].length <= 12)
+    .map((poly) => [poly[0].map(pt)]);
+  const call = (withAvoid) => {
+    const body = { coordinates: [start, end], instructions: false, preference: 'recommended' };
+    if (withAvoid && polys.length) body.options = { avoid_polygons: { type: 'MultiPolygon', coordinates: polys } };
+    const r = UrlFetchApp.fetch('https://api.openrouteservice.org/v2/directions/driving-car/geojson', {
+      method: 'post', contentType: 'application/json', payload: JSON.stringify(body), muteHttpExceptions: true,
+      headers: { Authorization: key, Accept: 'application/geo+json' },
+    });
+    const code = r.getResponseCode();
+    let j = null; try { j = JSON.parse(r.getContentText()); } catch (e) { /* ไม่ใช่ JSON */ }
+    if (code !== 200) return { error: (j && j.error && (j.error.message || j.error)) || ('HTTP ' + code), status: code };
+    const f = j.features && j.features[0];
+    if (!f) return { error: 'ไม่พบเส้นทาง' };
+    const sum = f.properties && f.properties.summary || {};
+    return { coords: f.geometry.coordinates.map((p) => [round_(p[1]), round_(p[0])]), distance: sum.distance || 0, duration: sum.duration || 0 };
+  };
+  const safe = call(true), normal = b.compare === false ? null : call(false);
+  return { ok: true, safe, normal, avoided: polys.length };
 }
 
 function json_(o) { return ContentService.createTextOutput(JSON.stringify(o)).setMimeType(ContentService.MimeType.JSON); }

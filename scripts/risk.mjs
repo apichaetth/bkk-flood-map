@@ -66,6 +66,12 @@ function roadKind(segIdx, la, lo) {
   }
   return !best ? 'off' : isMain(best.s.cls) ? 'main' : 'soi';
 }
+// ช่วงถนนที่ใกล้ที่สุดในรัศมี (ไว้ตั้งชื่อจุด)
+function nearestSeg(segIdx, la, lo, maxM) {
+  let best = null;
+  for (const s of near(segIdx, la, lo, maxM)) { const d = distM(la, lo, s.la, s.lo); if (d <= maxM && (!best || d < best.d)) best = { d, s }; }
+  return best && best.s;
+}
 function inRing(lng, lat, ring) {
   let inside = false;
   for (let i = 0, j = ring.length - 1; i < ring.length; j = i++) {
@@ -329,10 +335,16 @@ export function evalUpdate(state, roads, reports, now = Date.now()) {
     }
     const c = day(r.t).rec[kind];
     c[0]++; if (caught) c[1]++; if (caught === 3) c[2]++;
+    // เก็บจุดที่พลาด (ท่วมจริงแต่ไม่ได้ทายไว้) ไว้ดูว่าพลาดที่ไหนบ่อย
+    if (!caught) {
+      const s = nearestSeg(segIdx, r.la, r.lo, 400);
+      (state.miss ||= []).push([r.t, (s && s.name) || '', (s && s.district) || '', kind]);
+    }
   }
   // เก็บกวาด
   state.runs = state.runs.filter((r) => now - r.t <= P.rawKeepH * 36e5);
   for (const [k, t] of Object.entries(state.seen)) if (now - t > (P.rawKeepH + 1) * 36e5) delete state.seen[k];
+  if (state.miss) state.miss = state.miss.filter(([t]) => now - t <= 7 * 864e5);
   const keep = dayOf(now - P.evalKeepDays * 864e5);
   for (const k of Object.keys(state.days)) if (k < keep) delete state.days[k];
   return summarize(state);
@@ -349,5 +361,13 @@ function summarize(state) {
     for (const kind of ['main', 'soi', 'off']) add(total.rec[kind], d.rec[kind]);
     return { d: k, ...d };
   });
-  return { v: 3, horizonH: PARAMS.evalHorizonH, hitM: PARAMS.evalHitM, aheadH: PARAMS.aheadLookH, total, days };
+  // จุดที่พลาดบ่อยใน 7 วัน (รวมตามชื่อถนน + เขต)
+  const g = new Map();
+  for (const [, name, district, kind] of state.miss || []) {
+    const k = (name || 'ถนน/ซอยไม่มีชื่อ') + '|' + district;
+    const o = g.get(k) || { name: name || 'ถนน/ซอยไม่มีชื่อ', district, n: 0, kinds: {} };
+    o.n++; o.kinds[kind] = (o.kinds[kind] || 0) + 1; g.set(k, o);
+  }
+  const missTop = [...g.values()].sort((a, b) => b.n - a.n).slice(0, 10);
+  return { v: 3, horizonH: PARAMS.evalHorizonH, hitM: PARAMS.evalHitM, aheadH: PARAMS.aheadLookH, total, days, missTop, miss7: (state.miss || []).length };
 }

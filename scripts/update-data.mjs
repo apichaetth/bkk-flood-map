@@ -376,7 +376,10 @@ async function updateCamsRadar(meta) {
     const cams = JSON.parse(await fetchText('https://camera.longdo.com/feed/?command=json', {}, 45000));
     const keep = (Array.isArray(cams) ? cams : []).filter((c) => {
       const la = +c.latitude, lo = +c.longitude;
-      return la >= 13.48 && la <= 13.97 && lo >= 100.32 && lo <= 100.95 && /^https:\/\//.test(c.hls_url || '') && !/tempsus/.test(c.hls_url);
+      // กล้องวิดีโอสด (HLS) หรือกล้องที่มีแต่ภาพนิ่ง (อัปเดตเป็นระยะ) ก็ใช้ได้
+      const video = /^https:\/\//.test(c.hls_url || '') && !/tempsus/.test(c.hls_url);
+      const still = /^https:\/\//.test(c.imgurl || '') && !/X\.X\.X\.X/.test(c.imgurl);
+      return la >= 13.48 && la <= 13.97 && lo >= 100.32 && lo <= 100.95 && (video || still);
     }).map((c) => ({ camid: c.camid, title: c.title, latitude: c.latitude, longitude: c.longitude, hls_url: c.hls_url, imgurl: c.imgurl, organization: c.organization, sponsertext: c.sponsertext }));
     if (keep.length) await writeJSON('cams.json', { updated: now.toISOString(), cams: keep });
     meta.sources.cams = { ok: true, count: keep.length };
@@ -704,6 +707,20 @@ async function updateRisk(meta) {
   const accuracy = evalUpdate(state, roads, evalReports, now.getTime());
   await writeJSON('risk-history.json', state);
   const soi = roads.segments.filter((s) => !isMain(s.cls)).length;
+  // จุดที่ควรหลบสำหรับหน้าหาเส้นทาง: 0 = น้ำท่วมจริง (เซ็นเซอร์ ≥10 ซม., iTIC/Traffy/ประชาชน 3 ชม.), 1 = ควรระวังมาก, 2 = ควรระวัง
+  {
+    const r5 = (v) => Math.round(v * 1e5) / 1e5;
+    const SRCN = { itic: 'หน่วยงาน/iTIC', traffy: 'Traffy', web: 'ประชาชนปักหมุด', bma: 'เซ็นเซอร์ กทม.' };
+    const p = [];
+    for (const r of reports) {
+      if (r.src === 'news' || now - r.t > 3 * 36e5) continue;
+      if (r.src === 'bma' && r.lv < 2) continue; // เซ็นเซอร์ < 10 ซม. ยังขับผ่านได้
+      const x = r.c && roadNow.get(r.c);
+      p.push([r5(r.la), r5(r.lo), 0, (x ? x.n + ' ' + Math.round(x.v) + ' ซม.' : SRCN[r.src] || '')]);
+    }
+    for (const g of segs) if (g.tier >= 2) p.push([r5(g.la), r5(g.lo), g.tier === 3 ? 1 : 2]);
+    await writeJSON('avoid.json', { updated: now.toISOString(), p });
+  }
   await writeJSON('risk-roads.json', { updated: now.toISOString(), roadSegments: roads.segments.length, soiSegments: soi, sources: src, counts, accuracy, ...packSegments(segs.slice(0, 5000)) });
   meta.sources.risk = { ok: true, segments: segs.length, counts, sources: src };
 }
@@ -765,6 +782,31 @@ function updateTrends(state, roadNow, canalNow, rain, fc) {
   const cnt = (arr) => Object.fromEntries(['fast', 'up', 'peak', 'flat', 'down'].map((k) => [k, arr.filter((x) => x.tr === k).length]));
   meta.sources.trends = { road: cnt(out.road), canal: cnt(out.canal) };
   return { out, road, canal };
+}
+
+// ---------- ข้อความแจ้งเตือน "ล้นตลิ่งแล้ว" ของ ThaiWater (กทม. และจังหวัดรอบ ๆ) ----------
+const WARN_PROV = { 'กรุงเทพมหานคร': 0, 'นนทบุรี': 1, 'ปทุมธานี': 1, 'สมุทรปราการ': 1, 'นครปฐม': 1, 'สมุทรสาคร': 1, 'ฉะเชิงเทรา': 2, 'พระนครศรีอยุธยา': 2 };
+async function updateTwWarn(meta) {
+  try {
+    const j = JSON.parse(await fetchText('https://api-v3.thaiwater.net/api/v1/thaiwater30/public/warning', { headers: { Referer: 'https://www.thaiwater.net/' } }, 30000));
+    const byStation = new Map();
+    for (const w of j.data || []) {
+      const t = bkkTime(w.datetime);
+      if (isNaN(t) || now - t > 24 * 36e5) continue;
+      for (const line of String(w.message || '').split(/\n+/).map((x) => x.trim()).filter(Boolean)) {
+        const m = line.match(/จ\.(\S+)/), prov = m && m[1];
+        if (!(prov in WARN_PROV)) continue;
+        const name = (line.match(/^(สถานี\S+(?:\s\S+)?)/) || [])[1] || line.slice(0, 40);
+        const cm = +((line.match(/ล้นตลิ่งแล้ว\s*([\d.]+)\s*ซม/) || [])[1] || NaN);
+        const at = (line.match(/\[([^\]]+)\]/) || [])[1] || '';
+        const prev = byStation.get(name);
+        if (!prev || t > prev.t) byStation.set(name, { t, prov, near: WARN_PROV[prov], name, cm: isNaN(cm) ? null : cm, at, text: line.slice(0, 200) });
+      }
+    }
+    const items = [...byStation.values()].sort((a, b) => a.near - b.near || (b.cm || 0) - (a.cm || 0));
+    await writeJSON('tw-warn.json', { updated: now.toISOString(), items });
+    meta.sources.twWarn = { ok: true, bkk: items.filter((x) => x.near === 0).length, near: items.filter((x) => x.near > 0).length };
+  } catch (e) { log('tw warning failed:', e.message); meta.sources.twWarn = { ok: false, error: e.message }; }
 }
 
 // ---------- น้ำขึ้นน้ำลงปากแม่น้ำเจ้าพระยา (ตารางพยากรณ์ของกองทัพเรือ ผ่าน สสน.) ----------
@@ -848,6 +890,7 @@ await updateTraffy(meta);
 await updateCamsRadar(meta);
 await updateThaiwater(meta);
 await updateTide(meta);
+await updateTwWarn(meta);
 await updateTmdForecast(meta).catch((e) => { log('tmd forecast failed:', e.message); meta.sources.tmdFcst = { ok: false, error: e.message }; });
 await updateRisk(meta).catch((e) => { log('risk failed:', e); meta.sources.risk = { ok: false, error: e.message }; });
 await writeJSON('meta.json', meta);

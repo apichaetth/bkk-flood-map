@@ -559,17 +559,34 @@
     try {
       const d = await Flood.fetchCams();
       if (!Array.isArray(d)) throw new Error('รูปแบบข้อมูลไม่ถูกต้อง');
-      // เฉพาะกล้องที่เผยแพร่สาธารณะผ่าน HTTPS และยังไม่ถูกระงับ
-      S.cam = d.map((c) => ({ c, la: num(c.latitude), lo: num(c.longitude) }))
-        .filter((x) => x.la && x.lo && inBkk(x.la, x.lo) && /^https:\/\//.test(x.c.hls_url || '') && !/tempsus/.test(x.c.hls_url));
-      setFeed('cam', 'ok', `${S.cam.length} กล้อง`);
+      // เฉพาะกล้องที่เผยแพร่สาธารณะผ่าน HTTPS: วิดีโอสด (HLS) หรือภาพนิ่ง
+      S.cam = d.map((c) => ({ c, la: num(c.latitude), lo: num(c.longitude),
+        video: /^https:\/\//.test(c.hls_url || '') && !/tempsus/.test(c.hls_url), still: /^https:\/\//.test(c.imgurl || '') && !/X\.X\.X\.X/.test(c.imgurl) }))
+        .filter((x) => x.la && x.lo && inBkk(x.la, x.lo) && (x.video || x.still));
+      const nv = S.cam.filter((x) => x.video).length;
+      setFeed('cam', 'ok', `${S.cam.length} กล้อง (วิดีโอสด ${nv} · ภาพนิ่ง ${S.cam.length - nv})`);
     } catch (e) { S.cam = null; setFeed('cam', 'fail', e.message); }
     drawCams();
   }
-  let hls = null;
-  function stopStream() { if (hls) { try { hls.destroy(); } catch (e) { /* ignore */ } hls = null; } }
+  let hls = null, stillTimer = null;
+  function stopStream() {
+    if (hls) { try { hls.destroy(); } catch (e) { /* ignore */ } hls = null; }
+    clearInterval(stillTimer); stillTimer = null;
+  }
+  // กล้องภาพนิ่ง: โหลดภาพใหม่ทุก 60 วินาทีระหว่างเปิดป๊อปอัป
+  function showStill(el, x, note) {
+    const st = el.querySelector('.camst'), v = el.querySelector('video');
+    if (v) v.remove();
+    const img = new Image(); img.referrerPolicy = 'no-referrer'; img.alt = 'ภาพนิ่งจากกล้อง';
+    const load = () => { img.src = x.c.imgurl + (x.c.imgurl.includes('?') ? '&' : '?') + '_t=' + Date.now(); };
+    img.onload = () => { st.textContent = note + ' · ' + fmtTime(new Date()); };
+    img.onerror = () => { st.textContent = 'ไม่สามารถแสดงภาพจากกล้องนี้ได้ขณะนี้'; };
+    st.before(img); st.textContent = 'กำลังโหลดภาพ…'; load();
+    stillTimer = setInterval(load, 60000);
+  }
   function startStream(el, x) {
     stopStream();
+    if (!x.video) { showStill(el, x, 'ภาพนิ่ง (โหลดใหม่ทุก 1 นาที)'); return; }
     const v = el.querySelector('video'), st = el.querySelector('.camst');
     const fail = (why) => {
       v.remove();
@@ -594,9 +611,9 @@
     layers.cam.clearLayers();
     if (!S.cam) return;
     for (const x of S.cam) {
-      x.marker = L.marker([x.la, x.lo], { icon: icon('cam', '#1d2330', '▶', 12), zIndexOffset: -100 })
+      x.marker = L.marker([x.la, x.lo], { icon: icon('cam', x.video ? '#1d2330' : '#4a5568', x.video ? '▶' : '◻', 12), zIndexOffset: -100 })
         .bindPopup(() => `<div class="pp" style="width:290px;max-width:100%"><div class="m">${esc(x.c.organization || '')} · ${esc(x.c.camid)}</div><h3>${esc(x.c.title)}</h3>
-          <video muted autoplay playsinline controls></video><div class="m camst">กำลังเชื่อมต่อ…</div>
+          ${x.video ? '<video muted autoplay playsinline controls></video>' : ''}<div class="m camst">กำลังเชื่อมต่อ…</div>
           <div class="m">ภาพจาก ${esc(x.c.sponsertext || x.c.organization || 'iTIC')} ผ่าน iTIC / Longdo</div></div>`, { maxWidth: 310, minWidth: 250 })
         .on('popupopen', (e) => startStream(e.popup.getElement(), x))
         .on('popupclose', stopStream)
@@ -616,7 +633,7 @@
       if (best && !seen.has(best.cm.c.camid)) { seen.add(best.cm.c.camid); pairs.push({ sp, ...best }); }
     }
     listInto('listCam', pairs.slice(0, 20), (p) => ({ dot: LEVEL[p.sp.lv].color, title: p.cm.c.title, sub: `ห่าง ${(p.d * 1000).toFixed(0)} ม. จาก ${p.sp.name}`, right: '▶', go: p.cm, cam: true }),
-      'ไม่มีกล้องสาธารณะใกล้จุดน้ำท่วมในขณะนี้ (กล้องทั้งหมดแสดงบนแผนที่เป็นสี่เหลี่ยมสีดำ ▶ กดเพื่อดูภาพสด)');
+      'ไม่มีกล้องสาธารณะใกล้จุดน้ำท่วมในขณะนี้ (กล้องทั้งหมดแสดงบนแผนที่ ▶ = วิดีโอสด · ◻ = ภาพนิ่ง กดเพื่อดู)');
   }
 
   // ---------- 9) เรดาร์ฝน ----------

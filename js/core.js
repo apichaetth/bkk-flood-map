@@ -449,7 +449,7 @@ window.Flood = (function () {
   const nav = document.querySelector('nav.pages');
   if (!nav) return;
   const here = (nav.querySelector('[aria-current="page"]') || {}).getAttribute?.('href') || '';
-  const MAIN = [['./', 'ภาพรวม'], ['districts.html', 'เขต'], ['risk.html', 'ถนนเสี่ยง'], ['map.html', 'รายละเอียด'], ['traffy.html', 'Traffy']];
+  const MAIN = [['./', 'ภาพรวม'], ['districts.html', 'เขต'], ['risk.html', 'ถนนเสี่ยง'], ['route.html', 'เส้นทาง'], ['map.html', 'รายละเอียด'], ['traffy.html', 'Traffy']];
   const MORE = [['log.html', 'บันทึกการแจ้ง'], ['about.html', 'เกี่ยวกับ']];
   const cur = (h) => (h === here ? ' aria-current="page"' : '');
   const bar = document.createElement('nav');
