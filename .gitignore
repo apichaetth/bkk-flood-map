@@ -5,3 +5,4 @@ data/geocache.json
 data/yt-state.json
 data/roads.json
 data/risk-history.json
+.env

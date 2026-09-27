@@ -78,6 +78,10 @@ data/                       districts.json/geojson (คงที่), news.json,
 3. ทดสอบว่าเครื่องนี้ดึงได้: `node bma-fetch.mjs --dry`
 4. รันจริง: `GH_TOKEN=<token> node bma-fetch.mjs --loop 15` (หรือใส่ cron `*/15 * * * *` แบบไม่ใส่ `--loop`)
 
+ชุดติดตั้งสำเร็จรูปอยู่ในโฟลเดอร์ `bma-fetcher/`:
+- **NAS / Docker** (Synology Container Manager, QNAP Container Station): `docker-compose.yml` + คัดลอก `.env.example` เป็น `.env` แล้วใส่ token
+- **มือถือ Android**: ติดตั้ง Termux และ Termux:Boot จาก F-Droid แล้วรัน `bash termux-setup.sh` (ปิดโหมดประหยัดแบตให้ Termux ด้วย)
+
 อย่าใส่ token ไว้ในไฟล์ที่ commit
 
 ## เพิ่ม/แก้เพจ Facebook

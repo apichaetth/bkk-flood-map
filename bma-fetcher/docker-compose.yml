@@ -1,0 +1,18 @@
+# ตัวดึงเซ็นเซอร์น้ำท่วมถนน กทม. สำหรับ NAS (Synology Container Manager / QNAP Container Station) หรือเครื่องที่มี Docker
+# 1) คัดลอกโฟลเดอร์นี้ไปไว้บน NAS (ตัวสคริปต์จะโหลดเวอร์ชันล่าสุดจาก GitHub ทุกครั้งที่ container เริ่ม)
+# 2) คัดลอก .env.example เป็น .env แล้วใส่ GH_TOKEN (fine-grained token เฉพาะ repo นี้ สิทธิ์ Contents: Read and write)
+# 3) สร้าง Project ใน Container Manager ชี้มาที่โฟลเดอร์นี้ หรือรัน: docker compose up -d
+# ดูผล: docker logs -f bma-fetch  (ควรเห็น "ส่งแล้ว: ... จุด" ทุก 15 นาที)
+services:
+  bma-fetch:
+    container_name: bma-fetch
+    image: node:22-alpine
+    restart: unless-stopped
+    env_file: .env
+    environment:
+      TZ: Asia/Bangkok
+    command: ["sh", "-c", "wget -qO /tmp/bma-fetch.mjs https://raw.githubusercontent.com/$${GH_REPO:-apichaetth/bkk-flood-map}/main/scripts/bma-fetch.mjs && exec node /tmp/bma-fetch.mjs --loop 15"]
+    mem_limit: 128m
+    logging:
+      driver: json-file
+      options: { max-size: "1m", max-file: "2" }
