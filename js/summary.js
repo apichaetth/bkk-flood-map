@@ -422,6 +422,13 @@
       <p class="small">${tun.length ? `อุโมงค์ทางลอด: ${tunWet.length ? `<b>มีน้ำ ${tunWet.length} แห่ง</b> (${tunWet.map((r) => esc(r.n)).join(', ')})` : `ปกติทั้ง ${tun.filter((r) => r.st !== 'off').length} แห่ง`}` : ''}${top && top.r1 > 0 ? ` · ฝนหนักสุดชั่วโมงล่าสุด ${fmt(top.r1, 1)} มม. ที่${esc(top.n)}` : ''}</p>
       <p class="muted small">อัปเดต ${F.fmtTime(new Date(b.updated))} · <a href="map.html">ดูบนแผนที่ →</a></p>`;
   }
+  // ทางลัดบนสุด: ค้นหา / ใกล้ฉัน ส่งต่อให้ตัวกรองรายการจุดน้ำท่วม แล้วเลื่อนลงไปดูผล
+  {
+    const spotsCard = () => $('spots').closest('section');
+    $('heroQ').addEventListener('input', (e) => { $('spotQ').value = e.target.value; $('spotQ').dispatchEvent(new Event('input', { bubbles: true })); });
+    $('heroQ').addEventListener('keydown', (e) => { if (e.key === 'Enter') { e.preventDefault(); e.target.blur(); spotsCard().scrollIntoView({ behavior: 'smooth' }); } });
+    $('heroNear').onclick = () => { $('spotNear').click(); spotsCard().scrollIntoView({ behavior: 'smooth' }); };
+  }
   let tideP = null;
   // แนวโน้มน้ำ 1 ชม.: เซ็นเซอร์ถนน (ซม.) และคลอง (ม.) จาก data/trends.json + เจ้าพระยาจากตารางน้ำขึ้นน้ำลง
   const TR = { fast: ['⬆⬆', 'เพิ่มเร็ว', 3], up: ['⬆', 'กำลังเพิ่ม', 2], peak: ['⏸', 'ใกล้จุดสูงสุด', 2], flat: ['➖', 'ทรงตัว', 1], down: ['⬇', 'กำลังลด', 0] };

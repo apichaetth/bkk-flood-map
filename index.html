@@ -18,7 +18,7 @@
     <div class="brand">
       <svg viewBox="0 0 32 32" aria-hidden="true"><path d="M16 3C11 11 7 15.5 7 20a9 9 0 0 0 18 0c0-4.5-4-9-9-17z"/></svg>
       <div>
-        <h1>สรุปสถานการณ์น้ำท่วม กทม.</h1>
+        <h1>น้ำท่วม กทม. ตอนนี้</h1>
         <p id="updated" class="sub">กำลังโหลดข้อมูล…</p>
       </div>
     </div>
@@ -35,6 +35,14 @@
         <p id="subline" class="muted"></p>
         <div id="tmdLine"></div>
         <div id="twLine"></div>
+        <!-- ทางลัด: ค้นหาถนน/เขต, ใกล้ฉัน, หาเส้นทางเลี่ยงน้ำ -->
+        <form class="quick" id="quick" role="search" onsubmit="return false">
+          <input id="heroQ" type="search" placeholder="🔎 ค้นหาถนน หรือเขต" aria-label="ค้นหาถนนหรือเขต" enterkeyhint="search">
+          <div class="quick-btns">
+            <button type="button" class="btn" id="heroNear">📍 ใกล้ฉัน</button>
+            <a class="btn primary-blue" href="route.html">🚗 หาเส้นทางเลี่ยงน้ำ</a>
+          </div>
+        </form>
       </div>
       <div class="tiles">
         <div class="tile t3"><span class="tv" id="nConfirmed">–</span><span class="tl">จุดน้ำท่วม<br><b>ยืนยันแล้ว</b></span></div>
@@ -57,34 +65,23 @@
         <div class="legend-row">
           <span><i class="lg-line t3"></i>ถนนน้ำท่วม (ยืนยัน)</span>
           <span><i class="lg-line t2"></i>ถนนที่มีรายงาน</span>
+        </div>
+        <details class="mapopts"><summary>⚙️ ตัวเลือกแผนที่ (เรดาร์ฝน · กล้อง · พื้นที่เสี่ยง)</summary><div class="legend-row">
           <label class="lg-toggle"><input type="checkbox" id="showRadar" checked> <i class="lg-radar"></i>เรดาร์ฝน <span class="muted" id="radarSt">(กำลังโหลด…)</span></label>
           <label class="lg-toggle"><input type="checkbox" id="showCam" checked> <i class="lg-cam">▶</i>กล้อง CCTV <span class="muted" id="camSt">(กำลังโหลด…)</span></label>
           <label class="lg-toggle"><input type="checkbox" id="showRisk" checked> <i class="lg-area"></i>แสดงพื้นที่เสี่ยง (ฝนหนัก/น้ำสูง)</label>
           <label class="lg-toggle"><input type="checkbox" id="showTraffy" checked> <i class="lg-dot"></i>แสดงจุดที่แจ้งผ่าน Traffy Fondue อย่างเดียว</label>
           <label class="lg-toggle"><input type="checkbox" id="showSpots" checked> <i class="lg-dot"></i><i class="lg-web">!</i>แสดงจุดที่มีรายงาน (ยกเลิกเพื่อดูเฉพาะถนนสีแดง)</label>
-        </div>
+        </div></details>
         <p class="muted small" id="roadNote"></p>
       </div>
 
     </section>
 
-    <section class="card">
+    <section class="card" hidden>
       <div class="card-h"><h2>จุดที่น่าห่วงที่สุด</h2><span class="muted small" id="topNote"></span></div>
       <ol id="top10" class="top10"></ol>
       <button type="button" class="btn" id="topMore" hidden>ดูทั้ง 10 จุด ▾</button>
-    </section>
-
-    <!-- แนวโน้มน้ำ 1 ชม. จากเซ็นเซอร์ถนนและคลอง -->
-    <section class="card" id="trendCard" hidden>
-      <div class="card-h"><h2>แนวโน้มน้ำ 1 ชม.</h2><a class="more" href="map.html">ดูบนแผนที่ →</a></div>
-      <p id="trendRiver" class="small"></p>
-      <div id="trendWarn"></div>
-      <div class="tr-grid">
-        <div class="tr-col"><h3>⬆ กำลังเพิ่ม <span class="tag t3" id="trUpN">0</span></h3><div id="trUp"></div></div>
-        <div class="tr-col"><h3>⏸ ใกล้จุดสูงสุด <span class="tag t2" id="trPeakN">0</span></h3><div id="trPeak"></div></div>
-        <div class="tr-col"><h3>⬇ กำลังลด <span class="tag t0" id="trDownN">0</span></h3><div id="trDown"></div></div>
-      </div>
-      <p class="muted small" id="trendNote"></p>
     </section>
 
     <!-- 3) ทุกจุด: แบ่งตามสภาพถนน -->
@@ -102,23 +99,36 @@
       </div>
     </section>
 
+    <!-- แนวโน้มน้ำ 1 ชม. จากเซ็นเซอร์ถนนและคลอง -->
+    <section class="card" id="trendCard" hidden>
+      <div class="card-h"><h2>แนวโน้มน้ำ 1 ชม.</h2><a class="more" href="map.html">ดูบนแผนที่ →</a></div>
+      <p id="trendRiver" class="small"></p>
+      <div id="trendWarn"></div>
+      <div class="tr-grid">
+        <div class="tr-col"><h3>⬆ กำลังเพิ่ม <span class="tag t3" id="trUpN">0</span></h3><div id="trUp"></div></div>
+        <div class="tr-col"><h3>⏸ ใกล้จุดสูงสุด <span class="tag t2" id="trPeakN">0</span></h3><div id="trPeak"></div></div>
+        <div class="tr-col"><h3>⬇ กำลังลด <span class="tag t0" id="trDownN">0</span></h3><div id="trDown"></div></div>
+      </div>
+      <p class="muted small" id="trendNote"></p>
+    </section>
+
     <!-- แนวโน้มน้ำจาก ThaiWater -->
     <section class="card" id="outlook">
-      <div class="card-h"><h2>แนวโน้มน้ำ 1–3 วันข้างหน้า</h2><a class="more" href="map.html">รายละเอียด →</a></div>
+      <div class="card-h"><h2>ฝนข้างหน้า และคลองใน กทม.</h2><a class="more" href="map.html">เจ้าพระยา/เขื่อน →</a></div>
       <div class="ol-grid">
         <div class="ol-box"><h3>🌧 พยากรณ์ฝน</h3>
           <figure class="nowcast" id="nowcast"><a href="https://dds.bangkok.go.th/nowcast/" target="_blank" rel="noopener"><img alt="ภาพคาดการณ์ฝนล่วงหน้า 3 ชั่วโมง กทม." loading="lazy"></a>
             <figcaption class="muted small">ภาพเคลื่อนไหวคาดการณ์ฝน 3 ชม. ข้างหน้า · สำนักการระบายน้ำ กทม. / Weathernews</figcaption></figure>
           <div id="olTmd"></div><div id="olRain" class="muted small">กำลังโหลด…</div></div>
-        <div class="ol-box"><h3>🌊 เจ้าพระยาช่วง กทม.</h3><div id="olRiver" class="muted small">กำลังโหลด…</div></div>
-        <div class="ol-box"><h3>⛰ น้ำเหนือและเขื่อน</h3><div id="olNorth" class="muted small">กำลังโหลด…</div></div>
+        <div class="ol-box" hidden><h3>🌊 เจ้าพระยาช่วง กทม.</h3><div id="olRiver" class="muted small">กำลังโหลด…</div></div>
+        <div class="ol-box" hidden><h3>⛰ น้ำเหนือและเขื่อน</h3><div id="olNorth" class="muted small">กำลังโหลด…</div></div>
         <div class="ol-box wide" id="olCity" hidden><h3>🏙 คลองและอุโมงค์ใน กทม. <small class="muted">สำนักการระบายน้ำ กทม.</small></h3><div id="olCityBody"></div></div>
       </div>
-      <p class="muted small">ข้อมูลจาก ThaiWater (สสน.) · ระดับน้ำเจ้าพระยาใน กทม. ขึ้นลงตามน้ำทะเลหนุนด้วย ถ้าน้ำเหนือมากและตรงกับช่วงน้ำขึ้นสูง ริมแม่น้ำเสี่ยงล้นตลิ่ง</p>
+      <p class="muted small">ข้อมูลจากกรมอุตุนิยมวิทยา, สำนักการระบายน้ำ กทม. และ ThaiWater (สสน.)</p>
     </section>
 
-    <section class="card how">
-      <h2>อ่านหน้านี้อย่างไร</h2>
+    <details class="card how">
+      <summary><h2>อ่านหน้านี้อย่างไร</h2></summary>
       <ul>
         <li><b class="tag t3">ยืนยันแล้ว</b> เซ็นเซอร์ของ กทม. วัดน้ำบนถนนได้ ≥ 5 ซม. หรือหน่วยงาน/iTIC รายงาน หรือมีรายงานจาก 2 แหล่งขึ้นไปในรัศมี 500 ม.</li>
         <li><b class="tag t2">มีรายงาน</b> ประชาชนปักหมุดแจ้งผ่านเว็บนี้ หรือแจ้งผ่าน Traffy Fondue หรือข่าวระบุสถานที่ (แหล่งเดียว ยังไม่มีการยืนยัน)</li>
@@ -127,7 +137,7 @@
         <li>จุดที่ไม่มีสีแดง ≠ ไม่มีน้ำท่วม อาจยังไม่มีใครรายงาน · เว็บนี้ไม่ใช่เว็บทางราชการ โปรดติดตามประกาศจาก กทม. (สายด่วน 1555)</li>
       </ul>
       <p class="muted small" id="sources"></p>
-    </section>
+    </details>
   </main>
 
   <script src="https://cdn.jsdelivr.net/npm/leaflet@1.9.4/dist/leaflet.js"></script>

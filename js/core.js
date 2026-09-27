@@ -444,23 +444,42 @@ window.Flood = (function () {
   };
 })();
 
-// ---------- เมนูหน้าบนมือถือ: แถวเดียว 5 หน้าหลัก + ⋯ (บันทึกการแจ้ง / เกี่ยวกับ) ----------
+// ---------- เมนู: คอม = แถบบน 5 หน้า + "เพิ่มเติม ▾" · มือถือ = แถบล่าง 5 ปุ่ม (แบบแอป) ----------
 (function () {
   const nav = document.querySelector('nav.pages');
   if (!nav) return;
-  const here = (nav.querySelector('[aria-current="page"]') || {}).getAttribute?.('href') || '';
-  const MAIN = [['./', 'ภาพรวม'], ['districts.html', 'เขต'], ['risk.html', 'ถนนเสี่ยง'], ['route.html', 'เส้นทาง'], ['map.html', 'รายละเอียด'], ['traffy.html', 'Traffy']];
-  const MORE = [['log.html', 'บันทึกการแจ้ง'], ['about.html', 'เกี่ยวกับ']];
+  const path = location.pathname.split('/').pop() || './';
+  const here = (nav.querySelector('[aria-current="page"]') || {}).getAttribute?.('href') || (path === 'index.html' ? './' : path);
+  // [ลิงก์, ชื่อบนคอม, ชื่อบนมือถือ, ไอคอน]
+  const MAIN = [['./', 'หน้าแรก', 'หน้าแรก', '🏠'], ['map.html', 'แผนที่ละเอียด', 'แผนที่', '🗺️'], ['route.html', 'เส้นทางเลี่ยงน้ำ', 'เส้นทาง', '🚗'],
+    ['districts.html', 'เขต', 'เขต', '📍'], ['risk.html', 'ถนนเสี่ยง', 'ถนนเสี่ยง', '⚠️']];
+  const MORE = [['traffy.html', 'Traffy Fondue', '📣'], ['log.html', 'บันทึกการแจ้ง', '📝'], ['about.html', 'เกี่ยวกับ', 'ℹ️']];
   const cur = (h) => (h === here ? ' aria-current="page"' : '');
+  const inMore = MORE.some(([h]) => h === here);
+  // คอม
+  nav.innerHTML = MAIN.map(([h, t]) => `<a href="${h}"${cur(h)}>${t}</a>`).join('')
+    + `<div class="pmore"><button type="button" class="${inMore ? 'on' : ''}" aria-expanded="false" aria-haspopup="true">เพิ่มเติม ▾</button>`
+    + `<div class="pmenu" hidden>${MORE.map(([h, t, i]) => `<a href="${h}"${cur(h)}>${i} ${t}</a>`).join('')}</div></div>`;
+  const pb = nav.querySelector('.pmore button'), pm = nav.querySelector('.pmenu');
+  pb.onclick = (e) => { e.stopPropagation(); pm.hidden = !pm.hidden; pb.setAttribute('aria-expanded', String(!pm.hidden)); };
+  // มือถือ: แถบล่าง (หน้าแรก/แผนที่/เส้นทาง/เขต/อื่น ๆ) + แผ่นเมนูอื่น ๆ
+  const MOB = MAIN.slice(0, 4), SHEET = [MAIN[4], ...MORE.map(([h, t, i]) => [h, t, t, i])];
   const bar = document.createElement('nav');
-  bar.className = 'mnav'; bar.setAttribute('aria-label', 'หน้า');
-  bar.innerHTML = MAIN.map(([h, t]) => `<a href="${h}"${cur(h)}>${t}</a>`).join('')
-    + `<button type="button" class="more${MORE.some(([h]) => h === here) ? ' on' : ''}" aria-expanded="false" aria-label="หน้าอื่น">⋯</button>`
-    + `<div class="mmore" hidden>${MORE.map(([h, t]) => `<a href="${h}"${cur(h)}>${t}</a>`).join('')}</div>`;
-  nav.after(bar);
-  const btn = bar.querySelector('.more'), menu = bar.querySelector('.mmore');
-  btn.onclick = (e) => { e.stopPropagation(); menu.hidden = !menu.hidden; btn.setAttribute('aria-expanded', String(!menu.hidden)); };
-  document.addEventListener('click', (e) => { if (!menu.hidden && !bar.contains(e.target)) { menu.hidden = true; btn.setAttribute('aria-expanded', 'false'); } });
+  bar.className = 'tabbar'; bar.setAttribute('aria-label', 'หน้า');
+  bar.innerHTML = MOB.map(([h, , t, i]) => `<a href="${h}"${cur(h)}><span class="ti" aria-hidden="true">${i}</span><span>${t}</span></a>`).join('')
+    + `<button type="button" class="${SHEET.some(([h]) => h === here) ? 'on' : ''}" aria-expanded="false"><span class="ti" aria-hidden="true">☰</span><span>อื่น ๆ</span></button>`;
+  const sheet = document.createElement('div');
+  sheet.className = 'tsheet'; sheet.hidden = true;
+  sheet.innerHTML = `<div class="tsheet-in" role="menu">${SHEET.map(([h, , t, i]) => `<a href="${h}"${cur(h)} role="menuitem"><span aria-hidden="true">${i}</span>${t}</a>`).join('')}</div>`;
+  document.body.append(sheet, bar);
+  document.body.classList.add('has-tabbar');
+  const tb = bar.querySelector('button');
+  tb.onclick = (e) => { e.stopPropagation(); sheet.hidden = !sheet.hidden; tb.setAttribute('aria-expanded', String(!sheet.hidden)); };
+  sheet.onclick = (e) => { if (e.target === sheet) { sheet.hidden = true; tb.setAttribute('aria-expanded', 'false'); } };
+  document.addEventListener('click', (e) => {
+    if (!pm.hidden && !nav.contains(e.target)) { pm.hidden = true; pb.setAttribute('aria-expanded', 'false'); }
+  });
+  document.addEventListener('keydown', (e) => { if (e.key === 'Escape') { pm.hidden = true; sheet.hidden = true; } });
 })();
 
 // ---------- หน้าเก่าค้างในเครื่อง: เทียบกับ version.txt ถ้าไม่ตรงโหลดใหม่ (ครั้งเดียวต่อเวอร์ชัน) ----------
