@@ -367,6 +367,10 @@ async function updateTraffy(meta) {
   const prevSince = prev.acc === 2 && prev.since ? new Date(prev.since).getTime() : Infinity;
   const since = Math.min(...[oldestFetched, prevSince].filter((v) => v != null && isFinite(v)));
   await writeJSON('traffy.json', { acc: 2, updated: now.toISOString(), fetched: d.results.length, since: isFinite(since) ? new Date(Math.max(since, cutoff)).toISOString() : null, results: items });
+  // ไฟล์ย่อสำหรับหน้าแรก/แผนที่/เขต (ใช้แค่ 24 ชม. ที่ยังไม่เสร็จ) — traffy.json เต็ม 7 วันหลาย MB โหลดเฉพาะหน้า Traffy
+  const c24 = now - 26 * 36e5;
+  await writeJSON('traffy-24h.json', { acc: 2, updated: now.toISOString(), since: isFinite(since) ? new Date(Math.max(since, c24)).toISOString() : null,
+    results: items.filter((x) => ts(x) >= c24 && x.state !== 'เสร็จสิ้น').map((x) => ({ ...x, description: String(x.description || '').slice(0, 300) })) });
   meta.sources.traffy = { ok: true, fetched: d.results.length, flood: fresh.length, kept: items.length };
 }
 

@@ -211,13 +211,15 @@ window.Flood = (function () {
   }
   // เบราว์เซอร์ดึงจาก Traffy ตรง ๆ มักไม่ได้ (CORS) จึงใช้ไฟล์ data/traffy.json ที่ GitHub Actions ดึงไว้ทุก 15 นาทีเป็นหลัก
   // ถ้าไฟล์ไม่มี/เก่าเกิน 2 ชม. ค่อยลองดึงตรง
-  async function traffyRaw() {
+  // short=true: ไฟล์ย่อ 24 ชม. (เล็กกว่าหลายเท่า) ถ้ายังไม่มีค่อยใช้ไฟล์เต็ม
+  async function traffyRaw(short) {
     // ใช้ไฟล์ที่ GitHub Actions เก็บไว้ก่อนเสมอ (เร็ว) — API ของ Traffy ตอบช้าหรือล่มบ่อย รอได้เป็นนาที
     let file = null;
-    try { file = await getJSON('data/traffy.json', 20000, { cache: 'no-cache' }); } catch (e) { /* ยังไม่มีไฟล์ */ }
+    if (short) try { file = await getJSON('data/traffy-24h.json', 20000, { cache: 'no-cache' }); } catch (e) { /* ยังไม่มีไฟล์ย่อ */ }
+    if (!file) try { file = await getJSON('data/traffy.json', 20000, { cache: 'no-cache' }); } catch (e) { /* ยังไม่มีไฟล์ */ }
     const fromFile = () => ({ results: file.results, updated: new Date(file.updated), since: file.since ? new Date(file.since) : null, via: 'file',
       stale: Date.now() - new Date(file.updated) > 2 * 36e5 });
-    if (file && Array.isArray(file.results) && file.results.length) return fromFile();
+    if (file && Array.isArray(file.results) && (file.results.length || (short && !fromFile().stale))) return fromFile();
     // ไม่มีไฟล์เลย: ลองดึงตรง แต่ไม่รอนานเกิน 25 วินาที
     try {
       const d = await getJSON(URL.traffy, 25000);
@@ -229,7 +231,7 @@ window.Flood = (function () {
     throw new Error('ไม่มีข้อมูล Traffy');
   }
   async function fetchTraffy() {
-    const d = await traffyRaw();
+    const d = await traffyRaw(true);
     if (!Array.isArray(d.results)) throw new Error('รูปแบบข้อมูลไม่ถูกต้อง');
     const cutoff = Date.now() - TRAFFY_WINDOW_H * 36e5;
     let newest = null;
