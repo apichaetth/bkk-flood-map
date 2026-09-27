@@ -3,10 +3,11 @@
   'use strict';
   const F = Flood;
   const { $, esc, fmtDT, cssVar } = F;
-  const NAME = { 3: 'แนวโน้มสูง', 2: 'แนวโน้มกลาง', 1: 'เฝ้าระวัง' };
+  const NAME = { 3: 'ควรระวังมาก', 2: 'ควรระวัง', 1: 'เฝ้าระวัง' };
   const COLOR = () => ({ 3: cssVar('--rk3'), 2: cssVar('--rk2'), 1: cssVar('--rk1') });
-  const show = { 1: true, 2: true, 3: true };
-  const SRC = ['หน่วยงาน/iTIC', 'Traffy', 'ประชาชนปักหมุด', 'ข่าว'];
+  // ระดับ 1 (เฝ้าระวัง) เลิกใช้แล้ว ซ่อนไว้เผื่อข้อมูลรอบเก่าที่ค้างในเครื่อง
+  const show = { 1: false, 2: true, 3: true };
+  const SRC = ['หน่วยงาน/iTIC', 'Traffy', 'ประชาชนปักหมุด', 'ข่าว', 'เซ็นเซอร์ถนน กทม.'];
   // ไฟล์รูปแบบกะทัดรัด (v2): ถอดพิกัดแบบผลต่าง และสร้างข้อความเหตุผลจากตัวเลข
   function unpack(d) {
     if (d.v !== 2) return d;
@@ -20,9 +21,10 @@
   }
   function whyOf(s) {
     if (s.why) return s.why;
-    const [src, dist, age, mm1, mm24, hc, pct, st] = s.x, w = [];
+    const [src, dist, age, mm1, mm24, hc, pct, st, fc] = s.x, w = [];
     if (src >= 0) w.push(`มีรายงานน้ำท่วม (${SRC[src]}) ห่าง ${dist} ม. เมื่อ ${age} นาทีที่แล้ว`);
     if (mm1 >= 0) w.push(`ฝนแถวนี้ประมาณ ${mm1} มม./ชม. · ${mm24} มม./24 ชม.`);
+    if (fc >= 0) w.push(`กรมอุตุฯ คาดฝนอีกราว ${fc} มม. ใน 3 ชม. ข้างหน้า`);
     if (hc) w.push(`เคยมีคนแจ้งน้ำท่วมแถวนี้ ${hc} ครั้งในช่วงที่ผ่านมา`);
     if (pct >= 0) w.push(`ระดับน้ำ${st >= 0 ? ' ' + s.stations[st] : ''} ${pct}% ของตลิ่ง`);
     return w;
@@ -55,10 +57,10 @@
   }
   function renderSide() {
     const c = data.counts || {};
-    $('n3').textContent = c[3] || 0; $('n2').textContent = c[2] || 0; $('n1').textContent = c[1] || 0;
+    $('n3').textContent = (c[3] || 0).toLocaleString(); $('n2').textContent = (c[2] || 0).toLocaleString();
     // รวมตามชื่อถนน + เขต
     const byRoad = new Map();
-    for (const s of data.segments) {
+    for (const s of data.segments.filter((x) => show[x.tier])) {
       const k = (s.name || 'ถนนไม่มีชื่อ') + '|' + s.district;
       const r = byRoad.get(k) || { name: s.name || 'ถนนไม่มีชื่อ', district: s.district, tier: 0, score: 0, n: 0, s };
       r.n++; if (s.score > r.score) { r.score = s.score; r.tier = s.tier; r.s = s; }
@@ -72,17 +74,62 @@
       e.preventDefault(); const s = top[+a.dataset.i].s;
       map.setView([s.la, s.lo], 16); $('rmap').scrollIntoView({ behavior: 'smooth', block: 'center' });
     });
-    // วัดผล
-    const a = data.accuracy || {};
-    const hi = a.precision && a.precision['สูง'];
-    $('acc').textContent = hi && hi.pct != null ? hi.pct + '%' : '–';
-    $('accSub').textContent = a.runs ? `(${a.runs} รอบ)` : '(รอข้อมูล)';
-    $('evalBox').innerHTML = a.runs ? `<div class="rk-eval"><p class="muted small">จากการทาย ${a.runs} รอบที่ผ่านมา (ครบ ${a.horizonH} ชม. แล้ว) นับว่า "ถูก" เมื่อมีรายงานน้ำท่วมใหม่ในรัศมี ${a.hitM} ม. ภายใน ${a.horizonH} ชม.</p>
-      <table><thead><tr><th>ระดับที่ทาย</th><th class="n">ช่วงถนนที่ทาย</th><th class="n">มีรายงานจริง</th><th class="n">ทายถูก</th></tr></thead><tbody>
-      ${Object.entries(a.precision).reverse().map(([k, v]) => `<tr><td>${esc(k === 'สูง' ? 'แนวโน้มสูง' : k === 'กลาง' ? 'แนวโน้มกลาง' : k)}</td><td class="n">${v.predicted}</td><td class="n">${v.hit}</td><td class="n">${v.pct != null ? v.pct + '%' : '–'}</td></tr>`).join('')}
+    renderEval(data.accuracy);
+  }
+  // ---------- วัดผล ----------
+  const pc = (h, n) => (n ? Math.round((1000 * h) / n) / 10 : null);
+  const pcs = (h, n) => (n ? pc(h, n) + '%' : '–');
+  const n0 = (v) => (v || 0).toLocaleString();
+  const fmtDay = (k) => new Date(k + 'T12:00:00+07:00').toLocaleDateString('th-TH', { day: 'numeric', month: 'short' });
+  function renderEval(a) {
+    const box = $('evalBox');
+    // ไฟล์รูปแบบเดิม (ก่อน v3): ยังไม่มีสถิติแบบใหม่
+    if (!a || a.v !== 3 || !a.total.runs) {
+      $('acc').textContent = '–'; $('accSub').textContent = '(รอข้อมูล)'; $('rec').textContent = '–';
+      box.innerHTML = '<p class="muted">เริ่มเก็บสถิติชุดใหม่แล้ว ต้องรอผลการทายอย่างน้อย 3 ชม. แรกก่อน จึงจะเริ่มวัดความแม่นได้ ยิ่งผ่านวันที่ฝนตกหนักหลายวัน ตัวเลขยิ่งเชื่อถือได้</p>';
+      return;
+    }
+    const T = a.total, t3 = T.t[3], t2 = T.t[2], rec = T.rec;
+    const recAll = ['main', 'soi', 'off'].reduce((x, k) => [x[0] + rec[k][0], x[1] + rec[k][1]], [0, 0]);
+    const nDays = a.days.length;
+    $('acc').textContent = pcs(t3[1], t3[0]);
+    $('accSub').textContent = `(${nDays} วัน · ${n0(T.runs)} รอบ)`;
+    $('rec').textContent = pcs(recAll[1], recAll[0]);
+    const p3 = pc(t3[1], t3[0]), pb = pc(T.base[1], T.base[0]);
+    let verdict = '';
+    if (p3 != null && pb != null && t3[0] >= 200) {
+      verdict = p3 > pb * 1.2 ? `<p class="rk-verdict ok">ระดับควรระวังมากทายถูกมากกว่าวิธีง่าย ๆ (ทายแค่จุดที่ท่วมบ่อย) — ${p3}% เทียบกับ ${pb}%</p>`
+        : `<p class="rk-verdict warn">ยังไม่ดีกว่าวิธีง่าย ๆ (ทายแค่จุดที่ท่วมบ่อย) ชัดเจน — ${p3}% เทียบกับ ${pb}% ต้องเก็บข้อมูลเพิ่มและปรับค่าน้ำหนัก</p>`;
+    }
+    if (nDays < 7) verdict += `<p class="muted small">เก็บข้อมูลมาแล้ว ${nDays} วัน ตัวเลขยังแกว่งได้มาก ควรดูอีกครั้งเมื่อผ่านวันที่ฝนตกหนักหลายวัน</p>`;
+    const DRV = ['มีรายงาน/เซ็นเซอร์ใกล้ ๆ', 'ฝน (+จุดท่วมบ่อย)', 'น้ำในคลองใกล้ล้น'];
+    const row = (label, c, note) => `<tr><td>${label}${note ? `<br><span class="muted small">${note}</span>` : ''}</td><td class="n">${n0(c[0])}</td><td class="n">${n0(c[1])}</td><td class="n"><b>${pcs(c[1], c[0])}</b></td></tr>`;
+    const recRow = (label, c) => `<tr><td>${label}</td><td class="n">${n0(c[0])}</td><td class="n">${n0(c[1])}</td><td class="n"><b>${pcs(c[1], c[0])}</b></td></tr>`;
+    box.innerHTML = `<div class="rk-eval">
+      <p class="muted small">ทุกรอบที่ครบ ${a.horizonH} ชม. นับว่า "ถูก" เมื่อมีรายงานน้ำท่วมใหม่ (Traffy, iTIC, หมุดประชาชน, เซ็นเซอร์ กทม.) ในรัศมี ${a.hitM} ม. ภายใน ${a.horizonH} ชม. หลังทาย</p>
+      ${verdict}
+      <h3>ทายถูกกี่ %</h3>
+      <table><thead><tr><th>ที่ทาย</th><th class="n">ช่วงถนน×รอบ</th><th class="n">มีรายงานจริง</th><th class="n">ถูก</th></tr></thead><tbody>
+      ${row(NAME[3], t3)}
+      ${row('&nbsp;└ ทายล่วงหน้า', [t3[2], t3[3]], `ตอนทายยังไม่มีใครแจ้งแถวนั้นใน ${a.aheadH} ชม. ก่อนหน้า`)}
+      ${row(NAME[2], t2)}
+      ${row('&nbsp;└ ทายล่วงหน้า', [t2[2], t2[3]])}
+      ${row('ตัวเทียบ: จุดที่ท่วมบ่อย', T.base, 'ทายแค่ช่วงถนนที่มีคนแจ้งบ่อยที่สุด จำนวนเท่ากับระดับควรระวังมาก')}
       </tbody></table>
-      <p class="small" style="margin-top:8px">รายงานน้ำท่วมใหม่ที่เกิดขึ้น <b>${a.recall.newReports}</b> ครั้ง อยู่บนถนนที่ทายไว้ล่วงหน้า <b>${a.recall.caught}</b> ครั้ง (${a.recall.pct != null ? a.recall.pct + '%' : '–'})</p></div>`
-      : '<p class="muted">ต้องรอผลการทายอย่างน้อย 3 ชม. แรกก่อน จึงจะเริ่มวัดความแม่นได้</p>';
+      <h3>ระดับควรระวังมาก แยกตามเหตุผลหลัก</h3>
+      <table><tbody>${T.drv.map((c, i) => row(DRV[i], c)).join('')}</tbody></table>
+      <h3>น้ำท่วมจริง ทายไว้ล่วงหน้าได้กี่ %</h3>
+      <table><thead><tr><th>รายงานน้ำท่วมใหม่ (นับเรื่องละครั้ง)</th><th class="n">เรื่อง</th><th class="n">ทายไว้ก่อน</th><th class="n">%</th></tr></thead><tbody>
+      ${recRow('บนถนนสายหลัก/รอง', rec.main)}${recRow('ในซอย', rec.soi)}${recRow('ไม่อยู่ใกล้ถนนที่ระบบดู', rec.off)}
+      ${recRow('<b>รวม</b>', recAll)}
+      </tbody></table>
+      <h3>รายวัน</h3>
+      <table><thead><tr><th>วัน</th><th class="n">ฝนสูงสุด<br>มม./ชม.</th><th class="n">ควรระวังมาก<br>ถูก</th><th class="n">ตัวเทียบ<br>ถูก</th><th class="n">ทายไว้ก่อน</th></tr></thead><tbody>
+      ${a.days.slice(0, 14).map((d) => {
+        const r = ['main', 'soi', 'off'].reduce((x, k) => [x[0] + d.rec[k][0], x[1] + d.rec[k][1]], [0, 0]);
+        return `<tr><td>${fmtDay(d.d)}</td><td class="n">${d.rain}</td><td class="n">${pcs(d.t[3][1], d.t[3][0])}</td><td class="n">${pcs(d.base[1], d.base[0])}</td><td class="n">${pcs(r[1], r[0])} <span class="muted small">(${r[0]})</span></td></tr>`;
+      }).join('')}
+      </tbody></table></div>`;
   }
   // แสดงผลทันที: ผลรอบก่อนที่เก็บในเครื่อง แล้วค่อยแทนด้วยไฟล์ล่าสุด
   const CACHE = 'risk-cache-v2';

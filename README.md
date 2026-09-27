@@ -67,6 +67,19 @@ data/                       districts.json/geojson (คงที่), news.json,
 ข้อมูลเก็บใน Google Sheets + Google Drive ของแอดมินผ่าน Google Apps Script — วิธีติดตั้งดู [`apps-script/README.md`](apps-script/README.md)
 แล้วใส่ URL ของ Web App ที่ `data/report-config.json`
 
+## เครื่องในไทยช่วยดึงเซ็นเซอร์น้ำท่วมถนน กทม. (ไม่บังคับ)
+
+เซิร์ฟเวอร์ กทม. ปฏิเสธเครื่องนอกประเทศ (รวม GitHub Actions) ถ้ามีเครื่องในไทยเปิดทิ้งไว้ (NAS, Raspberry Pi, มือถือ Android + Termux)
+ให้รัน `scripts/bma-fetch.mjs` ทุก 15 นาที สคริปต์จะส่งไฟล์ `bma-sensors.json` ขึ้น branch `bma-data`
+แล้วรอบอัปเดตถัดไปจะใช้ข้อมูลนี้ในการทายถนนเสี่ยง วัดความแม่น และเป็นสำรองให้หน้าแผนที่ (ข้อมูลเก่ากว่า 1 ชม. จะไม่ใช้)
+
+1. สร้าง fine-grained token: เลือกเฉพาะ repo นี้ · Repository permissions → Contents: Read and write
+2. ต้องมี Node.js 18+ แล้วคัดลอก `scripts/bma-fetch.mjs` ไปไว้บนเครื่อง
+3. ทดสอบว่าเครื่องนี้ดึงได้: `node bma-fetch.mjs --dry`
+4. รันจริง: `GH_TOKEN=<token> node bma-fetch.mjs --loop 15` (หรือใส่ cron `*/15 * * * *` แบบไม่ใส่ `--loop`)
+
+อย่าใส่ token ไว้ในไฟล์ที่ commit
+
 ## เพิ่ม/แก้เพจ Facebook
 
 แก้ไฟล์ `data/facebook-pages.json` แล้ว push (ไม่ต้องแก้โค้ด) เพจต้องเป็นเพจสาธารณะ ใส่ URL แบบ `https://www.facebook.com/<ชื่อเพจ>` รายการแรกคือเพจที่แสดงเป็นค่าเริ่มต้น

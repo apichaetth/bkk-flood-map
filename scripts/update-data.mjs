@@ -12,7 +12,7 @@
 import { readFile, writeFile, mkdir } from 'node:fs/promises';
 import { createHash } from 'node:crypto';
 import path from 'node:path';
-import { loadRoads, scoreRoads, evaluate, packSegments, PARAMS as RISK_PARAMS } from './risk.mjs';
+import { loadRoads, scoreRoads, evalUpdate, newEvalState, packSegments, isMain } from './risk.mjs';
 import { fileURLToPath } from 'node:url';
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
@@ -489,7 +489,28 @@ async function updateRisk(meta) {
   try { roads = await loadRoads(DATA, fetchText, log); }
   catch (e) { log('roads failed:', e.message); }
   const inBkk = (la, lo) => la >= 13.4 && la <= 14.05 && lo >= 100.25 && lo <= 101.0;
-  const reports = [], history = [], rain = [], wl = [];
+  const reports = [], history = [], rain = [], wl = [], fc = [];
+  // เซ็นเซอร์น้ำท่วมถนน กทม.: เครื่องในไทย (scripts/bma-fetch.mjs) ส่งขึ้น branch bma-data ทุก 15 นาที
+  // เพราะเซิร์ฟเวอร์ กทม. ปฏิเสธเครื่องนอกประเทศ (รวม GitHub Actions)
+  try {
+    const repo = process.env.GITHUB_REPOSITORY || 'apichaetth/bkk-flood-map';
+    const b = JSON.parse(await fetchText(`https://raw.githubusercontent.com/${repo}/bma-data/bma-sensors.json?t=${now.getTime()}`, {}, 20000));
+    const age = now - Date.parse(b.updated);
+    if (!(age <= 60 * 6e4)) throw new Error(`ข้อมูลเก่า ${Math.round(age / 6e4)} นาที (เครื่องในไทยอาจปิดอยู่)`);
+    await writeJSON('bma-sensors.json', b);
+    let flooded = 0;
+    for (const x of b.sensors || []) {
+      if (x.cm == null || x.cm < 5 || !x.t || now - x.t > 3 * 36e5) continue;
+      flooded++;
+      reports.push({ la: x.la, lo: x.lo, t: x.t, src: 'bma', lv: x.cm >= 15 ? 3 : x.cm >= 10 ? 2 : 1 });
+    }
+    src.bma = (b.sensors || []).length;
+    meta.sources.bma = { ok: true, sensors: src.bma, flooded, ageMin: Math.round(age / 6e4) };
+  } catch (e) {
+    const msg = /HTTP 404/.test(e.message) ? 'ยังไม่มีเครื่องในไทยส่งข้อมูล' : e.message;
+    src.bma = 'off: ' + msg;
+    meta.sources.bma = { ok: false, error: msg };
+  }
   // Traffy (สะสมไว้แล้วใน traffy.json)
   const tf = await readJSON('traffy.json', { results: [] });
   const tfa = await readJSON('traffy-archive.json', { results: [] });
@@ -555,17 +576,31 @@ async function updateRisk(meta) {
     src.wl = wl.length;
   } catch (e) { src.wl = 'error: ' + e.message; }
 
+  // ฝนพยากรณ์ 3 ชม. ข้างหน้ารายจุดจากกรมอุตุฯ (ไฟล์ที่ updateTmdForecast เพิ่งเขียนรอบนี้)
+  const tmd = await readJSON('tmd-forecast.json', { areas: [] });
+  if (now - Date.parse(tmd.updated || 0) <= 6 * 36e5) {
+    for (const a of tmd.areas || []) {
+      if (!a.la || !a.lo) continue;
+      const mm = a.hours.filter((h) => { const t = Date.parse(h.t); return t > now - 30 * 6e4 && t <= now.getTime() + 3 * 36e5; }).reduce((x, h) => x + (h.rain || 0), 0);
+      fc.push({ la: a.la, lo: a.lo, mm });
+    }
+  }
+  src.fcst = fc.length;
+
   if (!roads) { meta.sources.risk = { ok: false, error: 'roads unavailable' }; return; }
-  const segs = scoreRoads(roads, { reports, history, rain, wl }, now.getTime());
-  // เก็บผลรอบนี้ไว้วัดความแม่นภายหลัง
-  const hist = (await readJSON('risk-history.json', [])).filter((h) => now - h.t <= RISK_PARAMS.historyKeepH * 36e5);
-  hist.push({ t: now.getTime(), segs: segs.map((s) => [s.id, s.tier]) });
-  await writeJSON('risk-history.json', hist);
-  const evalReports = [...reports.filter((r) => r.src !== 'news'), ...history.map((h) => ({ ...h, src: 'traffy' }))];
-  const accuracy = evaluate(hist, roads, evalReports, now.getTime());
-  const counts = { 3: 0, 2: 0, 1: 0 };
+  const segs = scoreRoads(roads, { reports, history, rain, wl, fc }, now.getTime());
+  const counts = { 3: 0, 2: 0 };
   segs.forEach((s) => counts[s.tier]++);
-  await writeJSON('risk-roads.json', { updated: now.toISOString(), roadSegments: roads.segments.length, sources: src, counts, accuracy, ...packSegments(segs.slice(0, 4000)) });
+  // เก็บผลรอบนี้ไว้วัดความแม่นภายหลัง + ตัวเทียบ "จุดท่วมบ่อย" จำนวนเท่ากับระดับควรระวังมาก
+  const state = newEvalState(await readJSON('risk-history.json', null));
+  state.runs.push({ t: now.getTime(), rb: roads.built, rain: Math.round(Math.max(0, ...rain.map((r) => r.mm1 || 0))),
+    segs: segs.map((s) => [s.id, s.tier, s.drv]), base: segs.hot.slice(0, counts[3]) });
+  // รายงานจริงสำหรับตรวจ: Traffy ทุกเรื่อง (ครั้งเดียว) + iTIC + หมุดประชาชน + เซ็นเซอร์ (ไม่รวมข่าว ตำแหน่งไม่แม่น)
+  const evalReports = [...history.map((h) => ({ ...h, src: 'traffy' })), ...reports.filter((r) => r.src !== 'news' && r.src !== 'traffy')];
+  const accuracy = evalUpdate(state, roads, evalReports, now.getTime());
+  await writeJSON('risk-history.json', state);
+  const soi = roads.segments.filter((s) => !isMain(s.cls)).length;
+  await writeJSON('risk-roads.json', { updated: now.toISOString(), roadSegments: roads.segments.length, soiSegments: soi, sources: src, counts, accuracy, ...packSegments(segs.slice(0, 5000)) });
   meta.sources.risk = { ok: true, segments: segs.length, counts, sources: src };
 }
 

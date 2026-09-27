@@ -127,7 +127,23 @@ window.Flood = (function () {
 
   // 1) เซ็นเซอร์น้ำท่วมถนน กทม.
   async function fetchSensors() {
-    // เรียกตรงจากเบราว์เซอร์ (เซิร์ฟเวอร์ กทม. ปฏิเสธเครื่องนอกประเทศ จึงสำรองผ่าน GitHub Actions ไม่ได้)
+    try { return await fetchSensorsDirect(); }
+    catch (e) {
+      // สำรอง: ไฟล์ที่เครื่องในไทยส่งขึ้นมา (scripts/bma-fetch.mjs) ใช้เมื่อเปิดเว็บจากต่างประเทศหรือระบบ กทม. ไม่ตอบ
+      const b = await getJSON('data/bma-sensors.json', 20000).catch(() => null);
+      if (!b || !(Date.now() - new Date(b.updated) < 90 * 6e4)) throw e;
+      let newest = null;
+      const items = (b.sensors || []).map((x) => {
+        const t = x.t ? new Date(x.t) : null;
+        if (t && (!newest || t > newest)) newest = t;
+        const stale = !t || Date.now() - t > SENSOR_STALE_H * 36e5;
+        return { s: { id: x.id, code: x.code, name: x.name, road: x.road, district: x.district }, la: x.la, lo: x.lo, cm: x.cm, t, stale, lv: stale || x.cm == null ? 0 : sensorLevel(x.cm) };
+      });
+      return { items, newest, msg: `${items.length} จุด (ผ่านเครื่องสำรองในไทย)` };
+    }
+  }
+  async function fetchSensorsDirect() {
+    // เรียกตรงจากเบราว์เซอร์ (เซิร์ฟเวอร์ กทม. ปฏิเสธเครื่องนอกประเทศ รวม GitHub Actions)
     let sp = null, nt = null;
     if (!sp) {
       // ตำแหน่งเซ็นเซอร์แทบไม่เปลี่ยน: เก็บไว้ในเบราว์เซอร์ 24 ชม. ลดการเรียกซ้ำ

@@ -23,3 +23,7 @@
 .rk-status { position: absolute; left: 50%; top: 10px; transform: translateX(-50%); z-index: 500; margin: 0; max-width: calc(100% - 90px);
   background: var(--surface); color: var(--ink); border: 1px solid var(--line); border-radius: 999px; padding: 5px 14px; font-size: 13px; box-shadow: 0 2px 8px rgba(0,0,0,.15); }
 .rk-status[hidden] { display: none; }
+.rk-eval h3 { font-size: 15px; margin: 16px 0 6px; }
+.rk-verdict { margin: 8px 0; padding: 8px 10px; border-radius: 8px; font-size: 14px; }
+.rk-verdict.ok { background: color-mix(in srgb, #1a9850 14%, transparent); }
+.rk-verdict.warn { background: color-mix(in srgb, #f39c12 18%, transparent); }
