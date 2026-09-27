@@ -490,6 +490,10 @@ async function updateRisk(meta) {
   catch (e) { log('roads failed:', e.message); }
   const inBkk = (la, lo) => la >= 13.4 && la <= 14.05 && lo >= 100.25 && lo <= 101.0;
   const reports = [], history = [], rain = [], wl = [], fc = [];
+  const lvOf = (cm) => (cm >= 15 ? 3 : cm >= 10 ? 2 : 1);
+  const fresh = (t, h) => t && now - t <= h * 36e5;
+  const seenCode = new Set(), seenCanal = new Set(); // จุดที่ได้จากเครื่องในไทยแล้ว ไม่ใช้ซ้ำจาก ThaiWater
+  let relay = null;
   // เซ็นเซอร์น้ำท่วมถนน กทม.: เครื่องในไทย (scripts/bma-fetch.mjs) ส่งขึ้น branch bma-data ทุก 15 นาที
   // เพราะเซิร์ฟเวอร์ กทม. ปฏิเสธเครื่องนอกประเทศ (รวม GitHub Actions)
   try {
@@ -497,11 +501,8 @@ async function updateRisk(meta) {
     const b = JSON.parse(await fetchText(`https://raw.githubusercontent.com/${repo}/bma-data/bma-sensors.json?t=${now.getTime()}`, {}, 20000));
     const age = now - Date.parse(b.updated);
     if (!(age <= 60 * 6e4)) throw new Error(`ข้อมูลเก่า ${Math.round(age / 6e4)} นาที (เครื่องในไทยอาจปิดอยู่)`);
-    await writeJSON('bma-sensors.json', b);
+    relay = b;
     // เซ็นเซอร์ถนน: ใช้ระบบ DDS (มีสถานะปัจจุบัน) เป็นหลัก ระบบ floodbangkok เสริมจุดที่ DDS ไม่มี
-    const lvOf = (cm) => (cm >= 15 ? 3 : cm >= 10 ? 2 : 1);
-    const fresh = (t, h) => t && now - t <= h * 36e5;
-    const seenCode = new Set();
     let flooded = 0;
     for (const x of b.road || []) {
       if (x.st === 'off') continue;
@@ -519,6 +520,7 @@ async function updateRisk(meta) {
     for (const x of b.rain || []) if (x.ok !== false && fresh(x.t, 1.5) && x.r1 != null) rain.push({ la: x.la, lo: x.lo, mm1: x.r1, mm24: x.r24 || 0 });
     // คลองตามสถานะของ กทม.: วิกฤต/เตือนภัย ส่งผลในรัศมีแคบ (300 ม.) และไม่พอทำให้ติดระดับได้เอง ต้องมีฝนหรือรายงานประกอบ
     for (const x of b.canal || []) {
+      if (fresh(x.t, 3) && x.st >= 0) seenCanal.add(x.c);
       if (x.st < 1 || !fresh(x.t, 3)) continue;
       wl.push({ la: x.la, lo: x.lo, pct: x.st === 2 ? 100 : 90, W: x.st === 2 ? 0.6 : 0.3, r: 300, name: x.n });
     }
@@ -531,6 +533,49 @@ async function updateRisk(meta) {
     src.bma = 'off: ' + msg;
     meta.sources.bma = { ok: false, error: msg };
   }
+  // เซ็นเซอร์ถนน 262 จุด + คลอง 282 สถานีของ กทม. ผ่าน ThaiWater (เข้าได้จาก GitHub Actions ตลอด 24 ชม.)
+  // ใช้เสริมจุดที่เครื่องในไทยไม่ได้ส่งมา และเป็นข้อมูลหลักเมื่อเครื่องในไทยปิด
+  let twStations = [];
+  try {
+    const TWP = 'https://api-v3.thaiwater.net/api/v1/thaiwater30/public/', H = { headers: { Referer: 'https://www.thaiwater.net/' } };
+    const [fr, cw] = await Promise.all([fetchText(TWP + 'flood_road', H, 60000), fetchText(TWP + 'canal_waterlevel', H, 60000)].map((p) => p.then(JSON.parse)));
+    const tx = (o) => (o && (o.th || o.en)) || '';
+    const nm = (v) => (v == null || v === '' || isNaN(+v) ? null : +v);
+    const road = [], canal = [];
+    for (const x of fr.data || []) {
+      const st = x.station || {}, la = +st.floodroad_lat, lo = +st.floodroad_long, code = st.floodroad_oldcode || '';
+      if (!inBkk(la, lo)) continue;
+      twStations.push({ id: st.id, c: code, la, lo });
+      const t = bkkTime(x.floodroad_datetime), cm = nm(x.floodroad_value), live = fresh(t, 3) && cm != null;
+      road.push({ c: code, n: tx(st.floodroad_name), road: '', d: tx(x.geocode && x.geocode.amphoe_name).replace(/^เขต/, ''), la, lo, t,
+        st: !live ? 'off' : cm >= 5 ? 'flood' : 'ok', cm: live ? cm : null, tunnel: /^TN\./.test(code), dir: '' });
+    }
+    for (const x of cw.data || []) {
+      const st = x.station || {}, la = +st.canal_lat, lo = +st.canal_long, warn = nm(st.warning_level), crit = nm(st.critical_level);
+      if (!inBkk(la, lo) || warn == null || crit == null || crit <= warn) continue; // ไม่มีเกณฑ์ ใช้ไม่ได้
+      const t = bkkTime(x.canal_datetime), v = nm(x.canal_value), live = fresh(t, 3) && v != null;
+      canal.push({ c: st.canal_oldcode || '', n: tx(st.canal_name), river: '', d: tx(x.geocode && x.geocode.amphoe_name).replace(/^เขต/, ''), la, lo, t,
+        wl: live ? v : null, warn, crit, st: !live ? -1 : v >= crit ? 2 : v >= warn ? 1 : 0 });
+    }
+    let flooded = 0;
+    for (const x of road) {
+      if (seenCode.has(x.c) || x.st !== 'flood') continue;
+      flooded++;
+      reports.push({ la: x.la, lo: x.lo, t: x.t, src: 'bma', lv: lvOf(x.cm) });
+    }
+    for (const x of canal) {
+      if (seenCanal.has(x.c) || x.st < 1) continue;
+      wl.push({ la: x.la, lo: x.lo, pct: x.st === 2 ? 100 : 90, W: x.st === 2 ? 0.6 : 0.3, r: 300, name: x.n });
+    }
+    // หน้าเว็บใช้ไฟล์เดียวกัน: เครื่องในไทยเปิดอยู่ใช้ของเครื่องในไทย (ละเอียดกว่า มีฝน/อุโมงค์) ไม่งั้นใช้ของ ThaiWater
+    if (!relay) await writeJSON('bma-sensors.json', { updated: now.toISOString(), source: 'thaiwater', errors: {}, sensors: [], rain: [], canal, road });
+    meta.sources.bmaTw = { ok: true, road: road.length, live: road.filter((x) => x.st !== 'off').length, flooded,
+      canal: canal.length, canalCritical: canal.filter((x) => x.st === 2).length, used: relay ? 'fill-gaps' : 'primary' };
+  } catch (e) {
+    log('thaiwater bma failed:', e.message);
+    meta.sources.bmaTw = { ok: false, error: e.message };
+  }
+  if (relay) await writeJSON('bma-sensors.json', { ...relay, source: relay.source || 'relay' });
   // Traffy (สะสมไว้แล้วใน traffy.json)
   const tf = await readJSON('traffy.json', { results: [] });
   const tfa = await readJSON('traffy-archive.json', { results: [] });
@@ -608,11 +653,14 @@ async function updateRisk(meta) {
   src.fcst = fc.length;
 
   if (!roads) { meta.sources.risk = { ok: false, error: 'roads unavailable' }; return; }
-  const segs = scoreRoads(roads, { reports, history, rain, wl, fc }, now.getTime());
+  const state = newEvalState(await readJSON('risk-history.json', null));
+  // ประวัติน้ำท่วมจากเซ็นเซอร์ถนน 1 ปี: จุดที่เซ็นเซอร์วัดน้ำท่วมบ่อย = ท่วมซ้ำบ่อย (H) เสริมประวัติ Traffy
+  const evPts = await updateSensorEvents(state, twStations).catch((e) => { log('sensor events failed:', e.message); return []; });
+  src.sensorEvents = evPts.length;
+  const segs = scoreRoads(roads, { reports, history: [...history, ...evPts], rain, wl, fc }, now.getTime());
   const counts = { 3: 0, 2: 0 };
   segs.forEach((s) => counts[s.tier]++);
   // เก็บผลรอบนี้ไว้วัดความแม่นภายหลัง + ตัวเทียบ "จุดท่วมบ่อย" จำนวนเท่ากับระดับควรระวังมาก
-  const state = newEvalState(await readJSON('risk-history.json', null));
   state.runs.push({ t: now.getTime(), rb: roads.built, rain: Math.round(Math.max(0, ...rain.map((r) => r.mm1 || 0))),
     segs: segs.map((s) => [s.id, s.tier, s.drv]), base: segs.hot.slice(0, counts[3]) });
   // รายงานจริงสำหรับตรวจ: Traffy ทุกเรื่อง (ครั้งเดียว) + iTIC + หมุดประชาชน + เซ็นเซอร์ (ไม่รวมข่าว ตำแหน่งไม่แม่น)
@@ -622,6 +670,62 @@ async function updateRisk(meta) {
   const soi = roads.segments.filter((s) => !isMain(s.cls)).length;
   await writeJSON('risk-roads.json', { updated: now.toISOString(), roadSegments: roads.segments.length, soiSegments: soi, sources: src, counts, accuracy, ...packSegments(segs.slice(0, 5000)) });
   meta.sources.risk = { ok: true, segments: segs.length, counts, sources: src };
+}
+
+// ---------- น้ำขึ้นน้ำลงปากแม่น้ำเจ้าพระยา (ตารางพยากรณ์ของกองทัพเรือ ผ่าน สสน.) ----------
+async function updateTide(meta) {
+  try {
+    const txt = await fetchText('https://fews2.hii.or.th/model-output/data_portal/tide_table/summary.txt', {}, 30000);
+    const [head, ...lines] = txt.trim().split(/\r?\n/);
+    const keys = head.split(',');
+    const rows = lines.map((l) => Object.fromEntries(l.split(',').map((v, i) => [keys[i], v])));
+    const WANT = ['N01', 'N02', 'N03', 'N04']; // กองบัญชาการทัพเรือ, ท่าเรือกรุงเทพ, ป้อมพระจุล, สันดอนเจ้าพระยา
+    const stations = rows.filter((r) => WANT.includes(r.code)).map((r) => ({
+      code: r.code, name: r['station.name.TH'], date: r.date, max: +r.max_value, maxAt: r.max_time, min: +r.min_value, minAt: r.min_time,
+      h4: ['0000', '0400', '0800', '1200', '1600', '2000'].map((h) => +r['time_' + h]),
+    }));
+    if (!stations.length) throw new Error('no Chao Phraya stations');
+    await writeJSON('tide.json', { updated: now.toISOString(), source: 'กองทัพเรือ / สสน.', stations });
+    meta.sources.tide = { ok: true, stations: stations.length, date: stations[0].date };
+  } catch (e) { log('tide failed:', e.message); meta.sources.tide = { ok: false, error: e.message }; }
+}
+
+// ---------- ประวัติน้ำท่วมจากเซ็นเซอร์ถนน กทม. (ThaiWater flood_road_graph ทุก 10 นาที) ----------
+// เก็บเป็นช่วงน้ำท่วม (≥5 ซม.) ไว้ใน state.ev ของ risk-history.json (ไฟล์ที่ cache อยู่แล้ว)
+// ครั้งแรกดึงย้อนหลัง 1 ปีทีละ 8 สถานีต่อรอบ (ครบใน ~8 ชม.) จากนั้นทยอยดึง 3 วันล่าสุดวนไปทีละ 8 สถานี
+const EV_DAYS = 365, EV_PER_RUN = 8;
+async function updateSensorEvents(state, stations) {
+  const ev = (state.ev ||= { st: {}, list: [] });
+  if (stations.length) {
+    const fetched = (x) => ev.st[x.id] || 0;
+    const todo = stations.filter((x) => !fetched(x)).slice(0, EV_PER_RUN);
+    const refresh = todo.length ? [] : [...stations].sort((a, b) => fetched(a) - fetched(b)).filter((x) => now - fetched(x) > 6 * 36e5).slice(0, EV_PER_RUN);
+    const day = (ms) => new Date(ms + 7 * 36e5).toISOString().slice(0, 10);
+    for (const [x, days] of [...todo.map((x) => [x, EV_DAYS]), ...refresh.map((x) => [x, 3])]) {
+      try {
+        const from = now - days * 864e5;
+        const j = JSON.parse(await fetchText(`https://api-v3.thaiwater.net/api/v1/thaiwater30/public/flood_road_graph?station_id=${x.id}&date_start=${day(from)}&date_end=${day(now.getTime())}`,
+          { headers: { Referer: 'https://www.thaiwater.net/' } }, 60000));
+        const pts = (j.data || []).map((p) => [bkkTime(p.floodroad_datetime), p.floodroad_value == null ? null : +p.floodroad_value]).filter((p) => !isNaN(p[0])).sort((a, b) => a[0] - b[0]);
+        // ช่วงน้ำท่วม: ค่า ≥ 5 ซม. ต่อเนื่อง (ขาดข้อมูลไม่เกิน 1 ชม.) อย่างน้อย 2 จุด (20 นาที)
+        const eps = []; let cur = null;
+        for (const [t, v] of pts) {
+          if (v != null && v >= 5) {
+            if (cur && t - cur.e <= 36e5) { cur.e = t; cur.max = Math.max(cur.max, v); cur.n++; }
+            else { if (cur) eps.push(cur); cur = { s: t, e: t, max: v, n: 1 }; }
+          }
+        }
+        if (cur) eps.push(cur);
+        ev.list = ev.list.filter(([id, s]) => !(id === x.id && s >= from)).concat(eps.filter((e) => e.n >= 2).map((e) => [x.id, e.s, e.e, Math.round(e.max)]));
+        ev.st[x.id] = now.getTime();
+      } catch (e) { log(`sensor history ${x.c} failed:`, e.message); }
+    }
+    ev.list = ev.list.filter(([, s]) => now - s <= EV_DAYS * 864e5);
+  }
+  const pos = new Map(stations.map((x) => [x.id, x]));
+  meta.sources.sensorHistory = { stations: Object.keys(ev.st).length, of: stations.length, events: ev.list.length };
+  // จุดประวัติสำหรับ H (ตัดช่วงที่เพิ่งเกิดใน 6 ชม. ออกเองใน scoreRoads)
+  return ev.list.filter(([id]) => pos.has(id)).map(([id, s]) => ({ la: pos.get(id).la, lo: pos.get(id).lo, t: s }));
 }
 
 // ---------- ตรวจระบบรับแจ้งจากประชาชน (Google Apps Script) ว่ายังตอบได้ ----------
@@ -648,6 +752,7 @@ await checkReports(meta);
 await updateTraffy(meta);
 await updateCamsRadar(meta);
 await updateThaiwater(meta);
+await updateTide(meta);
 await updateTmdForecast(meta).catch((e) => { log('tmd forecast failed:', e.message); meta.sources.tmdFcst = { ok: false, error: e.message }; });
 await updateRisk(meta).catch((e) => { log('risk failed:', e); meta.sources.risk = { ok: false, error: e.message }; });
 await writeJSON('meta.json', meta);

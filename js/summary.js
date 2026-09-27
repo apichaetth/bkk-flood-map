@@ -420,7 +420,19 @@
       const d = c.msl != null && c.prev != null ? c.msl - c.prev : 0;
       const tr = Math.abs(d) < 0.005 ? 'ทรงตัว' : d > 0 ? '▲ ขึ้น' : '▼ ลง';
       return `<div class="ol-row">${lvDot(F.wlLevel(c.pct))}<span>${esc(c.label)}<small>${tr}${c.stale ? ' · ค่าเก่า' : ''}</small></span><b>${fmt(c.pct)}%</b></div>`;
-    }).join('') + '<p class="small muted">% ของความสูงตลิ่ง</p>' : '<p class="muted small">ไม่มีข้อมูลระดับน้ำ</p>';
+    }).join('') + '<p class="small muted">% ของความสูงตลิ่ง</p><div id="olTide"></div>' : '<p class="muted small">ไม่มีข้อมูลระดับน้ำ</p><div id="olTide"></div>';
+    renderTide();
+  }
+  // น้ำขึ้นสูงสุดวันนี้ (ตารางพยากรณ์ของกองทัพเรือ) ช่วง ต.ค.–พ.ย. ถ้าตรงกับน้ำเหนือมาก ริมแม่น้ำเสี่ยงล้นตลิ่ง
+  let tideP = null;
+  async function renderTide() {
+    tideP ||= F.getJSON('data/tide.json', 20000).catch(() => null);
+    const d = await tideP, el = $('olTide');
+    if (!el || !d || !(d.stations || []).length) return;
+    const pick = (c) => d.stations.find((x) => x.code === c);
+    const rows = [pick('N02'), pick('N03')].filter(Boolean);
+    el.innerHTML = `<p class="small">🌊 น้ำขึ้นสูงสุดวันนี้: ${rows.map((x) => `${esc(x.name)} <b>${x.max.toFixed(2)} ม.</b> เวลา ${esc(x.maxAt)} น.`).join(' · ')}</p>
+      <p class="muted small">ค่าพยากรณ์จากกองทัพเรือ (เทียบระดับทะเลปานกลาง) ผ่าน สสน.</p>`;
   }
   function renderNorth(d) {
     if (d) dams = d;

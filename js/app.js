@@ -80,7 +80,7 @@
     web: { name: 'ประชาชนแจ้งผ่านเว็บนี้ (ปักหมุด)', link: 'log.html' },
     wl: { name: 'ระดับน้ำ – ThaiWater (สสน.)', link: 'https://www.thaiwater.net' },
     rain: { name: 'ปริมาณฝน – ThaiWater (สสน.)', link: 'https://www.thaiwater.net' },
-    relay: { name: 'ระดับน้ำคลอง / ฝน / อุโมงค์ – สำนักการระบายน้ำ กทม. (ผ่านเครื่องในไทย)', link: 'https://weather.bangkok.go.th/water' },
+    relay: { name: 'ระดับน้ำคลอง / ฝน / อุโมงค์ – สำนักการระบายน้ำ กทม.', link: 'https://weather.bangkok.go.th/water' },
     news: { name: 'ข่าว – Google News RSS + สรุปโดย Gemini', link: 'https://news.google.com' },
     youtube: { name: 'คลิป – YouTube Data API + สรุปโดย Gemini', link: 'https://www.youtube.com/results?search_query=%E0%B8%99%E0%B9%89%E0%B8%B3%E0%B8%97%E0%B9%88%E0%B8%A7%E0%B8%A1+%E0%B8%81%E0%B8%A3%E0%B8%B8%E0%B8%87%E0%B9%80%E0%B8%97%E0%B8%9E' },
     tmd: { name: 'ประกาศเตือนภัย – กรมอุตุนิยมวิทยา', link: 'https://www.tmd.go.th' },
@@ -351,14 +351,17 @@
     if (!b) setFeed('relay', 'off', 'ต้องมีเครื่องในไทยส่งข้อมูล (ข้อมูลเก่ากว่า 90 นาทีจะไม่แสดง)');
     else {
       const crit = (b.canal || []).filter((c) => c.st === 2).length;
-      setFeed('relay', 'ok', `คลอง ${(b.canal || []).length} สถานี (วิกฤต ${crit}) · ฝน ${(b.rain || []).length} สถานี · อุโมงค์ ${(b.road || []).filter((r) => r.tunnel).length} แห่ง`, new Date(b.updated));
+      const via = b.source === 'thaiwater' ? 'ผ่าน ThaiWater (ไม่มีฝน/อุโมงค์)' : 'ผ่านเครื่องในไทย';
+      setFeed('relay', 'ok', `${via} · คลอง ${(b.canal || []).length} สถานี (วิกฤต ${crit})${(b.rain || []).length ? ` · ฝน ${b.rain.length} สถานี` : ''}${(b.road || []).some((r) => r.tunnel) ? ` · อุโมงค์ ${b.road.filter((r) => r.tunnel).length} แห่ง` : ''}`, new Date(b.updated));
     }
     drawRelay();
   }
   function drawRelay() {
     layers.canal.clearLayers(); layers.bmaRain.clearLayers();
     const b = S.relay;
-    for (const id of ['secCanal', 'secTunnel', 'secBmaRain']) $(id).hidden = !b;
+    $('secCanal').hidden = !b || !(b.canal || []).length;
+    $('secTunnel').hidden = !b || !(b.road || []).some((r) => r.tunnel);
+    $('secBmaRain').hidden = !b || !(b.rain || []).length;
     if (!b) return;
     // คลอง: ปกติ/ขัดข้องจุดเล็ก เตือนภัย/วิกฤตจุดใหญ่
     for (const c of b.canal || []) {
