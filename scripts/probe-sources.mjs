@@ -22,6 +22,20 @@ async function probe(label, url, headers = {}) {
     } catch { console.log('text:', txt.slice(0, 1500)); return txt; }
   } catch (e) { console.log(`\n### ${label}\nERROR ${e.message} ${url}`); return null; }
 }
+// กล้อง: นับกล้องใน กทม. ของแต่ละแหล่ง
+{
+  const cams = await fetch('https://camera.longdo.com/feed/?command=json').then((r) => r.json()).catch((e) => (console.log('longdo ERR', e.message), []));
+  const bkk = cams.filter((c) => +c.latitude >= 13.48 && +c.latitude <= 13.97 && +c.longitude >= 100.32 && +c.longitude <= 100.95);
+  const by = {};
+  for (const c of bkk) { const k = (c.organization || '?') + ' | ' + (/^https:/.test(c.hls_url || '') && !/tempsus/.test(c.hls_url) ? 'hls' : 'no-hls') + ' | ' + (c.imgurl ? 'img' : 'no-img'); by[k] = (by[k] || 0) + 1; }
+  console.log('\n### Longdo cameras total', cams.length, 'in BKK', bkk.length); console.log(by);
+  const img = bkk.find((c) => c.imgurl && !(/^https:/.test(c.hls_url || '')));
+  if (img) { console.log('sample no-hls cam', JSON.stringify(img).slice(0, 500)); const r = await fetch(img.imgurl).catch(() => null); console.log('img fetch', r && r.status, r && r.headers.get('content-type'), r && r.headers.get('access-control-allow-origin')); }
+}
+for (const ep of ['cctv', 'cctv_load', 'camera', 'bma_cctv', 'flood_cctv', 'rain_1h', 'rain_3d', 'rain_today', 'waterlevel_graph', 'pump', 'floodgate', 'flood_gate', 'watergate', 'sea_level', 'tide', 'storm_load', 'warning', 'drain']) await probe('TW ' + ep, TW + ep, TWH);
+await probe('BMA traffic cams', 'http://www.bmatraffic.com/index.aspx');
+await probe('iTIC cams', 'https://www.iticfoundation.org/api/camera');
+process.exit(0);
 const fr = await probe('ThaiWater flood_road', TW + 'flood_road', TWH);
 await probe('ThaiWater canal_waterlevel', TW + 'canal_waterlevel', TWH);
 const rows = fr && (Array.isArray(fr.data) ? fr.data : fr.data && fr.data.data) || [];
