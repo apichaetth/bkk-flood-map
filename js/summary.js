@@ -41,6 +41,8 @@
   // ---------- เรดาร์ฝน (RainViewer) + กล้อง CCTV สาธารณะ ----------
   lyr.radar = L.layerGroup().addTo(map);
   lyr.cam = L.layerGroup().addTo(map);
+  lyr.trend = L.layerGroup().addTo(map);
+  $('showTrend').onchange = (e) => (e.target.checked ? map.addLayer(lyr.trend) : map.removeLayer(lyr.trend));
   $('showRadar').onchange = (e) => (e.target.checked ? map.addLayer(lyr.radar) : map.removeLayer(lyr.radar));
   $('showCam').onchange = (e) => (e.target.checked ? map.addLayer(lyr.cam) : map.removeLayer(lyr.cam));
   async function loadRadar() {
@@ -500,7 +502,10 @@
   async function renderTrends() {
     const d = await F.getJSON('data/trends.json', 20000, { cache: 'no-cache' }).catch(() => null);
     const card = $('trendCard');
-    if (!d || Date.now() - new Date(d.updated) > 90 * 6e4) { card.hidden = true; return; }
+    const ok = d && Date.now() - new Date(d.updated) <= 90 * 6e4;
+    const nz = await F.trendZones(lyr.trend, ok ? d : null, true);
+    $('trendLg').hidden = !nz;
+    if (!ok) { card.hidden = true; return; }
     card.hidden = false;
     const sign = (v, dp) => (v > 0 ? '+' : '') + fmt(v, dp);
     const items = [...d.road.map((x) => ({ ...x, kind: 'road' })), ...d.canal.map((x) => ({ ...x, kind: 'canal' }))];

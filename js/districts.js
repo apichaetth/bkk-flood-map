@@ -20,16 +20,19 @@
   F.addLocate(map);
   const layer = L.layerGroup().addTo(map);
   let geo = null, fitted = false, byName = new Map(), shapes = new Map();
+  let trend = new Map(); // แนวโน้มน้ำรายเขต จาก data/trends.json
 
   $('dLegend').innerHTML = STEPS.slice().reverse().map((s) => `<span><i style="background:${s.color}"></i>${s.label}</span>`).join('') + '<span><i class="none"></i>ไม่มีรายงาน</span>';
+  const trendBadge = (name) => { const c = trend.get(name); return c ? `<b style="color:${F.TREND_Z[c.z][0]}">${F.TREND_Z[c.z][1]} ${F.TREND_Z[c.z][2]}</b>` : ''; };
 
   function popupOf(name) {
     const d = byName.get(name);
-    if (!d) return `<div class="pp"><h3>เขต${esc(name)}</h3><div class="m">ยังไม่มีรายงานน้ำท่วมหรือพื้นที่เสี่ยง</div></div>`;
+    const tc = trend.get(name), tl = tc ? `<div style="margin-top:4px">${trendBadge(name)} <span class="m">(${F.trendText(tc)} · เทียบ 30 นาทีก่อน)</span></div>` : '';
+    if (!d) return `<div class="pp"><h3>เขต${esc(name)}</h3><div class="m">ยังไม่มีรายงานน้ำท่วมหรือพื้นที่เสี่ยง</div>${tl}</div>`;
     const st = stepOf(d.score);
     const list = d.clusters.filter((c) => c.tier >= 2).sort((a, b) => b.tier - a.tier || (b.cm || 0) - (a.cm || 0)).slice(0, 8);
     return `<div class="pp"><span class="badge" style="--c:${st.color}">${st.label}</span><h3>เขต${esc(name)}</h3>
-      <div class="m">ยืนยัน ${d[3]} · มีรายงาน ${d[2]}${d.news ? ` · ข่าว ${d.news}` : ''} · เสี่ยง ${d[1]}</div>
+      <div class="m">ยืนยัน ${d[3]} · มีรายงาน ${d[2]}${d.news ? ` · ข่าว ${d.news}` : ''} · เสี่ยง ${d[1]}</div>${tl}
       ${list.length ? `<ul class="plist">${list.map((c) => `<li><a href="${mapLink(c)}">${esc(c.name)}</a>${c.cm ? ` · ${Math.round(c.cm)} ซม.` : ''}${c.t ? ` <span class="m">${ago(c.t)}</span>` : ''}</li>`).join('')}</ul>` : ''}
       ${d.clusters.length > list.length ? `<div class="m">และอื่น ๆ อีก ${d.clusters.length - list.length} จุด (รวมพื้นที่เสี่ยง)</div>` : ''}</div>`;
   }
@@ -51,6 +54,14 @@
         l.on('mouseout', () => l.setStyle({ weight: 1.2, color: '#fff' }));
       },
     }).addTo(layer);
+    // ลูกศรแนวโน้มกลางเขต: ⬆ น้ำกำลังเพิ่ม · ⏸ ใกล้จุดสูงสุด · ⬇ กำลังลด
+    for (const [n, c] of trend) {
+      const l = shapes.get(n); if (!l) continue;
+      L.marker(l.getBounds().getCenter(), { icon: L.divIcon({ className: '', iconSize: [26, 26], iconAnchor: [13, 13],
+        html: `<div class="trz" style="--c:${F.TREND_Z[c.z][0]}">${F.TREND_Z[c.z][1].slice(0, 1)}</div>` }), zIndexOffset: c.z === 'down' ? 0 : 400 })
+        .bindTooltip(`เขต${esc(n)} · ${F.TREND_Z[c.z][2]}`).bindPopup(() => popupOf(n), { maxWidth: 320 }).addTo(layer);
+    }
+    $('dTrendLg').hidden = !trend.size;
     if (!fitted) { map.fitBounds(L.geoJSON(geo).getBounds(), { padding: [6, 6] }); fitted = true; }
     const ranked = [...byName.values()].sort((a, b) => b.score - a.score);
     const max = Math.max(1, ...ranked.map((d) => d.score));
@@ -59,7 +70,7 @@
       const st = stepOf(d.score);
       return `<li><button type="button" data-n="${esc(d.name)}"><span class="dn">เขต${esc(d.name)}</span>
         <span class="dbar"><i style="width:${Math.max(4, (d.score / max) * 100)}%;background:${st.color}"></i></span>
-        <span class="dv">${st.label}<small>${[d[3] ? `ยืนยัน ${d[3]}` : '', d[2] ? `รายงาน ${d[2]}` : '', d.news ? `ข่าว ${d.news}` : '', d[1] ? `เสี่ยง ${d[1]}` : ''].filter(Boolean).join(' · ')}</small></span></button></li>`;
+        <span class="dv">${st.label}${trend.get(d.name) ? ' ' + F.TREND_Z[trend.get(d.name).z][1] : ''}<small>${[d[3] ? `ยืนยัน ${d[3]}` : '', d[2] ? `รายงาน ${d[2]}` : '', d.news ? `ข่าว ${d.news}` : '', d[1] ? `เสี่ยง ${d[1]}` : ''].filter(Boolean).join(' · ')}</small></span></button></li>`;
     }).join('') : '<li class="muted">ยังไม่มีเขตที่มีรายงานน้ำท่วมหรือพื้นที่เสี่ยง</li>';
     $('dRank').querySelectorAll('button').forEach((b) => b.onclick = () => {
       const l = shapes.get(b.dataset.n); if (!l) return;
@@ -74,6 +85,8 @@
     const my = ++gen; last = Date.now();
     $('updated').textContent = 'กำลังโหลด…';
     geo = geo || await F.loadDistricts().catch(() => null);
+    const td = await F.getJSON('data/trends.json', 20000, { cache: 'no-cache' }).catch(() => null);
+    trend = td && Date.now() - new Date(td.updated) <= 90 * 6e4 ? F.trendByDistrict(td, geo) : new Map();
     const D = {}; let left = FEEDS.length, timer = null;
     const render = () => {
       if (my !== gen) return;
