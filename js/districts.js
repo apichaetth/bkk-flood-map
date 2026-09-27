@@ -23,7 +23,7 @@
   let trend = new Map(); // แนวโน้มน้ำรายเขต จาก data/trends.json
 
   $('dLegend').innerHTML = STEPS.slice().reverse().map((s) => `<span><i style="background:${s.color}"></i>${s.label}</span>`).join('') + '<span><i class="none"></i>ไม่มีรายงาน</span>';
-  const trendBadge = (name) => { const c = trend.get(name); return c ? `<b style="color:${F.TREND_Z[c.z][0]}">${F.TREND_Z[c.z][1]} ${F.TREND_Z[c.z][2]}</b>` : ''; };
+  const trendBadge = (name) => { const c = trend.get(name); return c ? `<b>${F.TREND_Z[c.z][0]} ${F.TREND_Z[c.z][1]}</b>` : ''; };
 
   function popupOf(name) {
     const d = byName.get(name);
@@ -57,9 +57,9 @@
     // ลูกศรแนวโน้มกลางเขต: ⬆ น้ำกำลังเพิ่ม · ⏸ ใกล้จุดสูงสุด · ⬇ กำลังลด
     for (const [n, c] of trend) {
       const l = shapes.get(n); if (!l) continue;
-      L.marker(l.getBounds().getCenter(), { icon: L.divIcon({ className: '', iconSize: [26, 26], iconAnchor: [13, 13],
-        html: `<div class="trz" style="--c:${F.TREND_Z[c.z][0]}">${F.TREND_Z[c.z][1].slice(0, 1)}</div>` }), zIndexOffset: c.z === 'down' ? 0 : 400 })
-        .bindTooltip(`เขต${esc(n)} · ${F.TREND_Z[c.z][2]}`).bindPopup(() => popupOf(n), { maxWidth: 320 }).addTo(layer);
+      L.marker(l.getBounds().getCenter(), { icon: L.divIcon({ className: '', iconSize: [34, 24], iconAnchor: [17, 12],
+        html: `<div class="trz neutral${F.TREND_Z[c.z][0].length > 1 ? ' two' : ''}">${F.TREND_Z[c.z][0]}</div>` }), zIndexOffset: c.z === 'fast' ? 400 : 0 })
+        .bindTooltip(`เขต${esc(n)} · น้ำ${F.TREND_Z[c.z][1]}`).bindPopup(() => popupOf(n), { maxWidth: 320 }).addTo(layer);
     }
     $('dTrendLg').hidden = !trend.size;
     if (!fitted) { map.fitBounds(L.geoJSON(geo).getBounds(), { padding: [6, 6] }); fitted = true; }
@@ -70,7 +70,7 @@
       const st = stepOf(d.score);
       return `<li><button type="button" data-n="${esc(d.name)}"><span class="dn">เขต${esc(d.name)}</span>
         <span class="dbar"><i style="width:${Math.max(4, (d.score / max) * 100)}%;background:${st.color}"></i></span>
-        <span class="dv">${st.label}${trend.get(d.name) ? ' ' + F.TREND_Z[trend.get(d.name).z][1] : ''}<small>${[d[3] ? `ยืนยัน ${d[3]}` : '', d[2] ? `รายงาน ${d[2]}` : '', d.news ? `ข่าว ${d.news}` : '', d[1] ? `เสี่ยง ${d[1]}` : ''].filter(Boolean).join(' · ')}</small></span></button></li>`;
+        <span class="dv">${st.label}${trend.get(d.name) ? ' ' + F.TREND_Z[trend.get(d.name).z][0] : ''}<small>${[d[3] ? `ยืนยัน ${d[3]}` : '', d[2] ? `รายงาน ${d[2]}` : '', d.news ? `ข่าว ${d.news}` : '', d[1] ? `เสี่ยง ${d[1]}` : ''].filter(Boolean).join(' · ')}</small></span></button></li>`;
     }).join('') : '<li class="muted">ยังไม่มีเขตที่มีรายงานน้ำท่วมหรือพื้นที่เสี่ยง</li>';
     $('dRank').querySelectorAll('button').forEach((b) => b.onclick = () => {
       const l = shapes.get(b.dataset.n); if (!l) return;

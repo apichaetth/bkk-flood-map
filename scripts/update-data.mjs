@@ -684,14 +684,14 @@ async function updateRisk(meta) {
     const tr = r.src === 'bma' && trends.road.get(r.c);
     if (!tr) continue;
     if (tr.tr === 'fast' || tr.tr === 'up') r.lv = Math.min(3, r.lv + 1);
-    else if (tr.tr === 'down') r.lv = Math.max(1, r.lv - 1);
+    else if (tr.tr === 'down' || tr.tr === 'dfast') r.lv = Math.max(1, r.lv - 1);
   }
   for (const [c, tr] of trends.road) {
     if (tr.tr === 'fast' && tr.v >= 2 && tr.v < 5 && !seenFlooded(c)) reports.push({ c, la: tr.la, lo: tr.lo, t: tr.t, src: 'bma', lv: 1 });
   }
   for (const w of wl) {
     const tr = w.c && trends.canal.get(w.c);
-    if (tr && tr.tr === 'down' && w.W != null) w.W /= 2;
+    if (tr && (tr.tr === 'down' || tr.tr === 'dfast') && w.W != null) w.W /= 2;
   }
   // คลองยังไม่ถึงเกณฑ์ แต่กำลังเพิ่มและคาดว่าถึงวิกฤตภายใน 2 ชม. ถือเป็นระดับเตือนภัย
   for (const [c, tr] of trends.canal) {
@@ -763,6 +763,7 @@ function updateTrends(state, roadNow, canalNow, rain, fc) {
     let t = 'flat';
     if (d30 >= u.fast) t = 'fast';
     else if (d30 >= u.up) t = d60 != null && d60 >= u.fast && d30 < d60 / 3 && easing ? 'peak' : 'up';
+    else if (d30 <= -u.fast) t = 'dfast';
     else if (d30 <= -u.up) t = 'down';
     else if (d60 != null && d60 >= u.fast && easing) t = 'peak';
     return { d30: +d30.toFixed(u.dp), d60: d60 == null ? null : +d60.toFixed(u.dp), tr: t, rainNow, rainNext };
@@ -786,7 +787,7 @@ function updateTrends(state, roadNow, canalNow, rain, fc) {
     const o = { c, n: x.n, d: x.d, la: x.la, lo: x.lo, v: x.v, t: x.t, warn: x.warn, crit: x.crit, st: x.st, ...k, eta: eta != null && eta <= 6 ? eta : null, s: a.slice(-12) };
     canal.set(c, o); out.canal.push(o);
   }
-  const cnt = (arr) => Object.fromEntries(['fast', 'up', 'peak', 'flat', 'down'].map((k) => [k, arr.filter((x) => x.tr === k).length]));
+  const cnt = (arr) => Object.fromEntries(['fast', 'up', 'peak', 'flat', 'down', 'dfast'].map((k) => [k, arr.filter((x) => x.tr === k).length]));
   meta.sources.trends = { road: cnt(out.road), canal: cnt(out.canal) };
   return { out, road, canal };
 }

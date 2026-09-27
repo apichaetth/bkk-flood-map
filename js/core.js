@@ -437,10 +437,15 @@ window.Flood = (function () {
     return '';
   }
 
-  // โซนแนวโน้มน้ำบนแผนที่ (จาก data/trends.json) ระบายสีทั้งเขต: แดง = มีจุดน้ำเพิ่มเร็ว, ส้ม = น้ำกำลังเพิ่ม,
-  // เหลือง = ใกล้จุดสูงสุด, เขียว = กำลังลด · arrows=true: ใส่ลูกศรรายจุดกดดูได้ (หน้าแรกที่ไม่มีหมุดเซ็นเซอร์)
-  const TREND_Z = { fast: ['#c62828', '⬆⬆', 'น้ำเพิ่มเร็ว'], up: ['#ef6c00', '⬆', 'น้ำกำลังเพิ่ม'], peak: ['#f9a825', '⏸', 'ใกล้จุดสูงสุด'], down: ['#2e7d32', '⬇', 'น้ำกำลังลด'] };
-  // รวมแนวโน้มรายเขต: Map ชื่อเขต → { fast, up, peak, down, z (แนวโน้มหลักของเขต) }
+  // แนวโน้มน้ำ (data/trends.json เทียบ 30 นาทีก่อน): สี = สถานการณ์ตอนนี้ · ลูกศร = ทิศทาง (สองอัน = เร็ว/มาก)
+  const TREND_Z = { fast: ['⬆⬆', 'เพิ่มขึ้นมาก'], up: ['⬆', 'เพิ่มขึ้น'], peak: ['⏸', 'ใกล้จุดสูงสุด'], down: ['⬇', 'ลดลง'], dfast: ['⬇⬇', 'ลดลงมาก'], flat: ['➖', 'ทรงตัว'] };
+  const TREND_KEYS = ['fast', 'up', 'peak', 'down', 'dfast', 'flat'];
+  // ระดับสถานการณ์ตอนนี้ของจุดแนวโน้ม: ถนนตามความสูงน้ำ (ซม.) · คลองตามเกณฑ์ กทม. (เตือนภัย/วิกฤต)
+  const trendLv = (x) => (x.k === 'canal' || x.crit !== undefined ? (x.st >= 2 ? 3 : x.st === 1 ? 2 : 0) : sensorLevel(x.v));
+  // ป้ายลูกศรบนแผนที่ (divIcon) สีพื้นตามระดับ
+  const trendIcon = (tr, lv) => L.divIcon({ className: '', iconSize: [34, 24], iconAnchor: [17, 12],
+    html: `<div class="trz${LEVEL[lv].dark ? ' dark' : ''}${TREND_Z[tr][0].length > 1 ? ' two' : ''}" style="--c:${LEVEL[lv].color}">${TREND_Z[tr][0]}</div>` });
+  // รวมแนวโน้มรายเขต: Map ชื่อเขต → { fast, up, peak, down, dfast, z (แนวโน้มหลักของเขต) }
   function trendByDistrict(d, geo) {
     const by = new Map();
     if (!d) return by;
@@ -448,40 +453,28 @@ window.Flood = (function () {
       if (!TREND_Z[x.tr] || !x.la || !x.lo) continue;
       const n = (geo && districtAt(geo, x.la, x.lo)) || x.d;
       if (!n) continue;
-      const c = by.get(n) || { fast: 0, up: 0, peak: 0, down: 0 };
+      const c = by.get(n) || { fast: 0, up: 0, peak: 0, down: 0, dfast: 0, flat: 0 };
       c[x.tr]++; by.set(n, c);
     }
-    for (const c of by.values()) c.z = c.fast ? 'fast' : c.up && c.up >= c.down ? 'up' : c.peak && c.peak >= c.down ? 'peak' : c.down ? 'down' : c.up ? 'up' : 'peak';
+    for (const c of by.values()) {
+      const net = 2 * c.fast + c.up - c.down - 2 * c.dfast;
+      c.z = net > 0 ? (c.fast && net >= 2 ? 'fast' : 'up') : net < 0 ? (c.dfast && net <= -2 ? 'dfast' : 'down') : c.peak ? 'peak' : c.fast + c.up ? 'up' : c.down + c.dfast ? 'down' : 'flat';
+    }
     return by;
   }
-  const trendText = (c) => [['fast', 'เพิ่มเร็ว'], ['up', 'กำลังเพิ่ม'], ['peak', 'ใกล้จุดสูงสุด'], ['down', 'กำลังลด']].filter(([k]) => c[k]).map(([k, t]) => `${t} ${c[k]} จุด`).join(' · ');
-  async function trendZones(layer, d, arrows) {
+  const trendText = (c) => TREND_KEYS.filter((k) => c[k]).map((k) => `${TREND_Z[k][1]} ${c[k]} จุด`).join(' · ');
+  // ลูกศรรายจุด (หน้าแรก): สีตามสถานการณ์ตอนนี้ กดดูรายละเอียดได้
+  function trendZones(layer, d) {
     layer.clearLayers();
     if (!d || !window.L) return 0;
     const items = [...(d.road || []).map((x) => ({ ...x, k: 'road' })), ...(d.canal || []).map((x) => ({ ...x, k: 'canal' }))]
-      .filter((x) => TREND_Z[x.tr] && x.la && x.lo);
-    if (!items.length) return 0;
-    const geo = await loadDistricts().catch(() => null);
-    if (geo) {
-      const by = trendByDistrict(d, geo), zone = (c) => c.z;
-      L.geoJSON(geo, {
-        filter: (f) => by.has(f.properties.name),
-        style: (f) => { const z = zone(by.get(f.properties.name)); return { color: TREND_Z[z][0], weight: 1.5, opacity: 0.7, fillColor: TREND_Z[z][0], fillOpacity: z === 'down' ? 0.16 : 0.24 }; },
-        interactive: !!arrows,
-        onEachFeature: (f, l) => {
-          if (!arrows) return;
-          const c = by.get(f.properties.name), z = zone(c);
-          l.bindPopup(`<div class="pp"><div class="m">แนวโน้มน้ำ 30 นาทีล่าสุด</div><h3>เขต${esc(f.properties.name)}</h3><b>${TREND_Z[z][1]} ${TREND_Z[z][2]}</b>`
-            + `<div class="m">${trendText(c)}</div></div>`);
-        },
-      }).addTo(layer);
-    }
-    if (arrows) for (const x of items) {
-      const [c, ar, lb] = TREND_Z[x.tr], road = x.k === 'road', dp = road ? 0 : 2, unit = road ? ' ซม.' : ' ม.';
-      L.marker([x.la, x.lo], { icon: L.divIcon({ className: '', iconSize: [26, 26], iconAnchor: [13, 13],
-        html: `<div class="trz" style="--c:${c}">${ar.slice(0, 1)}</div>` }), zIndexOffset: x.tr === 'down' ? 0 : 400 })
+      .filter((x) => TREND_Z[x.tr] && x.tr !== 'flat' && x.la && x.lo); // ทรงตัวไม่ต้องปักลูกศร (แผนที่จะรกเกิน)
+    for (const x of items) {
+      const lv = trendLv(x), road = x.k === 'road', dp = road ? 0 : 2, unit = road ? ' ซม.' : ' ม.';
+      L.marker([x.la, x.lo], { icon: trendIcon(x.tr, lv), zIndexOffset: 100 * lv + (x.tr === 'fast' ? 50 : 0) })
         .bindPopup(`<div class="pp"><div class="m">แนวโน้มน้ำ · ${road ? 'เซ็นเซอร์ถนน' : 'คลอง'} กทม.</div><h3>${esc(x.n || '')}</h3>`
-          + `<b>${ar} ${lb}</b><div class="m">ตอนนี้ ${(+x.v).toFixed(dp)}${unit} (${x.d30 > 0 ? '+' : ''}${(+x.d30).toFixed(dp)}${unit} ใน 30 นาที)`
+          + `${road ? badge(lv) : badge(lv, x.st >= 2 ? 'วิกฤต' : x.st === 1 ? 'เตือนภัย' : 'ปกติ')} <b>${TREND_Z[x.tr][0]} ${TREND_Z[x.tr][1]}</b>`
+          + `<div class="m">ตอนนี้ ${(+x.v).toFixed(dp)}${unit} (${x.d30 > 0 ? '+' : ''}${(+x.d30).toFixed(dp)}${unit} ใน 30 นาที)`
           + `${x.eta != null ? ` · ถึงวิกฤตใน ~${x.eta} ชม.` : ''}${x.d ? '<br>เขต' + esc(x.d) : ''}</div></div>`).addTo(layer);
     }
     return items.length;
@@ -492,7 +485,7 @@ window.Flood = (function () {
     $, esc, num, inBkk, nearBkk, th, fmtTime, fmtDT, ago, bkkDate, isoDate, distKm, getJSON, cssVar, store,
     LEVEL, badge, sensorLevel, wlLevel, rainStep, SEV_LV, levelFromText,
     fetchSensors, fetchBmaRelay, fetchEvents, fetchTraffy, traffyRaw, fetchCams, fetchRadar, isFloodTicket, fetchWebReports, fetchTw, fetchTmdFcst, twBkkHeavy, reportEndpoint, deviceId, WEB_LEVEL, fetchRain, fetchWl, fetchNews, fetchTmd, errMsg,
-    loadDistricts, districtAt, addLocate, trendZones, trendByDistrict, trendText, TREND_Z,
+    loadDistricts, districtAt, addLocate, trendZones, trendByDistrict, trendText, trendIcon, TREND_Z, TREND_KEYS,
   };
 })();
 

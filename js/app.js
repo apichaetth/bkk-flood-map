@@ -35,7 +35,6 @@
   const layers = {
     districts: L.layerGroup().addTo(map),
     radar: L.layerGroup().addTo(map),
-    trend: L.layerGroup().addTo(map),
     rain: L.layerGroup().addTo(map),
     wl: L.layerGroup().addTo(map),
     canal: L.layerGroup().addTo(map),
@@ -49,7 +48,6 @@
   };
   L.control.layers(null, {
     'เซ็นเซอร์น้ำท่วมถนน กทม.': layers.sensor,
-    'โซนน้ำกำลังเพิ่ม/ลด': layers.trend,
     'รายงานน้ำท่วม (หน่วยงาน/iTIC)': layers.event,
     'ประชาชนแจ้งผ่านเว็บนี้': layers.web,
     'ประชาชนแจ้ง (Traffy 24 ชม.)': layers.traffy,
@@ -64,13 +62,14 @@
   }, { collapsed: true, position: 'topright' }).addTo(map);
 
   // พื้นที่กดอย่างน้อย 22 px รอบจุด (จุดเล็กก็ยังกดง่ายบนมือถือ) โดยขนาดที่มองเห็นเท่าเดิม
-  const icon = (cls, color, text = '', size = 18, extra = '') => {
+  // tr: ป้ายลูกศรแนวโน้มมุมขวาบนของหมุด (⬆⬆ เพิ่มมาก … ⬇⬇ ลดมาก)
+  const icon = (cls, color, text = '', size = 18, extra = '', tr = '') => {
     size = Math.max(5, Math.round(size * Flood.MS));
     if (size < 14) text = ''; // เล็กเกินอ่านตัวเลข ดูได้ในป๊อปอัป
     const hit = Math.max(size, 22);
     return L.divIcon({
       className: '', iconSize: [hit, hit], iconAnchor: [hit / 2, hit / 2], popupAnchor: [0, -size / 2],
-      html: `<div class="mkhit" style="width:${hit}px;height:${hit}px"><div class="mk ${cls} ${extra}" style="--c:${color};width:${size}px;height:${size}px">${text}</div></div>`,
+      html: `<div class="mkhit" style="width:${hit}px;height:${hit}px"><div class="mk ${cls} ${extra}" style="--c:${color};width:${size}px;height:${size}px">${text}</div>${tr ? `<span class="mk-tr${tr.length > 1 ? ' two' : ''}">${tr}</span>` : ''}</div>`,
     });
   };
 
@@ -121,7 +120,7 @@
     drawSensors();
   }
   // แนวโน้มน้ำจาก data/trends.json (เซ็นเซอร์ถนน/คลอง) ใช้ในป๊อปอัปและลูกศรบนหมุด
-  const TRL = { fast: ['⬆⬆', 'เพิ่มเร็ว'], up: ['⬆', 'กำลังเพิ่ม'], peak: ['⏸', 'ใกล้จุดสูงสุด'], flat: ['➖', 'ทรงตัว'], down: ['⬇', 'กำลังลด'] };
+  const TRL = { fast: ['⬆⬆', 'เพิ่มขึ้นมาก'], up: ['⬆', 'เพิ่มขึ้น'], peak: ['⏸', 'ใกล้จุดสูงสุด'], flat: ['➖', 'ทรงตัว'], down: ['⬇', 'ลดลง'], dfast: ['⬇⬇', 'ลดลงมาก'] };
   async function loadTrends() {
     const d = await Flood.getJSON('data/trends.json', 20000, { cache: 'no-cache' }).catch(() => null);
     S.trend = d && Date.now() - new Date(d.updated) < 90 * 6e4 ? { road: new Map(d.road.map((x) => [x.c, x])), canal: new Map(d.canal.map((x) => [x.c, x])) } : null;
@@ -132,7 +131,6 @@
         if (tr && tr.t > (x.t ? +x.t : 0)) { x.cm = tr.v; x.t = new Date(tr.t); x.stale = false; x.lv = Flood.sensorLevel(tr.v); }
       }
     }
-    Flood.trendZones(layers.trend, S.trend ? d : null);
     drawSensors(); drawRelay(); listTrends(d);
   }
   // รายการแนวโน้มในแผง: กดแล้วไปที่หมุด
@@ -146,14 +144,14 @@
       return { ...x, kind, la: x.la ?? (src && src.la), lo: x.lo ?? (src && src.lo), get marker() { return src && src.marker; } };
     };
     const all = [...d.road.map((x) => mk(x, 'road')), ...d.canal.map((x) => mk(x, 'canal'))].filter((x) => x.la && x.lo && x.tr !== 'flat');
-    const ORD = { fast: 0, up: 1, peak: 2, down: 3 };
+    const ORD = { fast: 0, up: 1, peak: 2, down: 3, dfast: 4 };
     all.sort((a, b) => ORD[a.tr] - ORD[b.tr] || (b.eta != null) - (a.eta != null) || (b.kind === 'road') - (a.kind === 'road') || Math.abs(b.d30) - Math.abs(a.d30));
     const n = (k) => all.filter((x) => k.includes(x.tr)).length;
-    $('trendSum').textContent = all.length ? `⬆ กำลังเพิ่ม ${n(['fast', 'up'])} · ⏸ ใกล้จุดสูงสุด ${n(['peak'])} · ⬇ กำลังลด ${n(['down'])} จุด (เทียบ 30 นาทีก่อน)` : '';
-    const COL = { fast: 'var(--critical)', up: 'var(--serious)', peak: 'var(--warning)', down: 'var(--good)' };
+    $('trendSum').textContent = all.length ? `⬆⬆ ${n(['fast'])} · ⬆ ${n(['up'])} · ⏸ ${n(['peak'])} · ⬇ ${n(['down'])} · ⬇⬇ ${n(['dfast'])} จุด (เทียบ 30 นาทีก่อน)` : '';
+    const lvOf = (x) => (x.kind === 'road' ? Flood.sensorLevel(x.v) : x.st >= 2 ? 3 : x.st === 1 ? 2 : 0);
     listInto('listTrend', all.slice(0, 12), (x) => {
       const road = x.kind === 'road', dp = road ? 0 : 2, unit = road ? ' ซม.' : ' ม.';
-      return { dot: COL[x.tr], title: `${TRL[x.tr][0]} ${x.n}`, go: x,
+      return { dot: LEVEL[lvOf(x)].color, title: `${TRL[x.tr][0]} ${x.n}`, go: x,
         sub: `${road ? 'ถนน' : 'คลอง'} · เขต${x.d || '–'} · ${TRL[x.tr][1]}${x.eta != null ? ` · ถึงวิกฤตใน ~${x.eta} ชม.` : ''}`,
         right: `${(+x.v).toFixed(dp)}${unit} (${x.d30 > 0 ? '+' : ''}${(+x.d30).toFixed(dp)})` };
     }, 'น้ำทรงตัวทุกจุด ไม่มีจุดที่กำลังเพิ่มหรือลด');
@@ -170,9 +168,9 @@
     for (const x of S.sensor) {
       const tr = S.trend && S.trend.road.get(x.s.code);
       const flooded = x.lv > 0;
-      const arrow = tr && tr.tr !== 'flat' ? TRL[tr.tr][0].slice(0, 1) : '';
-      // ไม่ท่วมแต่น้ำกำลังเปลี่ยน: แสดงหมุดขนาดกลางมีลูกศร ให้เห็นแนวโน้มบนแผนที่
-      const size = flooded ? 18 : arrow ? 16 : 8;
+      const arrow = tr && TRL[tr.tr] && tr.tr !== 'flat' ? TRL[tr.tr][0] : '';
+      // สีหมุด = สถานการณ์ตอนนี้ · ป้ายลูกศร = แนวโน้ม (หมุดที่ไม่ท่วมแต่น้ำกำลังเปลี่ยนก็แสดง)
+      const size = flooded ? 18 : arrow ? 11 : 8;
       const html = `<div class="pp"><div class="m">เซ็นเซอร์น้ำท่วมถนน กทม. · ${esc(x.s.code)}</div>
         <h3>${esc(x.s.name || x.s.road || '')}</h3>
         ${x.stale ? '<span class="badge" style="--c:var(--stale)">ไม่มีค่าล่าสุด</span>' : badge(x.lv)}
@@ -180,7 +178,7 @@
         <div class="m">${esc(x.s.road || '')} ${x.s.district ? '· ' + esc(x.s.district) : ''}<br>
         อ่านค่า ${x.t ? fmtDT(x.t) + ' (' + ago(x.t) + ')' : '–'}</div>${trendHtml(tr, ' ซม.', 0)}</div>`;
       x.marker = L.marker([x.la, x.lo], {
-        icon: icon('sensor', LEVEL[x.lv].color, flooded ? Math.round(x.cm) + arrow : arrow, size, (LEVEL[x.lv].dark ? 'dark' : '') + (x.stale ? ' stale' : '')),
+        icon: icon('sensor', LEVEL[x.lv].color, flooded ? Math.round(x.cm) : '', size, (LEVEL[x.lv].dark ? 'dark' : '') + (x.stale ? ' stale' : ''), x.stale ? '' : arrow),
         zIndexOffset: flooded ? 1000 + x.cm : arrow ? 500 : 0, opacity: flooded || arrow ? 1 : 0.75,
       }).bindPopup(html).addTo(layers.sensor);
     }
@@ -420,9 +418,9 @@
         <span class="badge" style="--c:${color}">${label}</span>
         ${c.wl != null && lv >= 0 ? `<div style="margin-top:4px"><span class="big">${c.wl.toFixed(2)}</span> ม.</div>` : ''}
         <div class="m">${c.warn != null ? `เกณฑ์เตือนภัย ${c.warn} · วิกฤต ${c.crit} · ` : ''}${c.river ? esc(c.river) + ' · ' : ''}เขต${esc(c.d)}${c.t ? `<br>${fmtDT(new Date(c.t))} (${ago(new Date(c.t))})` : ''}</div>${trendHtml(S.trend && S.trend.canal.get(c.c), ' ม.', 2)}</div>`;
-      const ctr = S.trend && S.trend.canal.get(c.c), arrow = ctr && ctr.tr !== 'flat' && lv >= 0 ? TRL[ctr.tr][0].slice(0, 1) : '';
-      const size = arrow ? 16 : c.st >= 1 ? 13 : 7;
-      c.marker = L.marker([c.la, c.lo], { icon: icon('wl', color, arrow, size, (lv < 0 ? 'stale' : '') + (lv >= 0 && LEVEL[lv].dark ? ' dark' : '')), zIndexOffset: c.st * 100 + (arrow ? 50 : 0) }).bindPopup(html).addTo(layers.canal);
+      const ctr = S.trend && S.trend.canal.get(c.c), arrow = ctr && TRL[ctr.tr] && ctr.tr !== 'flat' && lv >= 0 ? TRL[ctr.tr][0] : '';
+      const size = c.st >= 1 ? 13 : arrow ? 10 : 7;
+      c.marker = L.marker([c.la, c.lo], { icon: icon('wl', color, '', size, lv < 0 ? 'stale' : '', arrow), zIndexOffset: c.st * 100 + (arrow ? 50 : 0) }).bindPopup(html).addTo(layers.canal);
     }
     const hot = (b.canal || []).filter((c) => c.st >= 1).sort((x, y) => y.st - x.st || (y.wl - y.crit) - (x.wl - x.crit));
     listInto('listCanal', hot.slice(0, 8), (c) => ({ dot: LEVEL[CANAL[c.st][1]].color, title: c.n, sub: `${CANAL[c.st][0]} · เขต${c.d}${c.t ? ' · ' + fmtTime(new Date(c.t)) : ''}`, right: c.wl != null ? c.wl.toFixed(2) + ' ม.' : '', go: c }),

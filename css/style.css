@@ -559,7 +559,11 @@ label.lg-toggle, .rk-filter label, .rt-opts label { display: inline-flex; align-
 .rt-sug { border: 1px solid var(--line); border-radius: 8px; max-height: 220px; overflow: auto; }
 .rt-sug button { display: block; width: 100%; text-align: left; padding: 10px; border: 0; border-bottom: 1px solid var(--line); background: none; color: inherit; font: inherit; font-size: 14px; cursor: pointer; }
 
-/* โซนแนวโน้มน้ำ: ลูกศรบนแผนที่หน้าแรก + ตัวอย่างสีในคำอธิบาย */
-.trz { width: 26px; height: 26px; border-radius: 50%; background: var(--c); color: #fff; font: 700 15px/26px system-ui, sans-serif; text-align: center;
-  border: 2px solid #fff; box-shadow: 0 1px 4px rgba(0,0,0,.35); box-sizing: border-box; line-height: 22px; }
-.lg-tz { display: inline-block; width: 14px; height: 14px; border-radius: 50%; background: var(--c); opacity: .55; vertical-align: -2px; margin: 0 3px 0 6px; }
+/* แนวโน้มน้ำ: ป้ายลูกศร (สีพื้น = ระดับน้ำตอนนี้) */
+.trz { min-width: 24px; height: 24px; padding: 0 4px; border-radius: 12px; background: var(--c); color: #fff; font: 700 13px/20px system-ui, sans-serif; text-align: center;
+  border: 2px solid #fff; box-shadow: 0 1px 4px rgba(0,0,0,.35); box-sizing: border-box; white-space: nowrap; letter-spacing: -2px; display: inline-block; }
+.trz.dark { color: #1d2330; }
+.trz.neutral { background: #fff; color: #1d2330; border-color: #1d2330; }
+.mkhit { position: relative; }
+.mk-tr { position: absolute; top: -9px; left: 60%; min-width: 16px; height: 16px; padding: 0 2px; border-radius: 8px; background: #1d2330; color: #fff;
+  font: 700 10px/14px system-ui, sans-serif; text-align: center; border: 1px solid #fff; white-space: nowrap; letter-spacing: -1px; pointer-events: none; box-sizing: border-box; }

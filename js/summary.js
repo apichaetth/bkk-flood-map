@@ -498,12 +498,12 @@
   }
   let tideP = null;
   // แนวโน้มน้ำ 1 ชม.: เซ็นเซอร์ถนน (ซม.) และคลอง (ม.) จาก data/trends.json + เจ้าพระยาจากตารางน้ำขึ้นน้ำลง
-  const TR = { fast: ['⬆⬆', 'เพิ่มเร็ว', 3], up: ['⬆', 'กำลังเพิ่ม', 2], peak: ['⏸', 'ใกล้จุดสูงสุด', 2], flat: ['➖', 'ทรงตัว', 1], down: ['⬇', 'กำลังลด', 0] };
+  const TR = { fast: ['⬆⬆', 'เพิ่มขึ้นมาก', 3], up: ['⬆', 'เพิ่มขึ้น', 2], peak: ['⏸', 'ใกล้จุดสูงสุด', 2], flat: ['➖', 'ทรงตัว', 1], down: ['⬇', 'ลดลง', 0], dfast: ['⬇⬇', 'ลดลงมาก', 0] };
   async function renderTrends() {
     const d = await F.getJSON('data/trends.json', 20000, { cache: 'no-cache' }).catch(() => null);
     const card = $('trendCard');
     const ok = d && Date.now() - new Date(d.updated) <= 90 * 6e4;
-    const nz = await F.trendZones(lyr.trend, ok ? d : null, true);
+    const nz = F.trendZones(lyr.trend, ok ? d : null);
     $('trendLg').hidden = !nz;
     if (!ok) { card.hidden = true; return; }
     card.hidden = false;
@@ -512,12 +512,13 @@
     const row = (x) => {
       const road = x.kind === 'road', dp = road ? 0 : 2, unit = road ? ' ซม.' : ' ม.';
       const sub = `${road ? 'ถนน' : 'คลอง'} · เขต${esc(x.d || '–')}${x.eta != null ? ` · <b>ถึงวิกฤตใน ~${fmt(x.eta, 1)} ชม.</b>` : ''}${!road && x.st === 2 ? ' · วิกฤต' : !road && x.st === 1 ? ' · เตือนภัย' : ''}`;
-      return `<div class="ol-row">${lvDot(TR[x.tr][2])}<span>${esc(x.n)}<small>${sub}</small></span><b>${fmt(x.v, dp)}${unit}<small> (${sign(x.d30, dp)})</small></b></div>`;
+      const lv = road ? F.sensorLevel(x.v) : x.st >= 2 ? 3 : x.st === 1 ? 2 : 0; // สี = สถานการณ์ตอนนี้ ลูกศร = แนวโน้ม
+      return `<div class="ol-row">${lvDot(lv)}<span>${TR[x.tr][0]} ${esc(x.n)}<small>${sub}</small></span><b>${fmt(x.v, dp)}${unit}<small> (${sign(x.d30, dp)})</small></b></div>`;
     };
     const pick = (keys, sort) => items.filter((x) => keys.includes(x.tr)).sort(sort);
     const up = pick(['fast', 'up'], (a, b) => (b.tr === 'fast') - (a.tr === 'fast') || (b.eta != null) - (a.eta != null) || (b.kind === 'road') - (a.kind === 'road') || b.d30 - a.d30);
     const peak = pick(['peak'], (a, b) => (b.kind === 'road') - (a.kind === 'road') || b.v - a.v);
-    const down = pick(['down'], (a, b) => (b.kind === 'road') - (a.kind === 'road') || b.v - a.v);
+    const down = pick(['down', 'dfast'], (a, b) => (b.kind === 'road') - (a.kind === 'road') || b.v - a.v);
     for (const [id, arr, empty] of [['trUp', up, 'ไม่มีจุดที่น้ำกำลังเพิ่ม'], ['trPeak', peak, 'ไม่มี'], ['trDown', down, 'ไม่มี']]) {
       $(id).innerHTML = arr.length ? arr.slice(0, 6).map(row).join('') + (arr.length > 6 ? `<p class="small muted">และอีก ${arr.length - 6} จุด</p>` : '') : `<p class="muted small">${empty}</p>`;
       $(id + 'N').textContent = arr.length;

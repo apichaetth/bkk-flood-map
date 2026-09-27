@@ -65,7 +65,7 @@
         <div id="listFlood" class="list"></div>
         <div id="secTrend" hidden><h2>น้ำกำลังขึ้น / ลง</h2>
           <p id="trendSum" class="muted small"></p><div id="listTrend" class="list"></div>
-          <p class="muted small">บนแผนที่: โซนสีส้ม/แดง = น้ำกำลังเพิ่ม · เขียว = กำลังลด · หมุดที่มี ⬆ = น้ำกำลังเพิ่ม · ⏸ = ใกล้จุดสูงสุด · ⬇ = กำลังลด (เซ็นเซอร์ถนนและคลอง กทม.)</p></div>
+          <p class="muted small">บนแผนที่: สีหมุด = ระดับน้ำตอนนี้ · ป้ายลูกศร = แนวโน้ม (⬆⬆ เพิ่มมาก · ⬆ เพิ่ม · ⏸ ใกล้สูงสุด · ⬇ ลด · ⬇⬇ ลดมาก) · จุดที่ไม่มีลูกศร = ทรงตัว</p></div>
         <h2>คลอง/แม่น้ำ ระดับน้ำสูง</h2>
         <div id="listWl" class="list"></div>
         <div id="secCanal" hidden><h2>คลอง กทม. ระดับเตือนภัย/วิกฤต</h2>
@@ -101,8 +101,7 @@
           <div><i class="sym news" style="--c:var(--news)"></i>ข่าวเตือนภัย / ฝนตก / น้ำลดแล้ว</div>
           <div><i class="sym yt" style="--c:var(--yt)"></i>ตำแหน่งจากคลิป YouTube (สรุปโดย AI)</div>
           <div><i class="sym cam"></i>กล้อง CCTV สาธารณะ</div>
-          <div><i class="lg-tz" style="--c:#ef6c00"></i><i class="lg-tz" style="--c:#f9a825"></i><i class="lg-tz" style="--c:#2e7d32"></i>โซนสี: ส้ม/แดง = น้ำกำลังเพิ่ม · เหลือง = ใกล้จุดสูงสุด · เขียว = กำลังลด</div>
-          <div><b style="display:inline-block;width:22px;text-align:center">⬆</b>น้ำกำลังเพิ่ม · <b>⏸</b> ใกล้จุดสูงสุด · <b>⬇</b> กำลังลด (บนหมุดเซ็นเซอร์ถนน/คลอง เทียบ 30 นาทีก่อน)</div>
+          <div><i class="sym sensor" style="--c:var(--serious)"></i><b class="mk-tr two" style="position:static">⬆⬆</b> ป้ายลูกศรบนหมุดเซ็นเซอร์ถนน/คลอง = แนวโน้มน้ำ 30 นาที: ⬆⬆ เพิ่มมาก · ⬆ เพิ่ม · ⏸ ใกล้สูงสุด · ⬇ ลด · ⬇⬇ ลดมาก (สีหมุด = ระดับน้ำตอนนี้)</div>
           <div class="scale">
             <span style="--c:var(--good)">ปกติ</span><span style="--c:var(--warning)">เล็กน้อย</span><span style="--c:var(--serious)">ท่วม</span><span style="--c:var(--critical)">ท่วมสูง</span>
           </div>
