@@ -25,8 +25,8 @@ export const PARAMS = {
   rainIdwKm: 6, fcIdwKm: 8, fcHours: 3,
   histRadiusM: 300, histExcludeH: 6, histSaturate: 10,
   wlRadiusM: 1000,
-  // ควรระวังมาก / ควรระวัง (ระดับ 0.2–0.35 เดิมทายถูกแค่ ~6% ใกล้เคียงการสุ่ม จึงเลิกแสดง)
-  tiers: [[0.6, 3], [0.35, 2]],
+  // ควรระวังมาก / ควรระวัง (ระดับ 0.2–0.35 เดิมทายถูกแค่ ~6% จึงเลิกแสดง; ขยับจาก 0.6/0.35 เป็น 0.7/0.45 หลังเพิ่มซอย+คลองแล้วติดธง ~16% ของถนน)
+  tiers: [[0.7, 3], [0.45, 2]],
   evalHorizonH: 3, evalHitM: 150, aheadLookH: 6, rawKeepH: 8, evalKeepDays: 30, roadNearM: 50,
 };
 export const ROADS_VER = 2; // เปลี่ยนเมื่อเปลี่ยนชุดถนนที่ดึง (v2 = เพิ่มซอยที่มีชื่อ)

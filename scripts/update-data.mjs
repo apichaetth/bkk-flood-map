@@ -519,11 +519,11 @@ async function updateRisk(meta) {
     }
     // ฝนจากสถานี กทม. (ถี่และใหม่กว่า) รวมกับ ThaiWater
     for (const x of b.rain || []) if (x.ok !== false && fresh(x.t, 1.5) && x.r1 != null) rain.push({ la: x.la, lo: x.lo, mm1: x.r1, mm24: x.r24 || 0 });
-    // คลองตามสถานะของ กทม.: วิกฤต/เตือนภัย ส่งผลในรัศมีแคบ (300 ม.) และไม่พอทำให้ติดระดับได้เอง ต้องมีฝนหรือรายงานประกอบ
+    // คลองตามสถานะของ กทม.: วิกฤต/เตือนภัย ส่งผลในรัศมีแคบ (300 ม.) และน้ำหนักต่ำ (วิกฤต 0.3 เตือนภัย 0.15) ไม่พอทำให้ติดระดับได้เอง ต้องมีฝนหรือรายงานประกอบ
     for (const x of b.canal || []) {
       if (fresh(x.t, 3) && x.st >= 0) seenCanal.add(x.c);
       if (x.st < 1 || !fresh(x.t, 3)) continue;
-      wl.push({ la: x.la, lo: x.lo, pct: x.st === 2 ? 100 : 90, W: x.st === 2 ? 0.6 : 0.3, r: 300, name: x.n });
+      wl.push({ la: x.la, lo: x.lo, pct: x.st === 2 ? 100 : 90, W: x.st === 2 ? 0.3 : 0.15, r: 300, name: x.n });
     }
     src.bma = (b.sensors || []).length + (b.road || []).length;
     meta.sources.bma = { ok: true, sensors: (b.sensors || []).length, road: (b.road || []).length, flooded,
@@ -568,7 +568,7 @@ async function updateRisk(meta) {
     }
     for (const x of canal) {
       if (seenCanal.has(x.c) || x.st < 1) continue;
-      wl.push({ la: x.la, lo: x.lo, pct: x.st === 2 ? 100 : 90, W: x.st === 2 ? 0.6 : 0.3, r: 300, name: x.n });
+      wl.push({ la: x.la, lo: x.lo, pct: x.st === 2 ? 100 : 90, W: x.st === 2 ? 0.3 : 0.15, r: 300, name: x.n });
     }
     // หน้าเว็บใช้ไฟล์เดียวกัน: เครื่องในไทยเปิดอยู่ใช้ของเครื่องในไทย (ละเอียดกว่า มีฝน/อุโมงค์) ไม่งั้นใช้ของ ThaiWater
     if (!relay) await writeJSON('bma-sensors.json', { updated: now.toISOString(), source: 'thaiwater', errors: {}, sensors: [], rain: [], canal, road });
