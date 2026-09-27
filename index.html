@@ -74,6 +74,18 @@
       <button type="button" class="btn" id="topMore" hidden>ดูทั้ง 10 จุด ▾</button>
     </section>
 
+    <!-- แนวโน้มน้ำ 1 ชม. จากเซ็นเซอร์ถนนและคลอง -->
+    <section class="card" id="trendCard" hidden>
+      <div class="card-h"><h2>แนวโน้มน้ำ 1 ชม.</h2><a class="more" href="map.html">ดูบนแผนที่ →</a></div>
+      <p id="trendRiver" class="small"></p>
+      <div class="tr-grid">
+        <div class="tr-col"><h3>⬆ กำลังเพิ่ม <span class="tag t3" id="trUpN">0</span></h3><div id="trUp"></div></div>
+        <div class="tr-col"><h3>⏸ ใกล้จุดสูงสุด <span class="tag t2" id="trPeakN">0</span></h3><div id="trPeak"></div></div>
+        <div class="tr-col"><h3>⬇ กำลังลด <span class="tag t0" id="trDownN">0</span></h3><div id="trDown"></div></div>
+      </div>
+      <p class="muted small" id="trendNote"></p>
+    </section>
+
     <!-- 3) ทุกจุด: แบ่งตามสภาพถนน -->
     <section class="card">
       <div class="card-h"><h2>จุดน้ำท่วมทั้งหมด</h2><span class="muted small" id="allCount"></span></div>

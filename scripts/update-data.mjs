@@ -495,6 +495,9 @@ async function updateRisk(meta) {
   const seenCode = new Set(), seenCanal = new Set(); // จุดที่ได้จากเครื่องในไทยแล้ว ไม่ใช้ซ้ำจาก ThaiWater
   let relay = null;
   const alertOnly = []; // เซ็นเซอร์จากระบบแจ้งเตือน (ลำดับความสำคัญต่ำสุด: DDS > ThaiWater > แจ้งเตือน)
+  // ค่าปัจจุบันของเซ็นเซอร์ถนน (ซม.) และคลอง (ม.) จากแหล่งที่ดีที่สุด ใช้คิดแนวโน้ม
+  const roadNow = new Map(), canalNow = new Map();
+  const state = newEvalState(await readJSON('risk-history.json', null));
   // เซ็นเซอร์น้ำท่วมถนน กทม.: เครื่องในไทย (scripts/bma-fetch.mjs) ส่งขึ้น branch bma-data ทุก 15 นาที
   // เพราะเซิร์ฟเวอร์ กทม. ปฏิเสธเครื่องนอกประเทศ (รวม GitHub Actions)
   try {
@@ -508,9 +511,10 @@ async function updateRisk(meta) {
     for (const x of b.road || []) {
       if (x.st === 'off') continue;
       seenCode.add(x.c);
+      if (fresh(x.t, 3) && x.cm != null && !x.tunnel) roadNow.set(x.c, { v: x.cm, t: x.t, la: x.la, lo: x.lo, n: x.n, d: x.d });
       if (x.st !== 'flood' || !(x.cm >= 5) || !fresh(x.t, 3)) continue;
       flooded++;
-      reports.push({ la: x.la, lo: x.lo, t: x.t, src: 'bma', lv: lvOf(x.cm) });
+      reports.push({ c: x.c, la: x.la, lo: x.lo, t: x.t, src: 'bma', lv: lvOf(x.cm) });
     }
     // ระบบแจ้งเตือน floodbangkok มีแค่จุดที่มีการแจ้งเตือน ใช้หลัง ThaiWater (ด้านล่าง) เฉพาะจุดที่ยังไม่มี
     for (const x of b.sensors || []) {
@@ -521,9 +525,12 @@ async function updateRisk(meta) {
     for (const x of b.rain || []) if (x.ok !== false && fresh(x.t, 1.5) && x.r1 != null) rain.push({ la: x.la, lo: x.lo, mm1: x.r1, mm24: x.r24 || 0 });
     // คลองตามสถานะของ กทม.: วิกฤต/เตือนภัย ส่งผลในรัศมีแคบ (300 ม.) และน้ำหนักต่ำ (วิกฤต 0.3 เตือนภัย 0.15) ไม่พอทำให้ติดระดับได้เอง ต้องมีฝนหรือรายงานประกอบ
     for (const x of b.canal || []) {
-      if (fresh(x.t, 3) && x.st >= 0) seenCanal.add(x.c);
+      if (fresh(x.t, 3) && x.st >= 0) {
+        seenCanal.add(x.c);
+        if (x.wl != null) canalNow.set(x.c, { v: x.wl, t: x.t, la: x.la, lo: x.lo, n: x.n, d: x.d, warn: x.warn, crit: x.crit, st: x.st });
+      }
       if (x.st < 1 || !fresh(x.t, 3)) continue;
-      wl.push({ la: x.la, lo: x.lo, pct: x.st === 2 ? 100 : 90, W: x.st === 2 ? 0.3 : 0.15, r: 300, name: x.n });
+      wl.push({ c: x.c, la: x.la, lo: x.lo, pct: x.st === 2 ? 100 : 90, W: x.st === 2 ? 0.3 : 0.15, r: 300, name: x.n });
     }
     src.bma = (b.sensors || []).length + (b.road || []).length;
     meta.sources.bma = { ok: true, sensors: (b.sensors || []).length, road: (b.road || []).length, flooded,
@@ -561,14 +568,16 @@ async function updateRisk(meta) {
     let flooded = 0;
     for (const x of road) {
       if (seenCode.has(x.c)) continue;
-      if (x.st !== 'off') seenCode.add(x.c);
+      if (x.st !== 'off') { seenCode.add(x.c); if (!x.tunnel) roadNow.set(x.c, { v: x.cm, t: x.t, la: x.la, lo: x.lo, n: x.n, d: x.d }); }
       if (x.st !== 'flood') continue;
       flooded++;
-      reports.push({ la: x.la, lo: x.lo, t: x.t, src: 'bma', lv: lvOf(x.cm) });
+      reports.push({ c: x.c, la: x.la, lo: x.lo, t: x.t, src: 'bma', lv: lvOf(x.cm) });
     }
     for (const x of canal) {
-      if (seenCanal.has(x.c) || x.st < 1) continue;
-      wl.push({ la: x.la, lo: x.lo, pct: x.st === 2 ? 100 : 90, W: x.st === 2 ? 0.3 : 0.15, r: 300, name: x.n });
+      if (seenCanal.has(x.c)) continue;
+      if (x.st >= 0) canalNow.set(x.c, { v: x.wl, t: x.t, la: x.la, lo: x.lo, n: x.n, d: x.d, warn: x.warn, crit: x.crit, st: x.st });
+      if (x.st < 1) continue;
+      wl.push({ c: x.c, la: x.la, lo: x.lo, pct: x.st === 2 ? 100 : 90, W: x.st === 2 ? 0.3 : 0.15, r: 300, name: x.n });
     }
     // หน้าเว็บใช้ไฟล์เดียวกัน: เครื่องในไทยเปิดอยู่ใช้ของเครื่องในไทย (ละเอียดกว่า มีฝน/อุโมงค์) ไม่งั้นใช้ของ ThaiWater
     if (!relay) await writeJSON('bma-sensors.json', { updated: now.toISOString(), source: 'thaiwater', errors: {}, sensors: [], rain: [], canal, road });
@@ -656,8 +665,31 @@ async function updateRisk(meta) {
   }
   src.fcst = fc.length;
 
-  if (!roads) { meta.sources.risk = { ok: false, error: 'roads unavailable' }; return; }
-  const state = newEvalState(await readJSON('risk-history.json', null));
+  // แนวโน้มน้ำ (เพิ่ม/ใกล้สูงสุด/ทรงตัว/ลด) จากค่าย้อนหลัง 3 ชม. ของเซ็นเซอร์ถนนและคลอง
+  const trends = updateTrends(state, roadNow, canalNow, rain, fc);
+  await writeJSON('trends.json', trends.out);
+  src.trends = trends.out.road.length + trends.out.canal.length;
+  // ใช้แนวโน้มช่วยทาย: น้ำกำลังเพิ่ม = หลักฐานแรงขึ้น (และเตือนก่อนถึง 5 ซม.), น้ำกำลังลด = อ่อนลง
+  for (const r of reports) {
+    const tr = r.src === 'bma' && trends.road.get(r.c);
+    if (!tr) continue;
+    if (tr.tr === 'fast' || tr.tr === 'up') r.lv = Math.min(3, r.lv + 1);
+    else if (tr.tr === 'down') r.lv = Math.max(1, r.lv - 1);
+  }
+  for (const [c, tr] of trends.road) {
+    if (tr.tr === 'fast' && tr.v >= 2 && tr.v < 5 && !seenFlooded(c)) reports.push({ c, la: tr.la, lo: tr.lo, t: tr.t, src: 'bma', lv: 1 });
+  }
+  for (const w of wl) {
+    const tr = w.c && trends.canal.get(w.c);
+    if (tr && tr.tr === 'down' && w.W != null) w.W /= 2;
+  }
+  // คลองยังไม่ถึงเกณฑ์ แต่กำลังเพิ่มและคาดว่าถึงวิกฤตภายใน 2 ชม. ถือเป็นระดับเตือนภัย
+  for (const [c, tr] of trends.canal) {
+    if (tr.eta != null && tr.eta <= 2 && tr.st < 1) wl.push({ c, la: tr.la, lo: tr.lo, pct: 90, W: 0.15, r: 300, name: tr.n });
+  }
+  function seenFlooded(c) { return reports.some((r) => r.c === c); }
+
+  if (!roads) { meta.sources.risk = { ok: false, error: 'roads unavailable' }; await writeJSON('risk-history.json', state); return; }
   // ประวัติน้ำท่วมจากเซ็นเซอร์ถนน 1 ปี: จุดที่เซ็นเซอร์วัดน้ำท่วมบ่อย = ท่วมซ้ำบ่อย (H) เสริมประวัติ Traffy
   const evPts = await updateSensorEvents(state, twStations).catch((e) => { log('sensor events failed:', e.message); return []; });
   src.sensorEvents = evPts.length;
@@ -674,6 +706,65 @@ async function updateRisk(meta) {
   const soi = roads.segments.filter((s) => !isMain(s.cls)).length;
   await writeJSON('risk-roads.json', { updated: now.toISOString(), roadSegments: roads.segments.length, soiSegments: soi, sources: src, counts, accuracy, ...packSegments(segs.slice(0, 5000)) });
   meta.sources.risk = { ok: true, segments: segs.length, counts, sources: src };
+}
+
+// ---------- แนวโน้มน้ำจากค่าย้อนหลัง ----------
+// state.tr = { road: { code: [[t, ซม.], ...] }, canal: { code: [[t, ม.], ...] } } เก็บ 3 ชม. (อยู่ใน risk-history.json ที่ cache อยู่แล้ว)
+const TREND_KEEP_H = 3;
+function updateTrends(state, roadNow, canalNow, rain, fc) {
+  const tr = (state.tr ||= { road: {}, canal: {} });
+  const add = (store, now) => {
+    for (const [c, x] of now) {
+      if (x.v == null || !x.t) continue;
+      const a = (store[c] ||= []);
+      if (!a.length || a[a.length - 1][0] !== x.t) a.push([x.t, x.v]);
+    }
+    for (const c of Object.keys(store)) {
+      store[c] = store[c].filter(([t]) => now_ - t <= TREND_KEEP_H * 36e5);
+      if (!store[c].length) delete store[c];
+    }
+  };
+  const now_ = now.getTime();
+  add(tr.road, roadNow); add(tr.canal, canalNow);
+  // ค่าเมื่อ ~m นาทีก่อนค่าล่าสุด (จุดที่ใกล้ที่สุดที่เก่ากว่าอย่างน้อย m-10 นาที)
+  const ago = (a, m) => { const tEnd = a[a.length - 1][0]; let best = null; for (const p of a) if (tEnd - p[0] >= (m - 10) * 6e4) best = p; return best; };
+  const nearVal = (list, la, lo, km, key) => { let best = null, bd = km; for (const s of list) { const d = distKm(la, lo, s.la, s.lo); if (d <= bd) { bd = d; best = s[key]; } } return best; };
+  // unit: ขั้นเปลี่ยนที่ถือว่า "เพิ่ม/ลด" (ถนน ซม. / คลอง ม.)
+  const classify = (a, u, la, lo) => {
+    const last = a[a.length - 1], p30 = ago(a, 30), p60 = ago(a, 60);
+    if (!p30 || now_ - last[0] > 90 * 6e4) return null;
+    const d30 = last[1] - p30[1], d60 = p60 ? last[1] - p60[1] : null;
+    const rainNow = nearVal(rain, la, lo, 4, 'mm1'), rainNext = nearVal(fc, la, lo, 8, 'mm');
+    const easing = (rainNow == null || rainNow < 2) && (rainNext == null || rainNext < 3);
+    let t = 'flat';
+    if (d30 >= u.fast) t = 'fast';
+    else if (d30 >= u.up) t = d60 != null && d60 >= u.fast && d30 < d60 / 3 && easing ? 'peak' : 'up';
+    else if (d30 <= -u.up) t = 'down';
+    else if (d60 != null && d60 >= u.fast && easing) t = 'peak';
+    return { d30: +d30.toFixed(u.dp), d60: d60 == null ? null : +d60.toFixed(u.dp), tr: t, rainNow, rainNext };
+  };
+  const out = { updated: new Date(now_).toISOString(), keepH: TREND_KEEP_H, road: [], canal: [] };
+  const road = new Map(), canal = new Map();
+  for (const [c, a] of Object.entries(tr.road)) {
+    const x = roadNow.get(c); if (!x) continue;
+    const k = classify(a, { fast: 5, up: 2, dp: 1 }, x.la, x.lo); if (!k) continue;
+    // ถนนแห้งและยังแห้ง ไม่ต้องรายงาน
+    if (x.v < 2 && Math.max(...a.map((p) => p[1])) < 2) continue;
+    const o = { c, n: x.n, d: x.d, la: x.la, lo: x.lo, v: x.v, t: x.t, ...k, s: a.slice(-12) };
+    road.set(c, o); out.road.push(o);
+  }
+  for (const [c, a] of Object.entries(tr.canal)) {
+    const x = canalNow.get(c); if (!x) continue;
+    const k = classify(a, { fast: 0.1, up: 0.03, dp: 2 }, x.la, x.lo); if (!k) continue;
+    // ถ้ายังเพิ่มในอัตราเดิม อีกกี่ชั่วโมงถึงวิกฤต (แสดงเฉพาะไม่เกิน 6 ชม.)
+    const rate = k.d60 != null ? k.d60 : k.d30 * 2;
+    const eta = (k.tr === 'fast' || k.tr === 'up') && x.crit != null && x.v < x.crit && rate > 0 ? +((x.crit - x.v) / rate).toFixed(1) : null;
+    const o = { c, n: x.n, d: x.d, la: x.la, lo: x.lo, v: x.v, t: x.t, warn: x.warn, crit: x.crit, st: x.st, ...k, eta: eta != null && eta <= 6 ? eta : null, s: a.slice(-12) };
+    canal.set(c, o); out.canal.push(o);
+  }
+  const cnt = (arr) => Object.fromEntries(['fast', 'up', 'peak', 'flat', 'down'].map((k) => [k, arr.filter((x) => x.tr === k).length]));
+  meta.sources.trends = { road: cnt(out.road), canal: cnt(out.canal) };
+  return { out, road, canal };
 }
 
 // ---------- น้ำขึ้นน้ำลงปากแม่น้ำเจ้าพระยา (ตารางพยากรณ์ของกองทัพเรือ ผ่าน สสน.) ----------

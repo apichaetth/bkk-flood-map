@@ -410,6 +410,43 @@
       <p class="small">${tun.length ? `อุโมงค์ทางลอด: ${tunWet.length ? `<b>มีน้ำ ${tunWet.length} แห่ง</b> (${tunWet.map((r) => esc(r.n)).join(', ')})` : `ปกติทั้ง ${tun.filter((r) => r.st !== 'off').length} แห่ง`}` : ''}${top && top.r1 > 0 ? ` · ฝนหนักสุดชั่วโมงล่าสุด ${fmt(top.r1, 1)} มม. ที่${esc(top.n)}` : ''}</p>
       <p class="muted small">อัปเดต ${F.fmtTime(new Date(b.updated))} · <a href="map.html">ดูบนแผนที่ →</a></p>`;
   }
+  let tideP = null;
+  // แนวโน้มน้ำ 1 ชม.: เซ็นเซอร์ถนน (ซม.) และคลอง (ม.) จาก data/trends.json + เจ้าพระยาจากตารางน้ำขึ้นน้ำลง
+  const TR = { fast: ['⬆⬆', 'เพิ่มเร็ว', 3], up: ['⬆', 'กำลังเพิ่ม', 2], peak: ['⏸', 'ใกล้จุดสูงสุด', 2], flat: ['➖', 'ทรงตัว', 1], down: ['⬇', 'กำลังลด', 0] };
+  async function renderTrends() {
+    const d = await F.getJSON('data/trends.json', 20000, { cache: 'no-cache' }).catch(() => null);
+    const card = $('trendCard');
+    if (!d || Date.now() - new Date(d.updated) > 90 * 6e4) { card.hidden = true; return; }
+    card.hidden = false;
+    const sign = (v, dp) => (v > 0 ? '+' : '') + fmt(v, dp);
+    const items = [...d.road.map((x) => ({ ...x, kind: 'road' })), ...d.canal.map((x) => ({ ...x, kind: 'canal' }))];
+    const row = (x) => {
+      const road = x.kind === 'road', dp = road ? 0 : 2, unit = road ? ' ซม.' : ' ม.';
+      const sub = `${road ? 'ถนน' : 'คลอง'} · เขต${esc(x.d || '–')}${x.eta != null ? ` · <b>ถึงวิกฤตใน ~${fmt(x.eta, 1)} ชม.</b>` : ''}${!road && x.st === 2 ? ' · วิกฤต' : !road && x.st === 1 ? ' · เตือนภัย' : ''}`;
+      return `<div class="ol-row">${lvDot(TR[x.tr][2])}<span>${esc(x.n)}<small>${sub}</small></span><b>${fmt(x.v, dp)}${unit}<small> (${sign(x.d30, dp)})</small></b></div>`;
+    };
+    const pick = (keys, sort) => items.filter((x) => keys.includes(x.tr)).sort(sort);
+    const up = pick(['fast', 'up'], (a, b) => (b.tr === 'fast') - (a.tr === 'fast') || (b.eta != null) - (a.eta != null) || (b.kind === 'road') - (a.kind === 'road') || b.d30 - a.d30);
+    const peak = pick(['peak'], (a, b) => (b.kind === 'road') - (a.kind === 'road') || b.v - a.v);
+    const down = pick(['down'], (a, b) => (b.kind === 'road') - (a.kind === 'road') || b.v - a.v);
+    for (const [id, arr, empty] of [['trUp', up, 'ไม่มีจุดที่น้ำกำลังเพิ่ม'], ['trPeak', peak, 'ไม่มี'], ['trDown', down, 'ไม่มี']]) {
+      $(id).innerHTML = arr.length ? arr.slice(0, 6).map(row).join('') + (arr.length > 6 ? `<p class="small muted">และอีก ${arr.length - 6} จุด</p>` : '') : `<p class="muted small">${empty}</p>`;
+      $(id + 'N').textContent = arr.length;
+    }
+    const span = Math.max(0, ...items.map((x) => (x.s && x.s.length ? x.t - x.s[0][0] : 0)));
+    $('trendNote').textContent = (items.length ? `เทียบกับ 30 นาทีก่อน (ตัวเลขในวงเล็บ) · "ใกล้จุดสูงสุด" = เพิ่มช้าลงและฝนแถวนั้นเบาลง เป็นการประมาณ ไม่ใช่การพยากรณ์`
+      : 'กำลังเก็บข้อมูลย้อนหลัง จะเริ่มบอกแนวโน้มได้ภายในประมาณ 1 ชม.') + ` · เซ็นเซอร์ถนนและคลองของ กทม. · อัปเดต ${F.fmtTime(new Date(d.updated))}${span && span < 45 * 6e4 ? ' · ข้อมูลย้อนหลังยังน้อย' : ''}`;
+    // เจ้าพระยา: เทียบเวลาตอนนี้กับเวลาน้ำขึ้นสูงสุดวันนี้
+    tideP ||= F.getJSON('data/tide.json', 20000).catch(() => null);
+    const td = await tideP, st = td && (td.stations || []).find((x) => x.code === 'N02');
+    const hm = new Intl.DateTimeFormat('en-GB', { timeZone: F.TZ, hour: '2-digit', minute: '2-digit', hour12: false }).format(new Date());
+    const toMin = (s) => { const [h, m] = String(s).split(':').map(Number); return h * 60 + m; };
+    if (st && st.maxAt) {
+      const left = toMin(st.maxAt) - toMin(hm);
+      $('trendRiver').innerHTML = `🌊 <b>เจ้าพระยา (ท่าเรือกรุงเทพ):</b> ` + (left > 0 && left <= 180 ? `น้ำกำลังขึ้น สูงสุดราว ${fmt(st.max, 2)} ม. เวลา ${esc(st.maxAt)} น. (อีก ${left >= 60 ? Math.floor(left / 60) + ' ชม. ' : ''}${left % 60} นาที)`
+        : left > 180 ? `น้ำขึ้นสูงสุดวันนี้ราว ${fmt(st.max, 2)} ม. เวลา ${esc(st.maxAt)} น.` : `ผ่านช่วงน้ำขึ้นสูงสุดวันนี้แล้ว (${esc(st.maxAt)} น. ${fmt(st.max, 2)} ม.)`);
+    } else $('trendRiver').innerHTML = '';
+  }
   let upstream = null, dams = null;
   function renderOutlookWl(up) { upstream = up || []; renderRiver(); renderNorth(); }
   function renderRiver() {
@@ -424,7 +461,6 @@
     renderTide();
   }
   // น้ำขึ้นสูงสุดวันนี้ (ตารางพยากรณ์ของกองทัพเรือ) ช่วง ต.ค.–พ.ย. ถ้าตรงกับน้ำเหนือมาก ริมแม่น้ำเสี่ยงล้นตลิ่ง
-  let tideP = null;
   async function renderTide() {
     tideP ||= F.getJSON('data/tide.json', 20000).catch(() => null);
     const d = await tideP, el = $('olTide');
@@ -458,6 +494,7 @@
     renderTmd();
     renderOutlookTw();
     renderCity();
+    renderTrends();
     renderTmdFcst();
     loadRadar();
     if (!lyr.cam.getLayers().length) loadCams();

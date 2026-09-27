@@ -476,3 +476,8 @@ table.log .thumbs img { width: 56px; height: 56px; object-fit: cover; border-rad
 .nowcast[hidden] { display: none; }
 .nowcast img { width: 100%; height: auto; border-radius: 8px; border: 1px solid var(--line); background: var(--bg); display: block; }
 .nowcast figcaption { margin-top: 4px; }
+.tr-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px; }
+.tr-col h3 { font-size: 15px; margin: 4px 0 6px; }
+.tr-col .ol-row b small { color: var(--muted); }
+.tag.t0 { background: var(--good, #1a9850); color: #fff; }
+@media (max-width: 860px) { .tr-grid { grid-template-columns: 1fr; gap: 4px; } }

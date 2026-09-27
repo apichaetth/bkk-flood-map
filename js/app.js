@@ -118,10 +118,31 @@
     } catch (e) { S.sensor = null; setFeed('sensor', 'fail', Flood.errMsg('sensor', e)); }
     drawSensors();
   }
+  // แนวโน้มน้ำจาก data/trends.json (เซ็นเซอร์ถนน/คลอง) ใช้ในป๊อปอัปและลูกศรบนหมุด
+  const TRL = { fast: ['⬆⬆', 'เพิ่มเร็ว'], up: ['⬆', 'กำลังเพิ่ม'], peak: ['⏸', 'ใกล้จุดสูงสุด'], flat: ['➖', 'ทรงตัว'], down: ['⬇', 'กำลังลด'] };
+  async function loadTrends() {
+    const d = await Flood.getJSON('data/trends.json', 20000, { cache: 'no-cache' }).catch(() => null);
+    S.trend = d && Date.now() - new Date(d.updated) < 90 * 6e4 ? { road: new Map(d.road.map((x) => [x.c, x])), canal: new Map(d.canal.map((x) => [x.c, x])) } : null;
+    if (S.trend && S.sensor) {
+      // ค่าจาก ThaiWater/เครื่องในไทยใหม่กว่าค่าจากระบบแจ้งเตือน: ใช้ค่าที่ใหม่กว่า
+      for (const x of S.sensor) {
+        const tr = S.trend.road.get(x.s.code);
+        if (tr && tr.t > (x.t ? +x.t : 0)) { x.cm = tr.v; x.t = new Date(tr.t); x.stale = false; x.lv = Flood.sensorLevel(tr.v); }
+      }
+    }
+    drawSensors(); drawRelay();
+  }
+  const trendHtml = (tr, unit, dp) => {
+    if (!tr) return '';
+    const hh = (t) => new Intl.DateTimeFormat('th-TH', { timeZone: Flood.TZ, hour: '2-digit', minute: '2-digit' }).format(new Date(t));
+    return `<div class="m" style="margin-top:4px"><b>${TRL[tr.tr][0]} ${TRL[tr.tr][1]}</b> (${tr.d30 > 0 ? '+' : ''}${tr.d30.toFixed(dp)}${unit} ใน 30 นาที)${tr.eta != null ? ` · ถึงวิกฤตใน ~${tr.eta} ชม.` : ''}<br>`
+      + (tr.s || []).slice(-6).map(([t, v]) => `${hh(t)} ${(+v).toFixed(dp)}`).join(' → ') + unit + '</div>';
+  };
   function drawSensors() {
     layers.sensor.clearLayers();
     if (!S.sensor) { $('kSensor').textContent = '–'; return; }
     for (const x of S.sensor) {
+      const tr = S.trend && S.trend.road.get(x.s.code);
       const flooded = x.lv > 0;
       const size = flooded ? 18 : 8;
       const html = `<div class="pp"><div class="m">เซ็นเซอร์น้ำท่วมถนน กทม. · ${esc(x.s.code)}</div>
@@ -129,9 +150,10 @@
         ${x.stale ? '<span class="badge" style="--c:var(--stale)">ไม่มีค่าล่าสุด</span>' : badge(x.lv)}
         <div style="margin-top:4px"><span class="big">${x.cm != null && !x.stale ? x.cm : '–'}</span> ซม.</div>
         <div class="m">${esc(x.s.road || '')} ${x.s.district ? '· ' + esc(x.s.district) : ''}<br>
-        อ่านค่า ${x.t ? fmtDT(x.t) + ' (' + ago(x.t) + ')' : '–'}</div></div>`;
+        อ่านค่า ${x.t ? fmtDT(x.t) + ' (' + ago(x.t) + ')' : '–'}</div>${trendHtml(tr, ' ซม.', 0)}</div>`;
+      const arrow = tr && tr.tr !== 'flat' ? TRL[tr.tr][0].slice(0, 1) : '';
       x.marker = L.marker([x.la, x.lo], {
-        icon: icon('sensor', LEVEL[x.lv].color, flooded ? Math.round(x.cm) : '', size, (LEVEL[x.lv].dark ? 'dark' : '') + (x.stale ? ' stale' : '')),
+        icon: icon('sensor', LEVEL[x.lv].color, flooded ? Math.round(x.cm) + arrow : '', size, (LEVEL[x.lv].dark ? 'dark' : '') + (x.stale ? ' stale' : '')),
         zIndexOffset: flooded ? 1000 + x.cm : 0, opacity: flooded ? 1 : 0.75,
       }).bindPopup(html).addTo(layers.sensor);
     }
@@ -370,7 +392,7 @@
       const html = `<div class="pp"><div class="m">ระดับน้ำคลอง · สำนักการระบายน้ำ กทม.</div><h3>${esc(c.n)}</h3>
         <span class="badge" style="--c:${color}">${label}</span>
         ${c.wl != null && lv >= 0 ? `<div style="margin-top:4px"><span class="big">${c.wl.toFixed(2)}</span> ม.</div>` : ''}
-        <div class="m">${c.warn != null ? `เกณฑ์เตือนภัย ${c.warn} · วิกฤต ${c.crit} · ` : ''}${c.river ? esc(c.river) + ' · ' : ''}เขต${esc(c.d)}${c.t ? `<br>${fmtDT(new Date(c.t))} (${ago(new Date(c.t))})` : ''}</div></div>`;
+        <div class="m">${c.warn != null ? `เกณฑ์เตือนภัย ${c.warn} · วิกฤต ${c.crit} · ` : ''}${c.river ? esc(c.river) + ' · ' : ''}เขต${esc(c.d)}${c.t ? `<br>${fmtDT(new Date(c.t))} (${ago(new Date(c.t))})` : ''}</div>${trendHtml(S.trend && S.trend.canal.get(c.c), ' ม.', 2)}</div>`;
       const size = c.st >= 1 ? 13 : 7;
       c.marker = L.marker([c.la, c.lo], { icon: icon('wl', color, '', size, lv < 0 ? 'stale' : ''), zIndexOffset: c.st * 100 }).bindPopup(html).addTo(layers.canal);
     }
@@ -690,7 +712,7 @@
   function refresh() {
     last = Date.now();
     $('updated').textContent = 'กำลังอัปเดต…';
-    Promise.allSettled([loadSensors(), loadEvents(), loadTraffy(), loadRain(), loadWl(), loadRelay(), loadTw(), loadNews(), loadTmd(), loadRadar(), S.cam ? null : loadCams()])
+    Promise.allSettled([loadSensors().then(loadTrends), loadEvents(), loadTraffy(), loadRain(), loadWl(), loadRelay(), loadTw(), loadNews(), loadTmd(), loadRadar(), S.cam ? null : loadCams()])
       .then(() => { $('updated').textContent = `อัปเดตหน้าเว็บ ${fmtTime(new Date(last))} · รีเฟรชอัตโนมัติทุก 15 นาที`; renderCams(); });
   }
   $('refresh').onclick = refresh;
