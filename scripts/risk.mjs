@@ -18,6 +18,8 @@ import path from 'node:path';
 export const PARAMS = {
   segM: 150,
   evidenceRadiusM: 800, evidenceDecayM: 250,
+  // รายงานที่อยู่ในซอย (หรือไม่อยู่ใกล้ถนนที่มีในระบบ เช่น ในหมู่บ้าน) น้ำมักท่วมเฉพาะจุด ตีวงแคบกว่า
+  soiRadiusM: 300, soiDecayM: 120,
   ageDecayH: { bma: 1, itic: 2, traffy: 3, web: 3, news: 4 },
   srcWeight: { bma: 1.0, itic: 1.0, web: 0.8, traffy: 0.7, news: 0.6 },
   rainIdwKm: 6, fcIdwKm: 8, fcHours: 3,
@@ -51,6 +53,18 @@ function distToLine(la, lo, c) {
     best = Math.min(best, Math.hypot(bx + u * dx, by + u * dy));
   }
   return best;
+}
+// จุดนี้อยู่บนถนนแบบไหน: 'main' ถนนหลัก/รอง, 'soi' ซอย, 'off' ไม่มีถนนในระบบอยู่ใกล้ ๆ
+function roadKind(segIdx, la, lo) {
+  const P = PARAMS;
+  let best = null;
+  // หาจากจุดกลางช่วงในรัศมี roadNearM + ความยาวช่วง แล้ววัดระยะถึงตัวเส้นถนนจริง
+  for (const s of near(segIdx, la, lo, P.roadNearM + P.segM)) {
+    if (distM(la, lo, s.la, s.lo) > P.roadNearM + P.segM) continue;
+    const dm = distToLine(la, lo, s.c);
+    if (dm <= P.roadNearM && (!best || dm < best.dm)) best = { dm, s };
+  }
+  return !best ? 'off' : isMain(best.s.cls) ? 'main' : 'soi';
 }
 function inRing(lng, lat, ring) {
   let inside = false;
@@ -166,6 +180,13 @@ export function scoreRoads(roads, input, now = Date.now()) {
   const P = PARAMS;
   // รายงาน (หลักฐาน) และประวัติ
   const reports = input.reports.filter((r) => r.t <= now && now - r.t <= 24 * 36e5);
+  // ประเภทตำแหน่งรายงาน: บนถนนหลัก/รอง = ตีวงกว้าง, ในซอยหรือห่างถนน = ตีวงแคบ
+  const segIdx = gridIndex(roads.segments);
+  for (const r of reports) {
+    const k = roadKind(segIdx, r.la, r.lo);
+    r.rad = k === 'main' ? P.evidenceRadiusM : P.soiRadiusM;
+    r.decay = k === 'main' ? P.evidenceDecayM : P.soiDecayM;
+  }
   const repIdx = gridIndex(reports);
   const hist = input.history.filter((h) => now - h.t > P.histExcludeH * 36e5);
   const histIdx = gridIndex(hist);
@@ -187,9 +208,9 @@ export function scoreRoads(roads, input, now = Date.now()) {
     let notE = 1, bestE = null;
     for (const r of near(repIdx, s.la, s.lo, P.evidenceRadiusM)) {
       const d = distM(s.la, s.lo, r.la, r.lo);
-      if (d > P.evidenceRadiusM) continue;
+      if (d > r.rad) continue;
       const ageH = (now - r.t) / 36e5;
-      const w = P.srcWeight[r.src] * (r.lv ? Math.min(1, 0.5 + r.lv / 6) : 1) * Math.exp(-d / P.evidenceDecayM) * Math.exp(-ageH / P.ageDecayH[r.src]);
+      const w = P.srcWeight[r.src] * (r.lv ? Math.min(1, 0.5 + r.lv / 6) : 1) * Math.exp(-d / r.decay) * Math.exp(-ageH / P.ageDecayH[r.src]);
       notE *= 1 - Math.min(0.95, w);
       if (!bestE || w > bestE.w) bestE = { w, d: Math.round(d), src: r.src, ageMin: Math.round(ageH * 60) };
     }
@@ -299,15 +320,7 @@ export function evalUpdate(state, roads, reports, now = Date.now()) {
     const before = runs.filter((h) => h.t < r.t && h.t >= r.t - H);
     if (!before.length) continue;
     state.seen[key] = r.t;
-    // ถนนที่ใกล้ที่สุด: ถนนหลัก / ซอย / ไม่มีถนนที่เราดูอยู่ใกล้ ๆ
-    let best = null;
-    // หาจากจุดกลางช่วงในรัศมี roadNearM + ครึ่งความยาวช่วง แล้ววัดระยะถึงตัวเส้นถนนจริง
-    for (const s of near(segIdx, r.la, r.lo, P.roadNearM + P.segM)) {
-      if (distM(r.la, r.lo, s.la, s.lo) > P.roadNearM + P.segM) continue;
-      const dm = distToLine(r.la, r.lo, s.c);
-      if (dm <= P.roadNearM && (!best || dm < best.dm)) best = { dm, s };
-    }
-    const kind = !best ? 'off' : isMain(best.s.cls) ? 'main' : 'soi';
+    const kind = roadKind(segIdx, r.la, r.lo);
     let caught = 0;
     for (const h of before) for (const [id, tier] of h.segs) {
       const s = segById.get(id);
