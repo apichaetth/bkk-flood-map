@@ -494,6 +494,7 @@ async function updateRisk(meta) {
   const fresh = (t, h) => t && now - t <= h * 36e5;
   const seenCode = new Set(), seenCanal = new Set(); // จุดที่ได้จากเครื่องในไทยแล้ว ไม่ใช้ซ้ำจาก ThaiWater
   let relay = null;
+  const alertOnly = []; // เซ็นเซอร์จากระบบแจ้งเตือน (ลำดับความสำคัญต่ำสุด: DDS > ThaiWater > แจ้งเตือน)
   // เซ็นเซอร์น้ำท่วมถนน กทม.: เครื่องในไทย (scripts/bma-fetch.mjs) ส่งขึ้น branch bma-data ทุก 15 นาที
   // เพราะเซิร์ฟเวอร์ กทม. ปฏิเสธเครื่องนอกประเทศ (รวม GitHub Actions)
   try {
@@ -511,10 +512,10 @@ async function updateRisk(meta) {
       flooded++;
       reports.push({ la: x.la, lo: x.lo, t: x.t, src: 'bma', lv: lvOf(x.cm) });
     }
+    // ระบบแจ้งเตือน floodbangkok มีแค่จุดที่มีการแจ้งเตือน ใช้หลัง ThaiWater (ด้านล่าง) เฉพาะจุดที่ยังไม่มี
     for (const x of b.sensors || []) {
-      if (seenCode.has(x.code) || x.cm == null || x.cm < 5 || !fresh(x.t, 3)) continue;
-      flooded++;
-      reports.push({ la: x.la, lo: x.lo, t: x.t, src: 'bma', lv: lvOf(x.cm) });
+      if (x.cm == null || x.cm < 5 || !fresh(x.t, 3)) continue;
+      alertOnly.push({ c: x.code, la: x.la, lo: x.lo, t: x.t, src: 'bma', lv: lvOf(x.cm) });
     }
     // ฝนจากสถานี กทม. (ถี่และใหม่กว่า) รวมกับ ThaiWater
     for (const x of b.rain || []) if (x.ok !== false && fresh(x.t, 1.5) && x.r1 != null) rain.push({ la: x.la, lo: x.lo, mm1: x.r1, mm24: x.r24 || 0 });
@@ -559,7 +560,9 @@ async function updateRisk(meta) {
     }
     let flooded = 0;
     for (const x of road) {
-      if (seenCode.has(x.c) || x.st !== 'flood') continue;
+      if (seenCode.has(x.c)) continue;
+      if (x.st !== 'off') seenCode.add(x.c);
+      if (x.st !== 'flood') continue;
       flooded++;
       reports.push({ la: x.la, lo: x.lo, t: x.t, src: 'bma', lv: lvOf(x.cm) });
     }
@@ -575,6 +578,7 @@ async function updateRisk(meta) {
     log('thaiwater bma failed:', e.message);
     meta.sources.bmaTw = { ok: false, error: e.message };
   }
+  for (const x of alertOnly) if (!seenCode.has(x.c)) { seenCode.add(x.c); reports.push(x); }
   if (relay) await writeJSON('bma-sensors.json', { ...relay, source: relay.source || 'relay' });
   // Traffy (สะสมไว้แล้วใน traffy.json)
   const tf = await readJSON('traffy.json', { results: [] });

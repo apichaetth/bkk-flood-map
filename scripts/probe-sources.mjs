@@ -22,6 +22,17 @@ async function probe(label, url, headers = {}) {
     } catch { console.log('text:', txt.slice(0, 1500)); return txt; }
   } catch (e) { console.log(`\n### ${label}\nERROR ${e.message} ${url}`); return null; }
 }
+// เทียบค่า ThaiWater flood_road กับไฟล์จากเครื่องในไทย (หน่วยเดียวกันไหม)
+const r1 = await fetch(TW + 'flood_road', { headers: TWH }).then((r) => r.json());
+const rel = await fetch('https://raw.githubusercontent.com/apichaetth/bkk-flood-map/bma-data/bma-sensors.json?t=' + Date.now()).then((r) => r.json()).catch(() => null);
+const byCode = new Map(((rel && rel.sensors) || []).map((x) => [x.code, x]));
+const nz = (r1.data || []).filter((x) => +x.floodroad_value > 0).sort((a, b) => b.floodroad_value - a.floodroad_value);
+console.log('ThaiWater nonzero', nz.length, 'relay updated', rel && rel.updated);
+for (const x of nz.slice(0, 40)) { const c = x.station.floodroad_oldcode, r = byCode.get(c); console.log(c, 'TW', x.floodroad_value, x.floodroad_datetime, '| relay', r ? `${r.cm} @ ${r.t ? new Date(r.t + 7 * 36e5).toISOString().slice(11, 16) : '-'}` : '-'); }
+const both = [...byCode.values()].filter((r) => r.cm != null).slice(0, 30);
+console.log('relay sensors with values, ThaiWater same code:');
+for (const r of both) { const x = (r1.data || []).find((y) => y.station.floodroad_oldcode === r.code); console.log(r.code, 'relay', r.cm, '| TW', x && x.floodroad_value, x && x.floodroad_datetime); }
+process.exit(0);
 const fr = await probe('ThaiWater flood_road', TW + 'flood_road', TWH);
 await probe('ThaiWater canal_waterlevel', TW + 'canal_waterlevel', TWH);
 const rows = fr && (Array.isArray(fr.data) ? fr.data : fr.data && fr.data.data) || [];
