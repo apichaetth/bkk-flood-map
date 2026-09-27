@@ -482,6 +482,11 @@ window.Flood = (function () {
   document.addEventListener('keydown', (e) => { if (e.key === 'Escape') { pm.hidden = true; sheet.hidden = true; } });
 })();
 
+// ---------- ติดตั้งเป็นแอป / เปิดได้ตอนเน็ตหลุด (sw.js ดึงจากเน็ตก่อนเสมอ) ----------
+if ('serviceWorker' in navigator && location.protocol === 'https:') {
+  window.addEventListener('load', () => navigator.serviceWorker.register('sw.js').catch(() => { /* ไม่รองรับก็ใช้เว็บปกติ */ }));
+}
+
 // ---------- หน้าเก่าค้างในเครื่อง: เทียบกับ version.txt ถ้าไม่ตรงโหลดใหม่ (ครั้งเดียวต่อเวอร์ชัน) ----------
 (function () {
   const m = document.querySelector('meta[name="build"]');

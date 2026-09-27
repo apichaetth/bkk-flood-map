@@ -307,7 +307,7 @@
     </a>`;
   }
   function renderSpots(clusters) {
-    if (clusters) lastClusters = clusters;
+    if (clusters) { lastClusters = clusters; renderPlaces(); }
     const q = spotUi.q.trim().replace(/^(ถนน|ถ\.|เขต)\s*/, '');
     let main = lastClusters.filter((c) => c.tier >= 2);
     main.forEach((c) => { c.group = groupOf(c); });
@@ -421,6 +421,71 @@
       <div class="ol-cols">${worst.map((c) => `<div class="ol-row">${lvDot(c.st === 2 ? 3 : 2)}<span>${esc(c.n)}<small>เขต${esc(c.d)}</small></span><b>${c.wl != null ? fmt(c.wl, 2) + '<small> ม.</small>' : ''}</b></div>`).join('')}</div>
       <p class="small">${tun.length ? `อุโมงค์ทางลอด: ${tunWet.length ? `<b>มีน้ำ ${tunWet.length} แห่ง</b> (${tunWet.map((r) => esc(r.n)).join(', ')})` : `ปกติทั้ง ${tun.filter((r) => r.st !== 'off').length} แห่ง`}` : ''}${top && top.r1 > 0 ? ` · ฝนหนักสุดชั่วโมงล่าสุด ${fmt(top.r1, 1)} มม. ที่${esc(top.n)}` : ''}</p>
       <p class="muted small">อัปเดต ${F.fmtTime(new Date(b.updated))} · <a href="map.html">ดูบนแผนที่ →</a></p>`;
+  }
+  // ---------- ที่ของฉัน (บันทึกในเครื่อง) ----------
+  const PL_KEY = 'bkkflood.places', PL_ICON = { home: '🏠', work: '🏢', other: '📍' }, PL_NAME = { home: 'บ้าน', work: 'ที่ทำงาน', other: 'ที่ของฉัน' };
+  let places = F.store.get(PL_KEY) || [], avoidPts = null;
+  const savePlaces = () => F.store.set(PL_KEY, places);
+  F.getJSON('data/avoid.json', 20000, { cache: 'no-cache' }).then((d) => { avoidPts = d.p || []; renderPlaces(); }).catch(() => { avoidPts = []; });
+  // สถานะรอบที่: น้ำท่วมใน 500 ม. / รายงานใน 1 กม. / ถนนควรระวังมากใน 300 ม. / ปกติ
+  function placeStatus(p) {
+    const near = lastClusters.filter((c) => c.tier >= 2).map((c) => ({ c, km: distKm(p.la, p.lo, c.la, c.lo) })).sort((a, b) => a.km - b.km);
+    const m = (km) => (km < 1 ? Math.round(km * 1000) + ' ม.' : km.toFixed(1) + ' กม.');
+    const n = near[0];
+    if (n && n.km <= 0.5) return [3, `น้ำท่วมห่าง ${m(n.km)} · ${n.c.name}${n.c.cm ? ` ${Math.round(n.c.cm)} ซม.` : ''}`];
+    if (n && n.km <= 1) return [2, `มีรายงานน้ำท่วมห่าง ${m(n.km)} · ${n.c.name}`];
+    const risk = (avoidPts || []).some(([la, lo, k]) => k === 1 && distKm(p.la, p.lo, la, lo) <= 0.3);
+    if (risk) return [1, 'ถนนใกล้ ๆ อยู่ในระดับควรระวังมาก'];
+    return [0, n ? `ปกติ · จุดน้ำท่วมใกล้สุดห่าง ${m(n.km)}` : 'ปกติ · ไม่มีรายงานน้ำท่วมใกล้ ๆ'];
+  }
+  function renderPlaces() {
+    const el = $('plList');
+    if (!el) return;
+    if (!places.length) {
+      el.innerHTML = '<p class="small">เพิ่มบ้านหรือที่ทำงาน แล้วทุกครั้งที่เปิดเว็บจะเห็นทันทีว่ารอบ ๆ มีน้ำท่วมไหม</p>';
+      return;
+    }
+    el.innerHTML = places.map((p, i) => {
+      const [lv, text] = placeStatus(p);
+      const to = `route.html?to=${p.la.toFixed(5)},${p.lo.toFixed(5)}&name=${encodeURIComponent(p.name)}`;
+      return `<div class="pl-row lv${lv}"><span class="pl-ic" aria-hidden="true">${PL_ICON[p.kind] || '📍'}</span>
+        <div class="pl-t"><b>${esc(p.name)}</b><span>${lvDot(lv)} ${esc(text)}</span></div>
+        <div class="pl-act"><a class="btn sm" href="${to}" title="หาเส้นทางเลี่ยงน้ำไปที่นี่">🚗</a><button type="button" class="btn sm" data-map="${i}" title="ดูบนแผนที่">🗺</button><button type="button" class="btn sm" data-del="${i}" title="ลบ" aria-label="ลบ ${esc(p.name)}">✕</button></div></div>`;
+    }).join('');
+    el.querySelectorAll('[data-map]').forEach((b) => b.onclick = () => { const p = places[+b.dataset.map]; map.setView([p.la, p.lo], 15); $('smap').scrollIntoView({ behavior: 'smooth', block: 'center' }); });
+    el.querySelectorAll('[data-del]').forEach((b) => b.onclick = () => { if (confirm('ลบ "' + places[+b.dataset.del].name + '" ?')) { places.splice(+b.dataset.del, 1); savePlaces(); renderPlaces(); } });
+  }
+  {
+    const form = $('plForm'), msg = (t) => { $('plMsg').textContent = t; };
+    const kind = () => document.querySelector('input[name="plKind"]:checked').value;
+    const add = (la, lo, label) => {
+      if (places.length >= 8) { msg('บันทึกได้สูงสุด 8 ที่'); return; }
+      const name = $('plName').value.trim() || (kind() === 'other' ? label : PL_NAME[kind()]);
+      places.push({ kind: kind(), name: name.slice(0, 40), la: +la.toFixed(5), lo: +lo.toFixed(5) });
+      savePlaces(); form.hidden = true; $('plName').value = $('plQ').value = ''; $('plSug').hidden = true; renderPlaces();
+    };
+    $('plAdd').onclick = () => { form.hidden = !form.hidden; msg(''); if (!form.hidden) $('plQ').focus(); };
+    $('plCancel').onclick = () => { form.hidden = true; };
+    $('plHere').onclick = () => {
+      if (!navigator.geolocation) { msg('เบราว์เซอร์นี้หาตำแหน่งไม่ได้'); return; }
+      msg('กำลังหาตำแหน่ง…');
+      navigator.geolocation.getCurrentPosition((p) => add(p.coords.latitude, p.coords.longitude, 'ตำแหน่งที่บันทึก'), () => msg('หาตำแหน่งไม่ได้ (ต้องอนุญาตให้เว็บเข้าถึงตำแหน่ง)'), { enableHighAccuracy: true, timeout: 15000 });
+    };
+    let timer = null;
+    $('plQ').addEventListener('input', (e) => {
+      clearTimeout(timer);
+      const q = e.target.value.trim(), box = $('plSug');
+      if (q.length < 3) { box.hidden = true; return; }
+      timer = setTimeout(async () => {
+        try {
+          const r = await F.getJSON('https://nominatim.openstreetmap.org/search?format=jsonv2&limit=6&accept-language=th&countrycodes=th&bounded=1&viewbox=100.2,14.1,101.0,13.4&q=' + encodeURIComponent(q), 15000);
+          box.innerHTML = r.length ? r.map((x, i) => `<button type="button" data-i="${i}">${esc(x.display_name)}</button>`).join('') : '<p class="muted small" style="padding:8px">ไม่พบสถานที่</p>';
+          box.hidden = false;
+          box.querySelectorAll('button').forEach((b) => b.onclick = () => { const x = r[+b.dataset.i]; add(+x.lat, +x.lon, x.name || x.display_name.split(',')[0]); });
+        } catch (err) { msg('ค้นหาไม่ได้ขณะนี้ ลองใช้ตำแหน่งปัจจุบันแทน'); }
+      }, 450);
+    });
+    renderPlaces();
   }
   // ทางลัดบนสุด: ค้นหา / ใกล้ฉัน ส่งต่อให้ตัวกรองรายการจุดน้ำท่วม แล้วเลื่อนลงไปดูผล
   {

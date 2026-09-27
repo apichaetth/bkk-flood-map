@@ -5,6 +5,15 @@
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
   <title>สรุปน้ำท่วม กทม.</title>
   <meta name="description" content="สรุปจุดที่มีน้ำท่วมและพื้นที่เสี่ยงน้ำท่วมในกรุงเทพมหานครตอนนี้ รวมจากเซ็นเซอร์ กทม., รายงานหน่วยงาน, ประชาชน, ข่าว, ปริมาณฝนและระดับน้ำ อัปเดตทุก 15 นาที">
+  <link rel="manifest" href="manifest.webmanifest">
+  <link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-title" content="น้ำท่วม กทม.">
+  <meta property="og:title" content="สรุปน้ำท่วม กทม.">
+  <meta property="og:description" content="__OG_DESC__">
+  <meta property="og:image" content="https://apichaetth.github.io/bkk-flood-map/icons/og.png">
+  <meta property="og:type" content="website">
+  <meta name="twitter:card" content="summary_large_image">
   <meta name="theme-color" content="#0f5ea8">
   <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Cpath d='M16 3C11 11 7 15.5 7 20a9 9 0 0 0 18 0c0-4.5-4-9-9-17z' fill='%230f5ea8'/%3E%3C/svg%3E">
   <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -50,6 +59,25 @@
         <div class="tile t1"><span class="tv" id="nRisk">–</span><span class="tl">พื้นที่<br><b>เสี่ยง</b></span></div>
         <div class="tile"><span class="tv" id="nDistricts">–</span><span class="tl">เขตที่<br><b>มีน้ำท่วม</b></span></div>
       </div>
+    </section>
+
+    <!-- ที่ของฉัน: บ้าน/ที่ทำงาน ที่บันทึกไว้ในเครื่อง พร้อมสถานะน้ำท่วมรอบ ๆ -->
+    <section class="card places" id="places">
+      <div class="card-h"><h2>⭐ ที่ของฉัน</h2><button type="button" class="btn sm" id="plAdd">＋ เพิ่มที่</button></div>
+      <div id="plList"></div>
+      <div id="plForm" class="pl-form" hidden>
+        <div class="pl-kind" role="radiogroup" aria-label="ประเภท">
+          <label><input type="radio" name="plKind" value="home" checked> 🏠 บ้าน</label>
+          <label><input type="radio" name="plKind" value="work"> 🏢 ที่ทำงาน</label>
+          <label><input type="radio" name="plKind" value="other"> 📍 อื่น ๆ</label>
+        </div>
+        <input id="plName" type="text" maxlength="40" placeholder="ชื่อที่ (ไม่ใส่ก็ได้) เช่น บ้านแม่, ร้าน" aria-label="ชื่อที่">
+        <input id="plQ" type="search" placeholder="🔎 ค้นหาสถานที่ หรือกดใช้ตำแหน่งปัจจุบัน" aria-label="ค้นหาสถานที่" autocomplete="off">
+        <div id="plSug" class="rt-sug" hidden></div>
+        <div class="quick-btns"><button type="button" class="btn" id="plHere">📍 ใช้ตำแหน่งปัจจุบัน</button><button type="button" class="btn" id="plCancel">ยกเลิก</button></div>
+        <p id="plMsg" class="small muted"></p>
+      </div>
+      <p class="muted small">บันทึกไว้ในเครื่องนี้เท่านั้น ไม่ได้ส่งไปที่ใด</p>
     </section>
 
     <div id="warn" class="warn" hidden></div>

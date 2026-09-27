@@ -1,0 +1,19 @@
+{
+  "name": "น้ำท่วม กทม. ตอนนี้",
+  "short_name": "น้ำท่วม กทม.",
+  "description": "จุดน้ำท่วม ถนนเสี่ยง และเส้นทางเลี่ยงน้ำในกรุงเทพฯ อัปเดตทุก 15 นาที",
+  "lang": "th",
+  "start_url": "./",
+  "scope": "./",
+  "display": "standalone",
+  "background_color": "#f4f6f8",
+  "theme_color": "#0f5ea8",
+  "icons": [
+    { "src": "icons/icon-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any maskable" },
+    { "src": "icons/icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any maskable" }
+  ],
+  "shortcuts": [
+    { "name": "แผนที่ละเอียด", "url": "map.html" },
+    { "name": "เส้นทางเลี่ยงน้ำ", "url": "route.html" }
+  ]
+}

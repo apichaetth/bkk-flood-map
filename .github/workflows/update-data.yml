@@ -95,7 +95,7 @@ jobs:
       - name: Prepare site
         run: |
           mkdir -p _site
-          cp -r index.html districts.html map.html log.html traffy.html risk.html route.html about.html dds-test.html css js data _site/
+          cp -r index.html districts.html map.html log.html traffy.html risk.html route.html about.html dds-test.html manifest.webmanifest sw.js icons css js data _site/
           rm -f _site/data/news-cache.json _site/data/yt-state.json _site/data/geocache.json _site/data/roads.json _site/data/risk-history.json
           # ติดเลขเวอร์ชันให้ css/js ทุกครั้งที่ deploy เบราว์เซอร์จะไม่ใช้ไฟล์เก่าที่ไม่เข้ากับหน้าใหม่
           V=$(date +%s)
@@ -106,6 +106,17 @@ jobs:
           sed -i "s#<meta charset=\"utf-8\">#<meta charset=\"utf-8\"><meta name=\"build\" content=\"$B\">#" _site/*.html
           echo "$B" > _site/version.txt
           touch _site/.nojekyll
+          # ข้อความตอนแชร์ลิงก์หน้าแรก: ใส่ตัวเลขล่าสุด (LINE/Facebook อ่านจาก HTML ตอนแชร์)
+          node -e '
+            const fs = require("fs"); const m = JSON.parse(fs.readFileSync("_site/data/meta.json", "utf8")); const s = m.sources || {};
+            const t = new Date(m.updated).toLocaleTimeString("th-TH", { timeZone: "Asia/Bangkok", hour: "2-digit", minute: "2-digit" });
+            const parts = [];
+            const wet = (s.bmaTw && s.bmaTw.flooded) || (s.bma && s.bma.flooded);
+            if (wet) parts.push("เซ็นเซอร์ กทม. วัดน้ำท่วมถนนได้ " + wet + " จุด");
+            if (s.traffy && s.traffy.flood) parts.push("ประชาชนแจ้งน้ำท่วม " + s.traffy.flood + " เรื่อง");
+            const d = (parts.length ? "ล่าสุด " + t + " น.: " + parts.join(" · ") + " · " : "") + "ดูจุดน้ำท่วม ถนนเสี่ยง และหาเส้นทางเลี่ยงน้ำในกรุงเทพฯ อัปเดตทุก 15 นาที";
+            const f = "_site/index.html"; fs.writeFileSync(f, fs.readFileSync(f, "utf8").replace("__OG_DESC__", d.replace(/"/g, "")));
+          ' || sed -i 's/__OG_DESC__/ดูจุดน้ำท่วม ถนนเสี่ยง และหาเส้นทางเลี่ยงน้ำในกรุงเทพฯ อัปเดตทุก 15 นาที/' _site/index.html
 
       - uses: actions/upload-pages-artifact@v3
         with:

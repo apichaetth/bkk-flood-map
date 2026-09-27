@@ -541,3 +541,20 @@ label.lg-toggle, .rk-filter label, .rt-opts label { display: inline-flex; align-
 .small a:not(.btn) { display: inline-block; padding: 8px 2px; }
 .depth small { font-size: 12px; }
 @media (pointer: coarse) { .leaflet-bar a { width: 40px !important; height: 40px !important; line-height: 40px !important; font-size: 20px !important; } }
+
+/* ---------- ที่ของฉัน ---------- */
+.places .card-h { align-items: center; }
+.pl-row { display: flex; align-items: center; gap: 10px; padding: 10px 0; border-bottom: 1px solid var(--line); }
+.pl-row:last-child { border-bottom: 0; }
+.pl-row.lv3 { background: color-mix(in srgb, var(--critical) 8%, transparent); border-radius: 10px; padding: 10px 8px; }
+.pl-ic { font-size: 24px; flex: none; }
+.pl-t { flex: 1; min-width: 0; display: flex; flex-direction: column; }
+.pl-t span { font-size: 14px; color: var(--ink2); display: flex; gap: 6px; align-items: baseline; }
+.pl-act { display: flex; gap: 4px; flex: none; }
+.pl-act .btn { min-width: 40px; padding: 6px 8px; text-decoration: none; }
+.pl-form { display: grid; gap: 8px; margin: 8px 0; }
+.pl-form input[type="text"], .pl-form input[type="search"] { min-height: 44px; font: inherit; padding: 8px 12px; border: 1px solid var(--line); border-radius: 10px; background: var(--surface); color: var(--ink); }
+.pl-kind { display: flex; flex-wrap: wrap; gap: 4px 14px; }
+.pl-kind label { display: inline-flex; align-items: center; min-height: 40px; cursor: pointer; }
+.rt-sug { border: 1px solid var(--line); border-radius: 8px; max-height: 220px; overflow: auto; }
+.rt-sug button { display: block; width: 100%; text-align: left; padding: 10px; border: 0; border-bottom: 1px solid var(--line); background: none; color: inherit; font: inherit; font-size: 14px; cursor: pointer; }

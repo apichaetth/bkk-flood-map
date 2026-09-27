@@ -169,6 +169,14 @@
     $('result').innerHTML = msg;
   }
 
+  // เปิดจากหน้าแรก ("ที่ของฉัน" → 🚗): route.html?to=lat,lng&name=ชื่อ
+  {
+    const u = new URLSearchParams(location.search), to = (u.get('to') || '').split(',').map(Number);
+    if (to.length === 2 && to.every((v) => isFinite(v)) && to[0] > 13 && to[0] < 14.5 && to[1] > 100 && to[1] < 101.5) {
+      setPoint('B', to[0], to[1], (u.get('name') || 'ปลายทาง').slice(0, 60));
+      status('เลือกต้นทาง: กด 📍 ตำแหน่งฉัน หรือแตะบนแผนที่');
+    }
+  }
   loadAvoid();
   setInterval(loadAvoid, F.REFRESH_MS);
 })();
