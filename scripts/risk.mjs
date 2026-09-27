@@ -86,27 +86,44 @@ export async function loadRoads(DATA, fetchText, log) {
     old = JSON.parse(await readFile(file, 'utf8'));
     const fresh = old.ver === ROADS_VER && Date.now() - new Date(old.built) < 30 * 864e5;
     // สร้างใหม่ไม่สำเร็จเมื่อไม่นานมานี้: ใช้ชุดเก่าไปก่อน ไม่ถาม Overpass ทุก 15 นาที
-    const backoff = old.lastTry && Date.now() - old.lastTry < 6 * 36e5;
+    const backoff = old.retryAt && Date.now() - old.retryAt < 6 * 36e5;
     if (old.segments.length && (fresh || backoff)) return old;
   } catch { /* ยังไม่มี */ }
   log('building road segments from Overpass…');
   // ถนนหลัก/รอง ทั้งหมด + ซอยที่มีชื่อ (ซอยไม่มีชื่อส่วนใหญ่เป็นทางในหมู่บ้าน/โครงการ ข้ามไปเพื่อไม่ให้ไฟล์ใหญ่เกิน)
-  const bb = BBOX.join(',');
-  const q = `[out:json][timeout:200];(way["highway"~"${HW}"](${bb});way["highway"~"${SOI}"]["name"](${bb}););out geom tags;`;
-  let data = null, lastErr = null;
-  for (const url of ['https://overpass-api.de/api/interpreter', 'https://overpass.kumi.systems/api/interpreter']) {
-    try { data = JSON.parse(await fetchText(url, { method: 'POST', body: 'data=' + encodeURIComponent(q), headers: { 'Content-Type': 'application/x-www-form-urlencoded' } }, 240000)); break; }
-    catch (e) { lastErr = e; }
+  // ซอยมีจำนวนมาก แบ่งถามทีละส่วน (3×3) ไม่ให้ Overpass ปฏิเสธเพราะคำขอใหญ่เกิน
+  const [S, W, N, E] = BBOX, parts = [`way["highway"~"${HW}"](${BBOX.join(',')});`];
+  for (let i = 0; i < 3; i++) for (let j = 0; j < 3; j++) {
+    const s = S + ((N - S) * i) / 3, n = S + ((N - S) * (i + 1)) / 3, w = W + ((E - W) * j) / 3, e = W + ((E - W) * (j + 1)) / 3;
+    parts.push(`way["highway"~"${SOI}"]["name"](${[s, w, n, e].map((v) => v.toFixed(4)).join(',')});`);
   }
-  // สร้างใหม่ไม่สำเร็จ: ใช้ชุดเก่าไปก่อน (ถนนแทบไม่เปลี่ยน) แล้วลองใหม่รอบถัดไป
-  if (!data) {
+  const MIRRORS = ['https://overpass-api.de/api/interpreter', 'https://overpass.kumi.systems/api/interpreter', 'https://maps.mail.ru/osm/tools/overpass/api/interpreter'];
+  const t0 = Date.now(), seen = new Set(), data = { elements: [] };
+  let failed = null;
+  for (const part of parts) {
+    const q = `[out:json][timeout:120];${part}out geom tags;`;
+    let ok = false;
+    for (const url of MIRRORS) {
+      if (Date.now() - t0 > 8 * 6e4) break; // ไม่ให้รอบอัปเดตนานเกิน
+      try {
+        const d = JSON.parse(await fetchText(url, { method: 'POST', body: 'data=' + encodeURIComponent(q), headers: { 'Content-Type': 'application/x-www-form-urlencoded' } }, 150000));
+        if (d.remark && /error/i.test(d.remark)) throw new Error(d.remark.slice(0, 120));
+        for (const w of d.elements || []) if (!seen.has(w.id)) { seen.add(w.id); data.elements.push(w); }
+        ok = true; break;
+      } catch (e) { log(`overpass ${new URL(url).host} failed:`, e.message); }
+    }
+    if (!ok) { failed = part; break; }
+  }
+  log(`overpass: ${data.elements.length} ways in ${Math.round((Date.now() - t0) / 1000)} s${failed ? ' (incomplete)' : ''}`);
+  // สร้างใหม่ไม่ครบ: ใช้ชุดเก่าไปก่อน (ถนนแทบไม่เปลี่ยน) แล้วลองใหม่ภายหลัง
+  if (failed) {
     if (old && old.segments && old.segments.length) {
       log('roads rebuild failed, using old file');
-      old.lastTry = Date.now();
+      old.retryAt = Date.now();
       await writeFile(file, JSON.stringify(old));
       return old;
     }
-    throw lastErr || new Error('overpass failed');
+    throw new Error('overpass failed');
   }
   const geo = JSON.parse(await readFile(path.join(DATA, 'districts.geojson'), 'utf8'));
   const segments = [];
