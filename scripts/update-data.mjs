@@ -395,6 +395,9 @@ async function updateCamsRadar(meta) {
 async function updateTmdForecast(meta) {
   const token = (process.env.TMD_TOKEN || '').trim();
   if (!token) { meta.sources.tmdFcst = { ok: false, status: 'no-key' }; return; }
+  // พยากรณ์รายชั่วโมงเปลี่ยนไม่บ่อย และ API จำกัดจำนวนครั้ง (429): ดึงใหม่ชั่วโมงละครั้ง
+  const prev = await readJSON('tmd-forecast.json', null);
+  if (prev && now - Date.parse(prev.updated) < 55 * 6e4 && (prev.areas || []).length) { meta.sources.tmdFcst = { ok: true, cached: true, areas: prev.areas.length }; return; }
   const API = 'https://data.tmd.go.th/nwpapi/v1/forecast/';
   const hdr = { accept: 'application/json', authorization: 'Bearer ' + token };
   // เวลาเริ่ม = ชั่วโมงปัจจุบันตามเวลาไทย
@@ -410,7 +413,7 @@ async function updateTmdForecast(meta) {
   let j = null, used = '', lastErr = null;
   for (const q of tries) {
     try { j = JSON.parse(await fetchText(API + q, { headers: hdr }, 60000)); used = q.split('?')[0]; if ((j.WeatherForecasts || []).length) break; }
-    catch (e) { lastErr = e; log('tmd forecast', q.split('?')[0], 'failed:', e.message); j = null; }
+    catch (e) { lastErr = e; log('tmd forecast', q.split('?')[0], 'failed:', e.message); j = null; if (/HTTP 429/.test(e.message)) break; }
   }
   if (!j || !(j.WeatherForecasts || []).length) { meta.sources.tmdFcst = { ok: false, error: lastErr ? lastErr.message : 'empty' }; return; }
   const first = j.WeatherForecasts[0];
