@@ -44,7 +44,6 @@
     rain: L.layerGroup().addTo(map),
     wl: L.layerGroup().addTo(map),
     canal: L.layerGroup().addTo(map),
-    bmaRain: L.layerGroup(),
     news: L.layerGroup().addTo(map),
     traffy: L.layerGroup().addTo(map),
     event: L.layerGroup().addTo(map),
@@ -72,8 +71,7 @@
     'ตำแหน่งจากข่าว / YouTube': layers.news,
     'ระดับน้ำคลอง/แม่น้ำ (ThaiWater)': layers.wl,
     'ระดับน้ำคลอง กทม. (312 สถานี)': layers.canal,
-    'ปริมาณฝน 24 ชม. (ThaiWater)': layers.rain,
-    'ฝน – สถานี กทม.': layers.bmaRain,
+    'ฝน 24 ชม. (สถานี กทม. + ThaiWater)': layers.rain,
     'เรดาร์ฝน (RainViewer)': layers.radar,
     'กล้อง CCTV สาธารณะ': layers.cam,
     'ขอบเขตเขต': layers.districts,
@@ -291,37 +289,51 @@
     } catch (e) { S.rain = null; setFeed('rain', 'fail', Flood.errMsg('rain', e)); }
     drawRain();
   }
+  // ฝน: รวมเป็นชุดเดียว · สถานี กทม. (ถี่และใหม่กว่า) เป็นหลัก · ThaiWater เพิ่มเฉพาะสถานีที่ไม่ซ้ำ
+  // (ThaiWater ส่งต่อสถานีฝนของ กทม. ~120 แห่ง ค่าเดียวกันแต่ช้ากว่า ~1 ชม. จึงข้ามจุดที่อยู่ห่างสถานี กทม. ไม่เกิน 150 ม.)
+  function rainStations() {
+    const b = S.relay;
+    const bma = ((b && b.rain) || []).filter((r) => r.r24 != null && r.t && Date.now() - r.t < 3 * 36e5).map((r) => ({
+      src: 'bma', key: 'bma:' + (r.c || r.n), name: r.n, where: 'เขต' + r.d, agency: 'สำนักการระบายน้ำ กทม.', la: r.la, lo: r.lo, t: new Date(r.t),
+      mm: r.r24, mm1: r.r1, extra: `15 นาที ${r.r15 ?? '–'} · 1 ชม. ${r.r1 ?? '–'} · 3 ชม. ${r.r3 ?? '–'} มม.` }));
+    const tw = [...(S.rain || []), ...(S.rainEdge || [])].filter((s) => !bma.some((r) => distKm(r.la, r.lo, s.la, s.lo) < 0.15)).map((s) => ({
+      src: 'tw', key: 'tw:' + s.x.station.id, name: th(s.x.station.tele_station_name), where: loc(s), agency: th(s.x.agency && s.x.agency.agency_shortname) + ' (ThaiWater)',
+      la: s.la, lo: s.lo, t: s.t, mm: s.mm, mm1: s.mm1, edge: s.edge }));
+    return [...bma, ...tw];
+  }
   function drawRain() {
     layers.rain.clearLayers();
-    if (!S.rain) { $('kRain').textContent = '–'; $('listRain').innerHTML = $('listRain1').innerHTML = '<div class="muted small">ไม่มีข้อมูลฝน</div>'; return; }
-    const all = [...S.rain, ...(S.rainEdge || [])];
+    const all = rainStations();
+    if (!all.length) { $('kRain').textContent = '–'; $('listRain').innerHTML = $('listRain1').innerHTML = '<div class="muted small">ไม่มีข้อมูลฝน</div>'; return; }
+    const shown = new Set(all.map((s) => s.key));
     for (const s of all) {
       const st = rainStep(s.mm);
-      const html = `<div class="pp"><div class="m">สถานีวัดฝน · ${esc(th(s.x.agency && s.x.agency.agency_shortname))}</div><h3>${esc(th(s.x.station.tele_station_name))}</h3>
+      const html = `<div class="pp"><div class="m">สถานีวัดฝน · ${esc(s.agency)}</div><h3>${esc(s.name)}</h3>
         ${s.mm > RAIN_HEAVY_MM ? badge(3, 'ฝน' + st[2]) : ''}
-        <div><span class="big">${s.mm}</span> มม. / 24 ชม. (${st[2]})${s.mm1 != null ? ` · ${s.mm1} มม. ชั่วโมงล่าสุด` : ''}</div>
+        <div><span class="big">${s.mm}</span> มม. / 24 ชม. (${st[2]})${s.mm1 != null && !s.extra ? ` · ${s.mm1} มม. ชั่วโมงล่าสุด` : ''}</div>
+        ${s.extra ? `<div>${s.extra}</div>` : ''}
         ${s.mm1 >= 10 ? badge(3, 'ตอนนี้ฝน' + rain1(s.mm1)[1]) : ''}
-        ${rainTrHtml(S.trend && S.trend.rain.get('tw:' + s.x.station.id))}
-        <div class="m">${esc(loc(s))} · ${fmtDT(s.t)} (${ago(s.t)})</div></div>`;
+        ${rainTrHtml(S.trend && S.trend.rain.get(s.key))}
+        <div class="m">${esc(s.where)} · ${fmtDT(s.t)} (${ago(s.t)})</div></div>`;
       const heavy = s.mm > RAIN_HEAVY_MM;
       s.marker = L.marker([s.la, s.lo], { icon: dropIcon(s.mm, s.mm1, heavy ? heavyRed(s.mm) : st[1]), zIndexOffset: Math.round(s.mm) + (s.mm1 >= 10 ? 500 : 0) })
         .bindPopup(html).addTo(layers.rain);
     }
-    // ป้ายลูกศรฝนแรงขึ้น/เบาลง (ทุกสถานีทั้ง ThaiWater และ กทม.) เทียบฝน 1 ชม. กับชั่วโมงก่อน
+    // ป้ายลูกศรฝนแรงขึ้น/เบาลง เทียบฝน 1 ชม. กับชั่วโมงก่อน (เฉพาะสถานีที่แสดงอยู่)
     for (const x of (S.trend && S.trend.rainList) || []) {
-      if (x.tr === 'flat') continue;
+      if (x.tr === 'flat' || !shown.has(x.c)) continue;
       L.marker([x.la, x.lo], { icon: L.divIcon({ className: '', iconSize: [30, 16], iconAnchor: [-2, 18], html: `<span class="rtr ${x.tr}">🌧${TRL[x.tr][0]}</span>` }),
         zIndexOffset: 300, interactive: false, keyboard: false }).addTo(layers.rain);
     }
-    const top = [...S.rain].sort((a, b) => b.mm - a.mm);
+    const top = all.filter((s) => !s.edge).sort((a, b) => b.mm - a.mm);
     $('kRain').textContent = top.length ? top[0].mm.toFixed(0) : '–';
-    $('kRainAt').textContent = top.length ? 'มม. · ' + th(top[0].x.station.tele_station_name) : 'มม.';
+    $('kRainAt').textContent = top.length ? 'มม. · ' + top[0].name : 'มม.';
     listInto('listRain', top.filter((s) => s.mm > 0).slice(0, 6), (s) => ({
-      dot: s.mm > RAIN_HEAVY_MM ? heavyRed(s.mm) : rainStep(s.mm)[1], title: th(s.x.station.tele_station_name), sub: `${loc(s)} · ${fmtTime(s.t)}`, right: s.mm + ' มม.', go: s,
+      dot: s.mm > RAIN_HEAVY_MM ? heavyRed(s.mm) : rainStep(s.mm)[1], title: s.name, sub: `${s.where} · ${fmtTime(s.t)}`, right: s.mm + ' มม.', go: s,
     }), 'ไม่มีฝนใน 24 ชม. ที่ผ่านมา');
     // ฝนตอนนี้: เรียงตามฝน 1 ชม. ล่าสุด (รวมสถานีรอบขอบ กทม.) เฉพาะค่าใน 2 ชม. ที่ผ่านมา
     const now1 = all.filter((s) => s.mm1 > 0 && Date.now() - s.t < 2 * 36e5).sort((a, b) => b.mm1 - a.mm1).slice(0, 6);
-    listInto('listRain1', now1, (s) => ({ dot: LEVEL[rain1(s.mm1)[0]].color, title: th(s.x.station.tele_station_name), sub: `${loc(s)} · ${rain1(s.mm1)[1]} · ${fmtTime(s.t)}`, right: s.mm1 + ' มม./ชม.', go: s }),
+    listInto('listRain1', now1, (s) => ({ dot: LEVEL[rain1(s.mm1)[0]].color, title: s.name, sub: `${s.where} · ${rain1(s.mm1)[1]} · ${fmtTime(s.t)}`, right: s.mm1 + ' มม./ชม.', go: s }),
       'ชั่วโมงล่าสุดไม่มีฝนที่สถานีใน กทม. และรอบ ๆ');
     renderBasin();
   }
@@ -504,12 +516,11 @@
     drawRelay();
   }
   function drawRelay() {
-    layers.canal.clearLayers(); layers.bmaRain.clearLayers();
+    layers.canal.clearLayers();
     const b = S.relay;
     $('secCanal').hidden = !b || !(b.canal || []).length;
     $('secTunnel').hidden = !b || !(b.road || []).some((r) => r.tunnel);
-    $('secBmaRain').hidden = !b || !(b.rain || []).length;
-    if (!b) return;
+    if (!b) { drawRain(); return; } // ไม่มีข้อมูล กทม. (เช่น เครื่องส่งข้อมูลปิด) ฝนใช้ ThaiWater ทั้งหมดแทน
     // คลอง: ปกติ/ขัดข้องจุดเล็ก เตือนภัย/วิกฤตจุดใหญ่
     for (const c of b.canal || []) {
       if (c.st < 0 || c.wl == null) continue; // สถานีขัดข้อง/ไม่มีค่า ไม่แสดง (รกแผนที่)
@@ -535,19 +546,7 @@
       title: r.n + (r.dir ? ` (${r.dir})` : ''), sub: `${r.st === 'off' ? 'เซ็นเซอร์ขัดข้อง' : r.cm >= 5 ? 'มีน้ำ' : 'ปกติ'} · เขต${r.d}${r.t ? ' · ' + fmtTime(new Date(r.t)) : ''}`,
       right: r.st === 'off' ? '–' : (r.cm || 0) + ' ซม.', go: r,
     }), 'ไม่มีข้อมูลอุโมงค์');
-    // ฝนสถานี กทม.
-    for (const r of b.rain || []) {
-      if (r.r24 == null) continue;
-      const st = rainStep(r.r24), heavy = r.r24 > RAIN_HEAVY_MM;
-      const html = `<div class="pp"><div class="m">สถานีวัดฝน · สำนักการระบายน้ำ กทม.</div><h3>${esc(r.n)}</h3>
-        <div><span class="big">${r.r24}</span> มม. / 24 ชม.</div><div>15 นาที ${r.r15 ?? '–'} · 1 ชม. ${r.r1 ?? '–'} · 3 ชม. ${r.r3 ?? '–'} มม.</div>
-        <div class="m">เขต${esc(r.d)}${r.t ? ' · ' + fmtDT(new Date(r.t)) : ''}</div></div>`;
-      r.marker = L.marker([r.la, r.lo], { icon: dropIcon(r.r24, r.r1, heavy ? heavyRed(r.r24) : st[1]), zIndexOffset: Math.round(r.r24) + (r.r1 >= 10 ? 500 : 0) })
-        .bindPopup(html).addTo(layers.bmaRain);
-    }
-    const now = (b.rain || []).filter((r) => r.r1 > 0 && r.t && Date.now() - r.t < 2 * 36e5).sort((x, y) => y.r1 - x.r1 || y.r15 - x.r15);
-    listInto('listBmaRain', now.slice(0, 6), (r) => ({ dot: LEVEL[rain1(r.r1)[0]].color, title: r.n, sub: `เขต${r.d} · 15 นาที ${r.r15 ?? 0} มม. · ${fmtTime(new Date(r.t))}`, right: r.r1 + ' มม./ชม.', go: r }),
-      'ชั่วโมงล่าสุดไม่มีฝนที่สถานีของ กทม.');
+    drawRain(); // ฝนสถานี กทม. รวมอยู่ในชั้นฝนชุดเดียว
   }
 
   // ---------- 6) ข่าว + สรุป AI (จาก GitHub Actions) ----------

@@ -743,13 +743,17 @@ async function updateRisk(meta) {
   try {
     const d = JSON.parse(await fetchText(TW + 'rain_24h', { headers: { Referer: 'https://www.thaiwater.net/' } }, 90000));
     await writeJSON('tw-rain.json', { updated: now.toISOString(), data: (d.data || []).filter(keepWeb) });
+    const bmaRain = rain.filter((r) => String(r.c).startsWith('bma:'));
+    let dupRain = 0;
     for (const x of d.data || []) {
       if (!x.station || !nearBkk(+x.station.tele_station_lat, +x.station.tele_station_long)) continue;
       const t = bkkTime(x.rainfall_datetime);
       if (isNaN(t) || now - t > 6 * 36e5) continue;
+      // สถานีฝนของ กทม. ที่ ThaiWater ส่งต่อมา (ค่าเดียวกันแต่ช้ากว่า ~1 ชม.) ข้ามถ้ามีค่าจาก กทม. โดยตรงอยู่แล้ว ไม่ให้นับซ้ำ
+      if (bmaRain.some((r) => distKm(r.la, r.lo, +x.station.tele_station_lat, +x.station.tele_station_long) < 0.15)) { dupRain++; continue; }
       rain.push({ c: 'tw:' + x.station.id, n: (x.station.tele_station_name && x.station.tele_station_name.th) || '', t, la: +x.station.tele_station_lat, lo: +x.station.tele_station_long, mm1: +x.rain_1h || 0, mm24: +x.rain_24h || 0 });
     }
-    src.rain = rain.length;
+    src.rain = rain.length; src.rainDup = dupRain;
   } catch (e) { src.rain = 'error: ' + e.message; }
   try {
     const d = JSON.parse(await fetchText(TW + 'waterlevel_load', { headers: { Referer: 'https://www.thaiwater.net/' } }, 90000));
