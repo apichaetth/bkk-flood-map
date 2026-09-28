@@ -508,8 +508,8 @@ window.Flood = (function () {
   const here = (nav.querySelector('[aria-current="page"]') || {}).getAttribute?.('href') || (path === 'index.html' ? './' : path);
   // [ลิงก์, ชื่อบนคอม, ชื่อบนมือถือ, ไอคอน]
   const MAIN = [['./', 'หน้าแรก', 'หน้าแรก', '🏠'], ['map.html', 'แผนที่ละเอียด', 'แผนที่', '🗺️'], ['route.html', 'เส้นทางเลี่ยงน้ำ', 'เส้นทาง', '🚗'],
-    ['districts.html', 'เขต', 'เขต', '📍'], ['risk.html', 'ถนนเสี่ยง', 'ถนนเสี่ยง', '⚠️']];
-  const MORE = [['details.html', 'รายละเอียด (แนวโน้ม ฝน คลอง)', '📊'], ['traffy.html', 'Traffy Fondue', '📣'], ['log.html', 'บันทึกการแจ้ง', '📝'], ['about.html', 'เกี่ยวกับ', 'ℹ️']];
+    ['districts.html', 'เขต', 'เขต', '📍'], ['traffy.html', 'ประชาชนแจ้ง', 'ประชาชนแจ้ง', '📣']];
+  const MORE = [['risk.html', 'ถนนที่อาจท่วม (3 ชม. ข้างหน้า)', '⚠️'], ['details.html', 'รายละเอียด (แนวโน้ม ฝน คลอง)', '📊'], ['log.html', 'บันทึกการแจ้ง', '📝'], ['about.html', 'เกี่ยวกับ', 'ℹ️']];
   const cur = (h) => (h === here ? ' aria-current="page"' : '');
   const inMore = MORE.some(([h]) => h === here);
   // คอม
@@ -518,7 +518,7 @@ window.Flood = (function () {
     + `<div class="pmenu" hidden>${MORE.map(([h, t, i]) => `<a href="${h}"${cur(h)}>${i} ${t}</a>`).join('')}</div></div>`;
   const pb = nav.querySelector('.pmore button'), pm = nav.querySelector('.pmenu');
   pb.onclick = (e) => { e.stopPropagation(); pm.hidden = !pm.hidden; pb.setAttribute('aria-expanded', String(!pm.hidden)); };
-  // มือถือ: แถบล่าง 4 ปุ่ม (หน้าแรก/แผนที่/เส้นทาง/อื่น ๆ) + แผ่นเมนูอื่น ๆ (เขต ถนนเสี่ยง รายละเอียด …)
+  // มือถือ: แถบล่าง 4 ปุ่ม (หน้าแรก/แผนที่/เส้นทาง/อื่น ๆ) + แผ่นเมนูอื่น ๆ (เขต ประชาชนแจ้ง ถนนที่อาจท่วม รายละเอียด …)
   const MOB = MAIN.slice(0, 3), SHEET = [MAIN[3], MAIN[4], ...MORE.map(([h, t, i]) => [h, t, t, i])];
   const bar = document.createElement('nav');
   bar.className = 'tabbar'; bar.setAttribute('aria-label', 'หน้า');

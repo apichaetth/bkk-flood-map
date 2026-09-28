@@ -4,7 +4,7 @@
   'use strict';
   const F = Flood;
   const { $, esc, distKm, fmtTime, fmtDT, ago, LEVEL } = F;
-  const FRESH_MS = 3 * 36e5, NEAR_KM = 1, CLOSE_KM = 0.5;
+  const FRESH_MS = 3 * 36e5, NEAR_KM = 1, CLOSE_KM = 0.5, AREA_KM = 3;
   const SRC = { sensor: 'เซ็นเซอร์ กทม.', itic: 'หน่วยงาน/iTIC', web: 'ประชาชนปักหมุด', traffy: 'Traffy', news: 'ข่าว', youtube: 'YouTube' };
   const PL_ICON = { home: '🏠', work: '🏢', other: '📍' };
   let H = null, me = null;
@@ -17,14 +17,16 @@
   // ---------- 1) แถวคุณ ----------
   // สถานะรอบจุด: ใช้เฉพาะรายงานใหม่ (≤ 3 ชม.) ตัดสิน ส่วนรายงานเก่าบอกเป็นหมายเหตุ
   function statusAt(la, lo) {
-    const all = pts().map((p) => ({ ...p, km: distKm(la, lo, p.la, p.lo) })).filter((p) => p.km <= 2).sort((a, b) => a.km - b.km);
-    const fresh = all.filter((p) => p.fresh), inR = fresh.filter((p) => p.km <= NEAR_KM);
-    const n = inR[0];
-    if (n && n.km <= CLOSE_KM) return { lv: 3, head: `มีน้ำท่วมใกล้มาก ห่าง ${m(n.km)}`, sub: `${n.name} · ${depth(n)} · ${ago(new Date(n.t))}${inR.length > 1 ? ` · ในรัศมี 1 กม. มี ${inR.length} จุด` : ''}`, list: inR };
-    if (n) return { lv: 2, head: `มีน้ำท่วมในรัศมี 1 กม. (${inR.length} จุด)`, sub: `ใกล้สุด ${n.name} ห่าง ${m(n.km)} · ${depth(n)}`, list: inR };
-    const old = all.filter((p) => !p.fresh && p.km <= NEAR_KM).length;
-    const f2 = fresh[0];
-    return { lv: 0, head: 'ไม่มีรายงานน้ำท่วมในรัศมี 1 กม.', sub: (f2 ? `จุดใกล้สุดห่าง ${m(f2.km)} (${f2.name})` : 'ไม่มีรายงานใหม่ในรัศมี 2 กม.') + (old ? ` · มีรายงานเก่ากว่า 3 ชม. ${old} จุด (อาจลดแล้ว)` : ''), list: [] };
+    // 🔴 ≤ 500 ม. · 🟠 ≤ 1 กม. · 🟡 ≤ 3 กม. · 🟢 ไม่มีในรัศมี 3 กม.
+    const all = pts().map((p) => ({ ...p, km: distKm(la, lo, p.la, p.lo) })).filter((p) => p.km <= AREA_KM).sort((a, b) => a.km - b.km);
+    const fresh = all.filter((p) => p.fresh), in1 = fresh.filter((p) => p.km <= NEAR_KM);
+    const n = fresh[0];
+    const old = all.filter((p) => !p.fresh).length;
+    const oldNote = old ? ` · มีรายงานเก่ากว่า 3 ชม. อีก ${old} จุด (อาจลดแล้ว)` : '';
+    if (n && n.km <= CLOSE_KM) return { lv: 3, head: `มีน้ำท่วมใกล้มาก ห่าง ${m(n.km)}`, sub: `${n.name} · ${depth(n)} · ${ago(new Date(n.t))}${in1.length > 1 ? ` · ในรัศมี 1 กม. มี ${in1.length} จุด` : ''} · ในรัศมี 3 กม. ${fresh.length} จุด`, list: fresh };
+    if (n && n.km <= NEAR_KM) return { lv: 2, head: `มีน้ำท่วมในรัศมี 1 กม. (${in1.length} จุด)`, sub: `ใกล้สุด ${n.name} ห่าง ${m(n.km)} · ${depth(n)} · ในรัศมี 3 กม. ${fresh.length} จุด`, list: fresh };
+    if (n) return { lv: 1, head: `มีน้ำท่วมในรัศมี 3 กม. (${fresh.length} จุด)`, sub: `ใกล้สุด ${n.name} ห่าง ${m(n.km)} · ${depth(n)} · ในรัศมี 1 กม. ยังไม่มีรายงาน${oldNote}`, list: fresh };
+    return { lv: 0, head: 'ไม่มีรายงานน้ำท่วมในรัศมี 3 กม.', sub: 'ช่วง 3 ชม. ล่าสุด' + oldNote, list: [] };
   }
   const verdict = (s, title) => `<div class="h2v lv${s.lv}"><span class="dot" style="--c:${LEVEL[s.lv].color}"></span><div>${title ? `<b class="h2vt">${esc(title)}</b>` : ''}<b>${esc(s.head)}</b><small>${esc(s.sub)}</small></div></div>`;
   function renderMe() {
@@ -42,7 +44,7 @@
     b.textContent = 'กำลังหาตำแหน่ง…'; b.disabled = true;
     navigator.geolocation.getCurrentPosition((p) => {
       me = [p.coords.latitude, p.coords.longitude]; b.textContent = '📍 ดูรอบตัวฉันอีกครั้ง'; b.disabled = false;
-      renderMe(); if (map) { map.setView(me, 14); drawMe(); }
+      renderMe(); if (map) { map.setView(me, 13); drawMe(); }
     }, () => { b.textContent = '📍 ดูรอบตัวฉัน'; b.disabled = false; $('meOut').innerHTML = '<p class="muted">หาตำแหน่งไม่ได้ (ต้องอนุญาตให้เว็บเข้าถึงตำแหน่ง)</p>'; },
     { enableHighAccuracy: true, timeout: 15000, maximumAge: 60000 });
   };
@@ -79,6 +81,7 @@
     for (const p of F.store.get('bkkflood.places') || []) L.marker([p.la, p.lo], { icon: L.divIcon({ className: '', iconSize: [28, 28], iconAnchor: [14, 14], html: `<div class="plm" style="--c:var(--accent)">${PL_ICON[p.kind] || '📍'}</div>` }) }).bindPopup(esc(p.name)).addTo(meLyr);
     if (me) {
       L.circle(me, { radius: NEAR_KM * 1000, color: F.cssVar('--accent'), weight: 1.5, dashArray: '5 5', fill: false, interactive: false }).addTo(meLyr);
+      L.circle(me, { radius: AREA_KM * 1000, color: F.cssVar('--accent'), weight: 1, opacity: 0.6, dashArray: '2 6', fill: false, interactive: false }).addTo(meLyr);
       L.circleMarker(me, { radius: 7, keepSize: true, color: '#fff', weight: 2, fillColor: F.cssVar('--accent'), fillOpacity: 1 }).bindPopup('ตำแหน่งของคุณ').addTo(meLyr);
     }
   }

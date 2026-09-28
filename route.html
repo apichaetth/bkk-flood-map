@@ -4,13 +4,13 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
   <title>หาเส้นทางเลี่ยงน้ำท่วม</title>
-  <meta name="description" content="หาเส้นทางรถยนต์ในกรุงเทพฯ ที่หลบจุดน้ำท่วมจากเซ็นเซอร์ กทม. รายงานน้ำท่วม และถนนเสี่ยง แล้วเปิดนำทางต่อใน Google Maps">
+  <meta name="description" content="หาเส้นทางรถยนต์ในกรุงเทพฯ ที่หลบจุดน้ำท่วมจากเซ็นเซอร์ กทม. รายงานน้ำท่วม และถนนที่อาจท่วม แล้วเปิดนำทางต่อใน Google Maps">
   <link rel="manifest" href="manifest.webmanifest">
   <link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
   <meta name="apple-mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-title" content="น้ำท่วม กทม.">
   <meta property="og:title" content="หาเส้นทางเลี่ยงน้ำท่วม">
-  <meta property="og:description" content="หาเส้นทางรถยนต์ในกรุงเทพฯ ที่หลบจุดน้ำท่วมจากเซ็นเซอร์ กทม. รายงานน้ำท่วม และถนนเสี่ยง แล้วเปิดนำทางต่อใน Google Maps">
+  <meta property="og:description" content="หาเส้นทางรถยนต์ในกรุงเทพฯ ที่หลบจุดน้ำท่วมจากเซ็นเซอร์ กทม. รายงานน้ำท่วม และถนนที่อาจท่วม แล้วเปิดนำทางต่อใน Google Maps">
   <meta property="og:image" content="https://apichaetth.github.io/bkk-flood-map/icons/og.png">
   <meta property="og:type" content="website">
   <meta name="twitter:card" content="summary_large_image">
@@ -32,7 +32,7 @@
         <p id="updated" class="sub">กำลังโหลดข้อมูลจุดน้ำท่วม…</p>
       </div>
     </div>
-    <nav class="pages" aria-label="หน้า"><a href="./">ภาพรวม</a><a href="districts.html">เขต</a><a href="map.html">แผนที่ละเอียด</a><a href="traffy.html">Traffy Fondue</a><a href="risk.html">ถนนเสี่ยง</a><a href="route.html" aria-current="page">เส้นทางเลี่ยงน้ำ</a><a href="log.html">บันทึกการแจ้ง</a><a href="about.html">เกี่ยวกับ</a></nav>
+    <nav class="pages" aria-label="หน้า"><a href="./">ภาพรวม</a><a href="districts.html">เขต</a><a href="map.html">แผนที่ละเอียด</a><a href="traffy.html">ประชาชนแจ้ง</a><a href="risk.html">ถนนที่อาจท่วม</a><a href="route.html" aria-current="page">เส้นทางเลี่ยงน้ำ</a><a href="log.html">บันทึกการแจ้ง</a><a href="about.html">เกี่ยวกับ</a></nav>
   </header>
   <main class="sum">
     <section class="card rt-form" aria-label="เลือกต้นทางและปลายทาง">
@@ -63,7 +63,7 @@
       <h2>ใช้อย่างไร / ข้อควรรู้</h2>
       <ul>
         <li>เลือกต้นทางและปลายทาง (ค้นหา, ใช้ตำแหน่งของฉัน หรือแตะบนแผนที่) แล้วกด "หาเส้นทางเลี่ยงน้ำ" เฉพาะรถยนต์</li>
-        <li>ระบบจะหลบ: เซ็นเซอร์น้ำท่วมถนน กทม. ที่วัดได้ตั้งแต่ 10 ซม., รายงานจากหน่วยงาน/iTIC, Traffy และประชาชนใน 3 ชม. และถนน "ควรระวังมาก" จากหน้าถนนเสี่ยง</li>
+        <li>ระบบจะหลบ: เซ็นเซอร์น้ำท่วมถนน กทม. ที่วัดได้ตั้งแต่ 10 ซม., รายงานจากหน่วยงาน/iTIC, Traffy และประชาชนใน 3 ชม. และถนน "ควรระวังมาก" จากหน้าถนนที่อาจท่วม</li>
         <li>กด "เปิดใน Google Maps" เพื่อนำทางต่อ (ส่งจุดผ่านไปด้วย แต่ Google อาจปรับเส้นทางเล็กน้อย)</li>
         <li><b>หลบได้เฉพาะจุดที่ระบบรู้</b> จุดที่ท่วมแต่ไม่มีเซ็นเซอร์และไม่มีคนแจ้งจะไม่รู้ ข้อมูลช้าได้ถึง ~15 นาที</li>
         <li><b>ใช้ประกอบการตัดสินใจเท่านั้น ห้ามขับรถฝ่าน้ำที่ไม่รู้ความลึก</b> ถ้าเจอน้ำท่วมให้เลี่ยงหรือจอดรอในที่ปลอดภัย</li>

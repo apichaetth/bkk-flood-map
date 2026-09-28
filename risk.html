@@ -3,13 +3,13 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-  <title>ถนนเสี่ยงน้ำท่วม (ประมาณการ)</title>
+  <title>ถนนที่อาจท่วมใน 3 ชม. ข้างหน้า</title>
   <meta name="description" content="ประมาณการถนนหลักและรองในกรุงเทพฯ ที่มีแนวโน้มน้ำท่วมตอนนี้ จากรายงานน้ำท่วม ฝน ประวัติการท่วมซ้ำ และระดับน้ำในคลอง (หน้าทดลอง)">
   <link rel="manifest" href="manifest.webmanifest">
   <link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
   <meta name="apple-mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-title" content="น้ำท่วม กทม.">
-  <meta property="og:title" content="ถนนเสี่ยงน้ำท่วม (ประมาณการ)">
+  <meta property="og:title" content="ถนนที่อาจท่วมใน 3 ชม. ข้างหน้า">
   <meta property="og:description" content="ประมาณการถนนหลักและรองในกรุงเทพฯ ที่มีแนวโน้มน้ำท่วมตอนนี้ จากรายงานน้ำท่วม ฝน ประวัติการท่วมซ้ำ และระดับน้ำในคลอง (หน้าทดลอง)">
   <meta property="og:image" content="https://apichaetth.github.io/bkk-flood-map/icons/og.png">
   <meta property="og:type" content="website">
@@ -28,11 +28,11 @@
     <div class="brand">
       <svg viewBox="0 0 32 32" aria-hidden="true"><path d="M16 3C11 11 7 15.5 7 20a9 9 0 0 0 18 0c0-4.5-4-9-9-17z"/></svg>
       <div>
-        <h1>ถนนเสี่ยงน้ำท่วม · ประมาณการ <span class="beta">ทดลอง</span></h1>
+        <h1>ถนนที่อาจท่วม · 3 ชม. ข้างหน้า <span class="beta">ทดลอง</span></h1>
         <p id="updated" class="sub">กำลังโหลด…</p>
       </div>
     </div>
-    <nav class="pages" aria-label="หน้า"><a href="./">ภาพรวม</a><a href="districts.html">เขต</a><a href="map.html">แผนที่ละเอียด</a><a href="traffy.html">Traffy Fondue</a><a href="risk.html" aria-current="page">ถนนเสี่ยง</a><a href="route.html">เส้นทางเลี่ยงน้ำ</a><a href="log.html">บันทึกการแจ้ง</a><a href="about.html">เกี่ยวกับ</a></nav>
+    <nav class="pages" aria-label="หน้า"><a href="./">ภาพรวม</a><a href="districts.html">เขต</a><a href="map.html">แผนที่ละเอียด</a><a href="traffy.html">ประชาชนแจ้ง</a><a href="risk.html" aria-current="page">ถนนที่อาจท่วม</a><a href="route.html">เส้นทางเลี่ยงน้ำ</a><a href="log.html">บันทึกการแจ้ง</a><a href="about.html">เกี่ยวกับ</a></nav>
     <button id="refresh" class="btn" type="button">↻ รีเฟรช</button>
   </header>
   <main class="sum">
@@ -46,7 +46,7 @@
     <section class="card">
       <div class="card-h"><h2>แผนที่ถนนที่มีแนวโน้มน้ำท่วม</h2>
         <span class="rk-filter"><label><input type="checkbox" data-t="3" checked> ควรระวังมาก</label><label><input type="checkbox" data-t="2" checked> ควรระวัง</label></span></div>
-      <div class="rk-mapwrap"><div id="rmap" role="region" aria-label="แผนที่ถนนเสี่ยงน้ำท่วม"></div><p id="rkStatus" class="rk-status" role="status" hidden></p></div>
+      <div class="rk-mapwrap"><div id="rmap" role="region" aria-label="แผนที่ถนนที่อาจท่วม"></div><p id="rkStatus" class="rk-status" role="status" hidden></p></div>
       <div class="legend-row">
         <span><i class="rk-line t3"></i>ควรระวังมาก</span><span><i class="rk-line t2"></i>ควรระวัง</span>
         <span class="muted">กดเส้นถนนเพื่อดูเหตุผล</span>

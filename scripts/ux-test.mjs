@@ -125,7 +125,7 @@ for (const kind of ['m', 'd']) {
     done(); await p.close();
   });
 
-  await step(`[${K}] ถนนเสี่ยง`, async () => {
+  await step(`[${K}] ถนนที่อาจท่วม`, async () => {
     const p = await ctx.newPage(); const done = watch(p, 'risk');
     const t0 = Date.now();
     await p.goto(BASE + 'risk.html?ux=' + Date.now(), { waitUntil: 'domcontentloaded', timeout: 60000 });
