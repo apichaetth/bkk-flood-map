@@ -640,3 +640,11 @@ label.lg-toggle, .rk-filter label, .rt-opts label { display: inline-flex; align-
   .h2btns .btn { font-size: 15px; min-height: 46px; }
   .h2city .muted.small { margin: 0 0 2px; }
 }
+/* จอใหญ่ (≥1500 px): กว้างขึ้นและตัวอักษรใหญ่ขึ้นเล็กน้อย */
+@media (min-width: 1500px) {
+  .h2wrap { max-width: 1560px; grid-template-columns: minmax(420px, 520px) minmax(0, 1fr); font-size: 17px; }
+  .h2wrap h2 { font-size: 24px; }
+  .h2v b { font-size: 19px; } .h2v small, .h2t small { font-size: 15px; }
+  .h2t b { font-size: 17px; }
+  .h2city #hmap { min-height: 520px; }
+}
