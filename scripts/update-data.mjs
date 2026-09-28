@@ -333,6 +333,21 @@ function isFloodTicket(r) {
   const d = String(r.description || '');
   return T_FLOOD_RE.test(d) && !T_NOT_FLOOD_RE.test(d);
 }
+// ระดับน้ำจากข้อความรายงาน (เหมือนใน js/core.js)
+function levelFromText(text) {
+  const t = String(text || '');
+  let cm = null;
+  for (const m of t.matchAll(/(\d{1,3})(?:\s*[-–~]\s*(\d{1,3}))?\s*(?:ซ\.?\s?ม\.?|ซม|เซน(?:ติเมตร)?|cm)/gi)) {
+    const v = Math.max(+m[1], m[2] ? +m[2] : 0);
+    if (v > 0 && v < 300) cm = Math.max(cm || 0, v);
+  }
+  if (/น้ำลด(ลง)?แล้ว|ระบายแล้ว|แห้งแล้ว|กลับสู่ภาวะปกติ|ผ่านได้ตามปกติ/.test(t)) return { lv: 0, why: 'รายงานว่าน้ำลดแล้ว' };
+  if (/ผ่านไม่ได้|ไม่สามารถผ่าน|สัญจรไม่ได้|ปิดการจราจร|ปิดถนน/.test(t)) return { lv: 3, why: 'รายงานว่ารถผ่านไม่ได้' + (cm ? ` · ${cm} ซม.` : ''), cm };
+  if (cm != null) return { lv: cm >= 20 ? 3 : cm >= 10 ? 2 : 1, why: `ระดับน้ำประมาณ ${cm} ซม.`, cm };
+  if (/เข่า|เอว|ต้นขา|หน้าแข้ง/.test(t)) return { lv: 3, why: 'รายงานว่าน้ำสูงระดับเข่าขึ้นไป' };
+  if (/ข้อเท้า|ตาตุ่ม/.test(t)) return { lv: 1, why: 'รายงานว่าน้ำสูงระดับข้อเท้า' };
+  return { lv: 2, why: 'มีรายงานน้ำท่วม ไม่ระบุความสูง' };
+}
 async function updateTraffy(meta) {
   const prev = await readJSON('traffy.json', { results: [] });
   let d = null, lastErr = null;
@@ -369,16 +384,19 @@ async function updateTraffy(meta) {
   await writeJSON('traffy.json', { acc: 2, updated: now.toISOString(), fetched: d.results.length, since: isFinite(since) ? new Date(Math.max(since, cutoff)).toISOString() : null, results: items });
   // ไฟล์ย่อสำหรับหน้าแรก/แผนที่/เขต (ใช้แค่ 24 ชม. ที่ยังไม่เสร็จ) — traffy.json เต็ม 7 วันหลาย MB โหลดเฉพาะหน้า Traffy
   // เก็บเฉพาะช่องที่หน้าเว็บใช้ + ย่อข้อความ (ทุกเรื่องในไฟล์ผ่านตัวกรองน้ำท่วมแล้ว จึงใส่ประเภทแบบสั้น)
+  // ระดับน้ำคิดจากข้อความเต็มไว้ก่อน (lv/cm/why) หน้าเว็บจึงไม่ต้องใช้ข้อความยาว · ตัดเรื่องที่แจ้งว่าน้ำลดแล้ว (lv 0)
   const c24 = now - 24.5 * 36e5;
   const slim = (x) => {
+    const L = levelFromText(x.description);
     const o = { ticket_id: x.ticket_id, timestamp: x.timestamp, coords: x.coords.map((v) => +(+v).toFixed(5)), state: x.state,
-      description: String(x.description || '').slice(0, 220), problem_type_abdul: ['น้ำท่วม'] };
-    if (x.address) o.address = String(x.address).slice(0, 90);
+      description: String(x.description || '').slice(0, 140), problem_type_abdul: ['น้ำท่วม'], lv: L.lv, why: L.why };
+    if (L.cm != null) o.cm = L.cm;
+    if (x.address) o.address = String(x.address).slice(0, 60);
     if (x.photo_url) o.photo_url = x.photo_url;
     return o;
   };
   await writeJSON('traffy-24h.json', { acc: 2, updated: now.toISOString(), since: isFinite(since) ? new Date(Math.max(since, c24)).toISOString() : null,
-    results: items.filter((x) => ts(x) >= c24 && x.state !== 'เสร็จสิ้น').map(slim) });
+    results: items.filter((x) => ts(x) >= c24 && x.state !== 'เสร็จสิ้น').map(slim).filter((x) => x.lv > 0) });
   meta.sources.traffy = { ok: true, fetched: d.results.length, flood: fresh.length, kept: items.length };
 }
 

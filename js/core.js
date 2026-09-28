@@ -250,7 +250,7 @@ window.Flood = (function () {
       .map((r) => ({ r, t: isoDate(r.timestamp), lo: num(r.coords && r.coords[0]), la: num(r.coords && r.coords[1]) }))
       .filter((x) => x.la && x.lo && x.t && x.t >= cutoff && inBkk(x.la, x.lo) && x.r.state !== 'เสร็จสิ้น'
         && isFloodTicket(x.r))
-      .map((x) => ({ ...x, ...levelFromText(x.r.description) }))
+      .map((x) => ({ ...x, ...(x.r.lv != null ? { lv: x.r.lv, why: x.r.why, cm: x.r.cm } : levelFromText(x.r.description)) }))
       .filter((x) => x.lv > 0);
     items.forEach((x) => { if (!newest || x.t > newest) newest = x.t; });
     // บอกช่วงเวลาที่ข้อมูลครอบคลุมจริง (500 เรื่องล่าสุดอาจย้อนหลังได้ไม่ถึง 24 ชม. ช่วงคนแจ้งเยอะ)
