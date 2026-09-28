@@ -282,21 +282,9 @@
         ${s.mm1 >= 10 ? badge(3, 'ตอนนี้ฝน' + rain1(s.mm1)[1]) : ''}
         ${rainTrHtml(S.trend && S.trend.rain.get('tw:' + s.x.station.id))}
         <div class="m">${esc(loc(s))} · ${fmtDT(s.t)} (${ago(s.t)})</div></div>`;
-      // ฝนตกหนักในชั่วโมงล่าสุด: วงแดงรอบจุด ให้เห็นว่าตอนนี้ฝนกำลังหนัก
-      if (s.mm1 >= 10) L.circleMarker([s.la, s.lo], { radius: 9 + Math.min(8, s.mm1 / 5), color: cssVar('--critical'), weight: 2.5, fill: false, dashArray: '4 3', interactive: false }).addTo(layers.rain);
-      // ฝนหนัก (> 35 มม./24 ชม.) ขอบสีแดง ให้เห็นชัดบนแผนที่
       const heavy = s.mm > RAIN_HEAVY_MM;
-      // ฝนน้อย/ไม่มีฝน: จุดเล็กและจาง ไม่ให้แย่งสายตาจากจุดที่สำคัญ
-      // ฝนหนัก = จุดเสี่ยงน้ำท่วม ใช้สีแดงทั้งจุด (แดงหมายถึงเสี่ยงน้ำท่วมทั้งแผนที่) ฝนหนักมาก (> 90 มม.) ใหญ่ขึ้นอีก
-      // ขนาดวงแปรตามปริมาณฝน (รากที่สอง เพื่อให้พื้นที่วงสัมพันธ์กับปริมาณ) เห็นแนวโน้มได้ทันที
-      const radius = Math.min(11, 2 + Math.sqrt(Math.max(0, s.mm)) * 0.7);
-      const style = heavy ? { radius, color: '#fff', weight: 1.5, fillOpacity: 1, opacity: 1 }
-        : s.mm > 10 ? { radius, color: '#fff', weight: 1.2, fillOpacity: 0.85, opacity: 1 }
-        : s.mm > 0 ? { radius, color: '#fff', weight: 0.8, fillOpacity: 0.5, opacity: 0.6 }
-        : { radius: 2, color: '#fff', weight: 0.5, fillOpacity: 0.3, opacity: 0.4 };
-      s.marker = L.circleMarker([s.la, s.lo], { ...style, fillColor: heavy ? heavyRed(s.mm) : cssVar(st[1].slice(4, -1)) })
+      s.marker = L.marker([s.la, s.lo], { icon: dropIcon(s.mm, s.mm1, heavy ? heavyRed(s.mm) : st[1]), zIndexOffset: Math.round(s.mm) + (s.mm1 >= 10 ? 500 : 0) })
         .bindPopup(html).addTo(layers.rain);
-      if (heavy) s.marker.bringToFront();
     }
     // ป้ายลูกศรฝนแรงขึ้น/เบาลง (ทุกสถานีทั้ง ThaiWater และ กทม.) เทียบฝน 1 ชม. กับชั่วโมงก่อน
     for (const x of (S.trend && S.trend.rainList) || []) {
@@ -354,6 +342,31 @@
   const fmtN = (v) => (v == null || isNaN(v) ? '–' : Number(v).toLocaleString('th-TH', { maximumFractionDigits: 2 }));
 
   // ฝนหนัก: แดงอ่อน (35 มม.) → แดงเข้ม (≥ 150 มม.) ไล่ตามปริมาณฝน
+  // ---------- สัญลักษณ์: หยดน้ำ (สถานีฝน) และหลอดวัดระดับ (สถานีระดับน้ำ/คลอง) ----------
+  // หยดน้ำ: ใหญ่/เข้มตามฝนสะสม 24 ชม. · ขอบแดงเมื่อชั่วโมงล่าสุดฝนหนัก (≥ 10 มม.) · ไม่มีฝน = หยดเล็กสีเทาจาง
+  function dropIcon(mm, mm1, fill) {
+    const dry = !(mm > 0);
+    const h = dry ? 10 : Math.round(12 + Math.min(24, Math.sqrt(mm) * 2.4)), w = Math.round(h * 0.75);
+    const hot = mm1 >= 10, hit = Math.max(h, touch ? 30 : 22);
+    return L.divIcon({ className: '', iconSize: [hit, hit], iconAnchor: [hit / 2, hit / 2], popupAnchor: [0, -h / 2],
+      html: `<div class="mkhit${dry ? ' dry' : ''}" style="width:${hit}px;height:${hit}px"><svg class="drop" width="${w}" height="${h}" viewBox="0 0 24 32" aria-hidden="true">`
+        + `<path d="M12 1.5C12 1.5 2.5 13.5 2.5 21a9.5 9.5 0 0 0 19 0C21.5 13.5 12 1.5 12 1.5z" style="fill:${dry ? '#9aa4b1' : fill};stroke:${hot ? 'var(--critical)' : '#fff'};stroke-width:${hot ? 3.5 : 2}"/>`
+        + `${!dry && h >= 20 ? '<path d="M8 20a4.5 4.5 0 0 0 3 5" style="fill:none;stroke:rgba(255,255,255,.7);stroke-width:2;stroke-linecap:round"/>' : ''}</svg></div>` });
+  }
+  // หลอดวัดระดับ: น้ำในหลอดสูงตามสัดส่วนของเกณฑ์ (คลอง กทม. = ระดับ/วิกฤต · ThaiWater = % ของตลิ่ง) เส้นขีด = เกณฑ์เตือนภัย
+  // สี: ปกติ = น้ำเงิน · ใกล้เกณฑ์/เตือนภัย = ส้ม · วิกฤต/ล้นตลิ่ง = แดง · ไม่มีค่า = เทา
+  function gaugeIcon(frac, warnFrac, lv, stale, tr, big) {
+    const H = big ? 24 : 18, W = big ? 13 : 10, hit = Math.max(H, touch ? 34 : 24);
+    const col = stale ? '#9aa4b1' : lv >= 3 ? 'var(--critical)' : lv >= 2 ? 'var(--serious)' : '#1e7fd6';
+    const f = stale || frac == null ? 0 : Math.max(0.06, Math.min(1, frac)), ih = H - 4, fh = Math.round(ih * f);
+    const wy = warnFrac != null ? 2 + Math.round(ih * (1 - Math.min(1, warnFrac))) : null;
+    return L.divIcon({ className: '', iconSize: [hit, hit], iconAnchor: [hit / 2, hit / 2], popupAnchor: [0, -H / 2],
+      html: `<div class="mkhit" style="width:${hit}px;height:${hit}px"><svg class="gauge" width="${W}" height="${H}" viewBox="0 0 ${W} ${H}" aria-hidden="true">`
+        + `<rect x="1" y="1" width="${W - 2}" height="${H - 2}" rx="3" style="fill:#fff;stroke:${col};stroke-width:1.6"/>`
+        + `<rect x="2.5" y="${2 + ih - fh}" width="${W - 5}" height="${fh}" rx="1.5" style="fill:${col}"/>`
+        + `${wy != null ? `<line x1="0" x2="${W}" y1="${wy}" y2="${wy}" style="stroke:#1d2330;stroke-width:1"/>` : ''}${frac > 1 && !stale ? `<path d="M${W / 2} -1l3 3h-6z" style="fill:${col}"/>` : ''}</svg>`
+        + `${tr ? `<span class="mk-tr${tr.length > 1 ? ' two' : ''}">${tr}</span>` : ''}</div>` });
+  }
   function heavyRed(mm) {
     const t = Math.max(0, Math.min(1, (mm - RAIN_HEAVY_MM) / (150 - RAIN_HEAVY_MM)));
     const from = [245, 150, 146], to = [122, 14, 10];
@@ -420,7 +433,7 @@
         <div style="margin-top:4px"><span class="big">${s.msl != null ? s.msl.toFixed(2) : '–'}</span> ม.รทก. <span class="m">${trend(s)}</span></div>
         <div class="m">ตลิ่งต่ำสุด ${s.bank != null ? s.bank.toFixed(2) + ' ม.รทก.' : '–'} · ${esc(loc(s))}<br>${fmtDT(s.t)} (${ago(s.t)})</div></div>`;
       const k = wlTr(s);
-      s.marker = L.marker([s.la, s.lo], { icon: icon('wl', LEVEL[lv].color, '', 18, s.stale ? 'stale' : '', k && k !== 'flat' ? TRL[k][0] : ''), zIndexOffset: 200 }).bindPopup(html).addTo(layers.wl);
+      s.marker = L.marker([s.la, s.lo], { icon: gaugeIcon(s.pct != null ? s.pct / 100 : null, 0.9, s.pct >= 100 ? 3 : s.pct >= 90 ? 2 : 0, s.stale || s.pct == null, k && k !== 'flat' ? TRL[k][0] : '', true), zIndexOffset: 200 }).bindPopup(html).addTo(layers.wl);
     }
     const hi = allWl.filter((s) => !s.stale && s.pct != null).sort((a, b) => b.pct - a.pct).slice(0, 6);
     listInto('listWl', hi, (s) => ({ dot: LEVEL[wlLevel(s.pct)].color, title: th(s.x.station.tele_station_name), sub: `${s.edge ? loc(s) + ' · ' : ''}${trend(s) || 'ไม่มีแนวโน้ม'} · ${fmtTime(s.t)}`, right: s.pct.toFixed(0) + '%', go: s }), 'ไม่มีสถานีที่มีค่าล่าสุด');
@@ -457,8 +470,8 @@
         ${c.wl != null && lv >= 0 ? `<div style="margin-top:4px"><span class="big">${c.wl.toFixed(2)}</span> ม.</div>` : ''}
         <div class="m">${c.warn != null ? `เกณฑ์เตือนภัย ${c.warn} · วิกฤต ${c.crit} · ` : ''}${c.river ? esc(c.river) + ' · ' : ''}เขต${esc(c.d)}${c.t ? `<br>${fmtDT(new Date(c.t))} (${ago(new Date(c.t))})` : ''}</div>${trendHtml(S.trend && S.trend.canal.get(c.c), ' ม.', 2)}</div>`;
       const ctr = S.trend && S.trend.canal.get(c.c), arrow = ctr && TRL[ctr.tr] && ctr.tr !== 'flat' && lv >= 0 ? TRL[ctr.tr][0] : '';
-      const size = c.st >= 1 ? 13 : arrow ? 10 : 7;
-      c.marker = L.marker([c.la, c.lo], { icon: icon('wl', color, '', size, lv < 0 ? 'stale' : '', arrow), zIndexOffset: c.st * 100 + (arrow ? 50 : 0) }).bindPopup(html).addTo(layers.canal);
+      const frac = c.wl != null && c.crit ? c.wl / c.crit : null, wf = c.warn != null && c.crit ? c.warn / c.crit : null;
+      c.marker = L.marker([c.la, c.lo], { icon: gaugeIcon(frac, wf, lv, lv < 0 || c.wl == null, arrow, c.st >= 1), zIndexOffset: c.st * 100 + (arrow ? 50 : 0) }).bindPopup(html).addTo(layers.canal);
     }
     const hot = (b.canal || []).filter((c) => c.st >= 1).sort((x, y) => y.st - x.st || (y.wl - y.crit) - (x.wl - x.crit));
     listInto('listCanal', hot.slice(0, 8), (c) => ({ dot: LEVEL[CANAL[c.st][1]].color, title: c.n, sub: `${CANAL[c.st][0]} · เขต${c.d}${c.t ? ' · ' + fmtTime(new Date(c.t)) : ''}`, right: c.wl != null ? c.wl.toFixed(2) + ' ม.' : '', go: c }),
@@ -479,8 +492,8 @@
       const html = `<div class="pp"><div class="m">สถานีวัดฝน · สำนักการระบายน้ำ กทม.</div><h3>${esc(r.n)}</h3>
         <div><span class="big">${r.r24}</span> มม. / 24 ชม.</div><div>15 นาที ${r.r15 ?? '–'} · 1 ชม. ${r.r1 ?? '–'} · 3 ชม. ${r.r3 ?? '–'} มม.</div>
         <div class="m">เขต${esc(r.d)}${r.t ? ' · ' + fmtDT(new Date(r.t)) : ''}</div></div>`;
-      r.marker = L.circleMarker([r.la, r.lo], { radius: Math.min(11, 2 + Math.sqrt(Math.max(0, r.r24)) * 0.7), color: '#fff', weight: 1, fillOpacity: r.r24 > 0 ? 0.85 : 0.3,
-        fillColor: heavy ? heavyRed(r.r24) : cssVar(st[1].slice(4, -1)) }).bindPopup(html).addTo(layers.bmaRain);
+      r.marker = L.marker([r.la, r.lo], { icon: dropIcon(r.r24, r.r1, heavy ? heavyRed(r.r24) : st[1]), zIndexOffset: Math.round(r.r24) + (r.r1 >= 10 ? 500 : 0) })
+        .bindPopup(html).addTo(layers.bmaRain);
     }
     const now = (b.rain || []).filter((r) => r.r1 > 0 && r.t && Date.now() - r.t < 2 * 36e5).sort((x, y) => y.r1 - x.r1 || y.r15 - x.r15);
     listInto('listBmaRain', now.slice(0, 6), (r) => ({ dot: LEVEL[rain1(r.r1)[0]].color, title: r.n, sub: `เขต${r.d} · 15 นาที ${r.r15 ?? 0} มม. · ${fmtTime(new Date(r.t))}`, right: r.r1 + ' มม./ชม.', go: r }),
