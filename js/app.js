@@ -490,7 +490,7 @@
       const color = lv < 0 ? 'var(--stale)' : LEVEL[lv].color;
       const html = `<div class="pp"><div class="m">ระดับน้ำคลอง · สำนักการระบายน้ำ กทม.</div><h3>${esc(c.n)}</h3>
         <span class="badge" style="--c:${color}">${label}</span>
-        ${c.wl != null && lv >= 0 ? `<div style="margin-top:4px"><span class="big">${c.wl.toFixed(2)}</span> ม.</div>` : ''}
+        ${c.wl != null && lv >= 0 ? `<div style="margin-top:4px"><span class="big">${c.wl.toFixed(2)}</span> ม.${c.warn != null ? ` <span class="m">(${c.wl >= c.crit ? `เกินเกณฑ์วิกฤต ${(c.wl - c.crit).toFixed(2)} ม.` : c.wl >= c.warn ? `เกินเกณฑ์เตือนภัย ${(c.wl - c.warn).toFixed(2)} ม.` : `ต่ำกว่าเกณฑ์เตือนภัย ${(c.warn - c.wl).toFixed(2)} ม.`})</span>` : ''}</div>` : ''}
         <div class="m">${c.warn != null ? `เกณฑ์เตือนภัย ${c.warn} · วิกฤต ${c.crit} · ` : ''}${c.river ? esc(c.river) + ' · ' : ''}เขต${esc(c.d)}${c.t ? `<br>${fmtDT(new Date(c.t))} (${ago(new Date(c.t))})` : ''}</div>${trendHtml(S.trend && S.trend.canal.get(c.c), ' ม.', 2)}</div>`;
       const ctr = S.trend && S.trend.canal.get(c.c), arrow = ctr && TRL[ctr.tr] && ctr.tr !== 'flat' && lv >= 0 ? TRL[ctr.tr][0] : '';
       const frac = c.wl != null && c.crit ? c.wl / c.crit : null, wf = c.warn != null && c.crit ? c.warn / c.crit : null;
