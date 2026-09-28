@@ -48,6 +48,17 @@ const out = {
   c: clusters.map((c) => [r5(c.la), r5(c.lo), c.tier, c.name, c.district || '', Math.round(c.cm || 0), ms(c.t), c.sources, c.members.length,
     c.tier >= 2 ? c.members.filter((m) => m.tier >= 2).slice(0, 3).map((m) => [m.src, String(m.detail || '').slice(0, 120), ms(m.t), m.link || '']) : []]),
   d: dists.map((d) => [d.name, d.level, d[3], d[2], d[1], d.news]),
+  // รายงานรายจุด (ไม่รวมกลุ่ม) สำหรับ "รอบตัวฉัน": [lat, lng, แหล่ง, เวลา(ms), ซม., ชื่อ, รายละเอียด, ลิงก์, ระดับ]
+  m: (() => {
+    const seen = new Set(), out = [];
+    for (const c of clusters) for (const x of c.members) {
+      if (x.tier < 2) continue;
+      const k = x.src + r5(x.la) + ',' + r5(x.lo) + '@' + ms(x.t);
+      if (seen.has(k)) continue; seen.add(k);
+      out.push([r5(x.la), r5(x.lo), x.src, ms(x.t), Math.round(x.cm || 0), String(x.name || '').slice(0, 80), String(x.detail || '').slice(0, 100), x.link || '', x.tier]);
+    }
+    return out;
+  })(),
 };
 await writeFile(path.join(DATA, 'home.json'), JSON.stringify(out));
 log(`clusters ${clusters.length} (tier3 ${clusters.filter((c) => c.tier === 3).length}, tier2 ${clusters.filter((c) => c.tier === 2).length}) · districts ${dists.length} · feeds`,

@@ -11,22 +11,32 @@
 
   // จุด: [lat, lng, ระดับ, ชื่อ, เขต, ซม., เวลา, แหล่ง[], จำนวน, รายละเอียด]
   const pts = () => (H ? H.c.filter((c) => c[2] >= 2).map(([la, lo, tier, name, d, cm, t, src, n, det]) => ({ la, lo, tier, name, d, cm, t, src, n, det, fresh: t && Date.now() - t <= FRESH_MS })) : []);
+  // รายงานรายจุด (ตำแหน่ง/เวลา/แหล่งของแต่ละเรื่องจริง ไม่ใช่กลุ่ม 500 ม.) ใช้ตอบ "รอบตัวฉัน" ให้ตรงกับที่เห็นในแต่ละแหล่ง
+  const reps = () => (H && H.m ? H.m.map(([la, lo, src, t, cm, name, det, link, tier]) => ({ la, lo, src, t, cm, name, det, link, tier, fresh: t && Date.now() - t <= FRESH_MS })) : pts().map((p) => ({ ...p, src: p.src[0] })));
   const m = (km) => (km < 1 ? Math.round(km * 1000) + ' ม.' : km.toFixed(1) + ' กม.');
   const depth = (p) => (p.cm ? `${p.cm} ซม.` : p.tier === 3 ? 'ท่วม' : 'มีรายงาน');
 
   // ---------- 1) แถวคุณ ----------
   // สถานะรอบจุด: ใช้เฉพาะรายงานใหม่ (≤ 3 ชม.) ตัดสิน ส่วนรายงานเก่าบอกเป็นหมายเหตุ
   function statusAt(la, lo) {
-    // 🔴 ≤ 500 ม. · 🟠 ≤ 1 กม. · 🟡 ≤ 2 กม. · 🟢 ไม่มีในรัศมี 2 กม.
-    const all = pts().map((p) => ({ ...p, km: distKm(la, lo, p.la, p.lo) })).filter((p) => p.km <= AREA_KM).sort((a, b) => a.km - b.km);
+    // 🔴 ≤ 500 ม. · 🟠 ≤ 1 กม. · 🟡 ≤ 2 กม. · 🟢 ไม่มีในรัศมี 2 กม. — นับจากรายงานแต่ละเรื่องที่แจ้งภายใน 3 ชม.
+    const all = reps().map((p) => ({ ...p, km: distKm(la, lo, p.la, p.lo) })).filter((p) => p.km <= AREA_KM).sort((a, b) => a.km - b.km);
     const fresh = all.filter((p) => p.fresh), in1 = fresh.filter((p) => p.km <= NEAR_KM);
     const n = fresh[0];
     const old = all.filter((p) => !p.fresh).length;
-    const oldNote = old ? ` · มีรายงานเก่ากว่า 3 ชม. อีก ${old} จุด (อาจลดแล้ว)` : '';
-    if (n && n.km <= CLOSE_KM) return { lv: 3, head: `มีน้ำท่วมใกล้มาก ห่าง ${m(n.km)}`, sub: `${n.name} · ${depth(n)} · ${ago(new Date(n.t))}${in1.length > 1 ? ` · ในรัศมี 1 กม. มี ${in1.length} จุด` : ''} · ในรัศมี 2 กม. ${fresh.length} จุด`, list: fresh };
-    if (n && n.km <= NEAR_KM) return { lv: 2, head: `มีน้ำท่วมในรัศมี 1 กม. (${in1.length} จุด)`, sub: `ใกล้สุด ${n.name} ห่าง ${m(n.km)} · ${depth(n)} · ในรัศมี 2 กม. ${fresh.length} จุด`, list: fresh };
-    if (n) return { lv: 1, head: `มีน้ำท่วมในรัศมี 2 กม. (${fresh.length} จุด)`, sub: `ใกล้สุด ${n.name} ห่าง ${m(n.km)} · ${depth(n)} · ในรัศมี 1 กม. ยังไม่มีรายงาน${oldNote}`, list: fresh };
+    const oldNote = old ? ` · มีรายงานเก่ากว่า 3 ชม. อีก ${old} เรื่อง (อาจลดแล้ว)` : '';
+    const who = (p) => `${SRC[p.src] || p.src} ${ago(new Date(p.t))}`;
+    if (n && n.km <= CLOSE_KM) return { lv: 3, head: `มีน้ำท่วมใกล้มาก ห่าง ${m(n.km)}`, sub: `${n.name} · ${depth(n)} · ${who(n)}${in1.length > 1 ? ` · ในรัศมี 1 กม. ${in1.length} รายงาน` : ''} · ในรัศมี 2 กม. ${fresh.length} รายงาน`, list: fresh };
+    if (n && n.km <= NEAR_KM) return { lv: 2, head: `มีน้ำท่วมในรัศมี 1 กม. (${in1.length} รายงาน)`, sub: `ใกล้สุด ${n.name} ห่าง ${m(n.km)} · ${depth(n)} · ${who(n)}`, list: fresh };
+    if (n) return { lv: 1, head: `มีน้ำท่วมในรัศมี 2 กม. (${fresh.length} รายงาน)`, sub: `ใกล้สุด ${n.name} ห่าง ${m(n.km)} · ${depth(n)} · ${who(n)} · ในรัศมี 1 กม. ยังไม่มีรายงาน${oldNote}`, list: fresh };
     return { lv: 0, head: 'ไม่มีรายงานน้ำท่วมในรัศมี 2 กม.', sub: 'ช่วง 3 ชม. ล่าสุด' + oldNote, list: [] };
+  }
+  // แถวรายงานรายเรื่อง: บอกแหล่ง เวลาแจ้งจริง ระยะ และลิงก์ไปดูเรื่องนั้นที่ต้นทาง (เช่น Traffy)
+  function repRow(p, from) {
+    const km = from ? `ห่าง ${m(distKm(from[0], from[1], p.la, p.lo))} · ` : '';
+    const open = p.link ? `<a class="h2src" href="${esc(p.link)}" target="_blank" rel="noopener">ดูเรื่องนี้ที่ ${esc(SRC[p.src] || p.src)} ↗</a>` : '';
+    return `<div class="h2row${p.fresh ? '' : ' old'}"><span class="h2d" style="--c:${p.fresh ? LEVEL[p.tier >= 3 ? 3 : 2].color : '#9aa4b1'}">${p.cm ? p.cm + '<small>ซม.</small>' : '•'}</span>`
+      + `<span class="h2t"><b>${esc(p.name || 'ไม่ระบุชื่อ')}</b><small>${km}${esc(SRC[p.src] || p.src)} · แจ้ง ${p.t ? ago(new Date(p.t)) : '–'}${p.det ? ' · ' + esc(p.det) : ''}</small>${open}</span></div>`;
   }
   const verdict = (s, title) => `<div class="h2v lv${s.lv}"><span class="dot" style="--c:${LEVEL[s.lv].color}"></span><div>${title ? `<b class="h2vt">${esc(title)}</b>` : ''}<b>${esc(s.head)}</b><small>${esc(s.sub)}</small></div></div>`;
   function renderMe() {
@@ -35,7 +45,8 @@
     $('meList').innerHTML = !H ? '' : places.map((p) => verdict(statusAt(p.la, p.lo), `${PL_ICON[p.kind] || '📍'} ${p.name}`)).join('');
     if (me && H) {
       const s = statusAt(me[0], me[1]);
-      $('meOut').innerHTML = verdict(s, '📍 รอบตัวคุณตอนนี้') + (s.list.length ? `<div class="h2list">${s.list.slice(0, 5).map((p) => row(p, me)).join('')}</div>` : '');
+      $('meOut').innerHTML = verdict(s, '📍 รอบตัวคุณตอนนี้') + (s.list.length ? `<div class="h2list">${s.list.slice(0, 6).map((p) => repRow(p, me)).join('')}</div>`
+        + (s.list.length > 6 ? `<p class="muted small">และอีก ${s.list.length - 6} รายงาน · <a href="map.html?lat=${me[0].toFixed(5)}&lng=${me[1].toFixed(5)}&z=15">ดูบนแผนที่ละเอียด →</a></p>` : '') : '');
     }
   }
   $('meNear').onclick = () => {
@@ -61,7 +72,7 @@
   }
   function popup(p) {
     return `<div class="pp"><h3>${esc(p.name)}</h3>${p.d ? `<div class="m">เขต${esc(p.d)}</div>` : ''}<div><b>${esc(depth(p))}</b> · ${p.t ? `${fmtDT(new Date(p.t))} (${ago(new Date(p.t))})` : ''}${p.fresh ? '' : ' <span class="m">อาจลดแล้ว</span>'}</div>`
-      + `<div class="m" style="margin-top:4px">${(p.det || []).map(([s, txt, , link]) => `${esc(SRC[s] || s)}: ${esc(txt)}${link ? ` <a href="${esc(link)}" target="_blank" rel="noopener">ดู</a>` : ''}`).join('<br>')}</div>`
+      + `<div class="m" style="margin-top:4px">${(p.det || []).map(([s, txt, t, link]) => `${esc(SRC[s] || s)}${t ? ` (${ago(new Date(t))})` : ''}: ${esc(txt)}${link ? ` <a href="${esc(link)}" target="_blank" rel="noopener">ดู ↗</a>` : ''}`).join('<br>')}</div>`
       + `<div style="margin-top:6px"><a href="map.html?lat=${p.la}&lng=${p.lo}&z=16">ดูบนแผนที่ละเอียด →</a></div></div>`;
   }
   function drawMap() {
@@ -106,7 +117,7 @@
   function row(p, from) {
     const km = from ? ` · ห่าง ${m(distKm(from[0], from[1], p.la, p.lo))}` : '';
     return `<a class="h2row${p.fresh ? '' : ' old'}" href="map.html?lat=${p.la}&lng=${p.lo}&z=16"><span class="h2d" style="--c:${p.fresh ? LEVEL[p.tier].color : '#9aa4b1'}">${p.cm ? p.cm + '<small>ซม.</small>' : p.tier === 3 ? '!' : '•'}</span>`
-      + `<span class="h2t"><b>${esc(p.name)}</b><small>${p.d ? 'เขต' + esc(p.d) + ' · ' : ''}${p.t ? ago(new Date(p.t)) : ''}${km}${p.fresh ? '' : ' (อาจลดแล้ว)'} · ${esc(p.src.map((s) => SRC[s] || s).join(', '))}</small></span></a>`;
+      + `<span class="h2t"><b>${esc(p.name)}</b><small>${p.d ? 'เขต' + esc(p.d) + ' · ' : ''}${p.t ? 'ล่าสุด ' + ago(new Date(p.t)) : ''}${km}${p.fresh ? '' : ' (อาจลดแล้ว)'} · ${esc(p.src.map((s) => SRC[s] || s).join(', '))}</small></span></a>`;
   }
   function renderLatest() {
     const q = $('q').value.trim().replace(/^(ถนน|ถ\.|เขต)\s*/, '');
