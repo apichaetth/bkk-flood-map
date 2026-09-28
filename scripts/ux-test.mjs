@@ -43,33 +43,23 @@ for (const kind of ['m', 'd']) {
   const ctx = await ctxFor(kind);
   await ctx.route('**/version.txt*', (r) => r.fulfill({ body: 'x' })).catch(() => {});
 
-  await step(`[${K}] หน้าแรก: เปิดแล้วรู้ไหมว่าตอนนี้น้ำท่วมตรงไหน`, async () => {
+  await step(`[${K}] หน้าแรก: แถวฉันท่วมไหม / ทั้งเมืองเป็นยังไง`, async () => {
     const p = await ctx.newPage(); const done = watch(p, 'home');
     const t0 = Date.now();
     await p.goto(BASE + '?ux=' + Date.now(), { waitUntil: 'domcontentloaded', timeout: 60000 });
-    say('   DOM พร้อม', Date.now() - t0, 'ms');
-    const tHead = await until(p, () => { const h = document.getElementById('headline'); return h && h.textContent.trim() && !/กำลัง/.test(h.textContent); }, 45000);
-    say('   หัวข้อคำตอบแสดงใน', tHead == null ? '> 45 วิ (ไม่ขึ้น)' : tHead + ' ms หลัง DOM');
+    const tHead = await until(p, () => !/กำลังโหลด/.test((document.getElementById('cityLine') || {}).textContent || 'กำลังโหลด'), 45000);
+    say('   คำตอบทั้งเมืองขึ้นใน', tHead == null ? '> 45 วิ (ไม่ขึ้น)' : (Date.now() - t0) + ' ms');
+    say('   ทั้งเมือง:', await txt(p, '#cityLine'), '·', await txt(p, '#cityDists'));
+    say('   อัปเดต:', await txt(p, '#updated'), '· ความสูงหน้า', await p.evaluate(() => document.documentElement.scrollHeight), 'px');
     await snap(p, `${kind}-home-first`);
-    say('   หัวข้อ:', await txt(p, '#headline')); say('   รอง:', await txt(p, '#subline'));
-    say('   ตัวเลข: ยืนยัน', await txt(p, '#nConfirmed'), '· มีรายงาน', await txt(p, '#nReported'), '· เสี่ยง', await txt(p, '#nRisk'), '· เขต', await txt(p, '#nDistricts'));
-    say('   อัปเดต:', await txt(p, '#updated'));
-    await p.waitForTimeout(12000);
-    say('   จำนวนจุดทั้งหมด:', await txt(p, '#allCount'), '· แนวโน้ม: เพิ่ม', await txt(p, '#trUpN'), 'ใกล้สูงสุด', await txt(p, '#trPeakN'), 'ลด', await txt(p, '#trDownN'));
-    const warn = await p.locator('#warn').isVisible().catch(() => false);
-    if (warn) say('   ⚠ แถบเตือนบนหน้า:', await txt(p, '#warn'));
-    const tiny = await p.evaluate(() => [...document.querySelectorAll('a,button,input,select,summary,label')].filter((e) => { const r = e.getBoundingClientRect(); return e.offsetParent && r.width > 0 && r.height > 0 && (r.height < 30 || r.width < 30); }).map((e) => (e.innerText || e.getAttribute('aria-label') || e.tagName).trim().slice(0, 25)).slice(0, 12));
+    await p.click('#meNear'); await p.waitForTimeout(2500);
+    say('   กด "ดูรอบตัวฉัน" →', await txt(p, '#meOut'));
+    say('   ล่าสุด:', await txt(p, '#latestN'), '·', await txt(p, '#latest'));
+    await p.fill('#q', 'ลาดพร้าว'); await p.waitForTimeout(500);
+    say('   ค้นหา "ลาดพร้าว" →', await txt(p, '#latestN'), '·', await txt(p, '#latest'));
+    const tiny = await p.evaluate(() => [...document.querySelectorAll('a,button,input,select,summary')].filter((e) => { const r = e.getBoundingClientRect(); return e.offsetParent && r.width > 0 && r.height > 0 && (r.height < 30 || r.width < 30); }).map((e) => (e.innerText || e.getAttribute('aria-label') || e.tagName).trim().slice(0, 25)).slice(0, 12));
     say('   ปุ่ม/ลิงก์ที่เล็กกว่า 30px:', tiny.length ? tiny.join(' | ') : 'ไม่มี');
     await snap(p, `${kind}-home-full`, true);
-    // ค้นหาถนน
-    await p.fill('#heroQ', 'ลาดพร้าว'); await p.press('#heroQ', 'Enter'); await p.waitForTimeout(1500);
-    say('   ค้นหา "ลาดพร้าว" → รายการ:', await p.locator('#spots > *').count(), 'รายการ ·', await txt(p, '#spots'));
-    await snap(p, `${kind}-home-search`);
-    // ใกล้ฉัน
-    await p.fill('#heroQ', ''); await p.locator('#heroQ').dispatchEvent('input');
-    await p.click('#heroNear'); await p.waitForTimeout(3000);
-    say('   กด "ใกล้ฉัน" →', await txt(p, '#spots'));
-    await snap(p, `${kind}-home-near`);
     done(); await p.close();
   });
 

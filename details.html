@@ -1,0 +1,163 @@
+<!doctype html>
+<html lang="th">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <title>รายละเอียดสถานการณ์น้ำท่วม กทม.</title>
+  <meta name="description" content="สรุปจุดที่มีน้ำท่วมและพื้นที่เสี่ยงน้ำท่วมในกรุงเทพมหานครตอนนี้ รวมจากเซ็นเซอร์ กทม., รายงานหน่วยงาน, ประชาชน, ข่าว, ปริมาณฝนและระดับน้ำ อัปเดตทุก 15 นาที">
+  <link rel="manifest" href="manifest.webmanifest">
+  <link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-title" content="น้ำท่วม กทม.">
+  <meta property="og:title" content="รายละเอียดสถานการณ์น้ำท่วม กทม.">
+  <meta property="og:description" content="จุดน้ำท่วมทั้งหมด แนวโน้มน้ำ ฝนล่วงหน้า และระดับน้ำคลองในกรุงเทพฯ อัปเดตทุก 15 นาที">
+  <meta property="og:image" content="https://apichaetth.github.io/bkk-flood-map/icons/og.png">
+  <meta property="og:type" content="website">
+  <meta name="twitter:card" content="summary_large_image">
+  <meta name="theme-color" content="#0f5ea8">
+  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Cpath d='M16 3C11 11 7 15.5 7 20a9 9 0 0 0 18 0c0-4.5-4-9-9-17z' fill='%230f5ea8'/%3E%3C/svg%3E">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+Thai:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/leaflet@1.9.4/dist/leaflet.css">
+  <link rel="stylesheet" href="css/style.css">
+</head>
+<body class="summary">
+  <header class="top">
+    <div class="brand">
+      <svg viewBox="0 0 32 32" aria-hidden="true"><path d="M16 3C11 11 7 15.5 7 20a9 9 0 0 0 18 0c0-4.5-4-9-9-17z"/></svg>
+      <div>
+        <h1>รายละเอียดสถานการณ์</h1>
+        <p id="updated" class="sub">กำลังโหลดข้อมูล…</p>
+      </div>
+    </div>
+    <nav class="pages" aria-label="หน้า"><a href="./">ภาพรวม</a><a href="details.html" aria-current="page">รายละเอียด</a><a href="districts.html">เขต</a><a href="map.html">แผนที่ละเอียด</a><a href="traffy.html">Traffy Fondue</a><a href="risk.html">ถนนเสี่ยง</a><a href="route.html">เส้นทางเลี่ยงน้ำ</a><a href="log.html">บันทึกการแจ้ง</a><a href="about.html">เกี่ยวกับ</a></nav>
+    <button id="refresh" class="btn" type="button" title="โหลดข้อมูลใหม่">↻ รีเฟรช</button>
+  </header>
+
+  <main class="sum">
+    <!-- 1) ภาพรวม (infographic) -->
+    <section class="hero" aria-live="polite">
+      <div class="hero-text">
+        <p class="eyebrow" id="asof">ข้อมูล ณ –</p>
+        <h2 id="headline">กำลังรวบรวมข้อมูลจากทุกแหล่ง…</h2>
+        <p id="subline" class="muted"></p>
+        <div id="tmdLine"></div>
+        <div id="twLine"></div>
+        <!-- ทางลัด: ค้นหาถนน/เขต, ใกล้ฉัน, หาเส้นทางเลี่ยงน้ำ -->
+        <form class="quick" id="quick" role="search" onsubmit="return false">
+          <input id="heroQ" type="search" placeholder="🔎 ค้นหาถนน หรือเขต" aria-label="ค้นหาถนนหรือเขต" enterkeyhint="search">
+          <div class="quick-btns">
+            <button type="button" class="btn" id="heroNear">📍 ใกล้ฉัน</button>
+            <a class="btn primary-blue" href="route.html">🚗 หาเส้นทางเลี่ยงน้ำ</a>
+            <a class="btn" href="map.html#places">⭐ ที่ของฉัน</a>
+          </div>
+        </form>
+      </div>
+      <div class="tiles">
+        <div class="tile t3"><span class="tv" id="nConfirmed">–</span><span class="tl">จุดน้ำท่วม<br><b>ยืนยันแล้ว</b></span></div>
+        <div class="tile t2"><span class="tv" id="nReported">–</span><span class="tl">จุดที่<br><b>มีรายงาน</b></span></div>
+        <div class="tile t1"><span class="tv" id="nRisk">–</span><span class="tl">พื้นที่<br><b>เสี่ยง</b></span></div>
+        <div class="tile"><span class="tv" id="nDistricts">–</span><span class="tl">เขตที่<br><b>มีน้ำท่วม</b></span></div>
+      </div>
+    </section>
+
+    <!-- ที่ของฉัน: บ้าน/ที่ทำงาน ที่บันทึกไว้ในเครื่อง พร้อมสถานะน้ำท่วมรอบ ๆ -->
+
+    <div id="warn" class="warn" hidden></div>
+
+    <section class="mapwide">
+      <div class="card mapcard">
+        <div class="card-h"><h2>แผนที่จุดน้ำท่วม</h2><a class="more" href="map.html">แผนที่ละเอียด →</a></div>
+        <div class="actions-big">
+          <button type="button" id="btnReport" class="btn big primary">📍 แจ้งน้ำท่วม</button>
+          <button type="button" id="btnClose" class="btn big ok">✔ แจ้งน้ำลด</button>
+        </div>
+        <div id="smap" role="region" aria-label="แผนที่สรุปจุดน้ำท่วม"></div>
+        <div class="legend-row">
+          <span><i class="lg-line t3"></i>ถนนน้ำท่วม (ยืนยัน)</span>
+          <span><i class="lg-line t2"></i>ถนนที่มีรายงาน</span>
+          <label class="lg-toggle" id="trendLg" hidden><input type="checkbox" id="showTrend" checked> แนวโน้มน้ำ: ⬆⬆ เพิ่มมาก · ⬆ เพิ่ม · ⏸ ใกล้สูงสุด · ⬇ ลด · ⬇⬇ ลดมาก <span class="muted">(สีป้าย = ระดับน้ำตอนนี้)</span></label>
+        </div>
+        <details class="mapopts"><summary>⚙️ ตัวเลือกแผนที่ (เรดาร์ฝน · กล้อง · พื้นที่เสี่ยง)</summary><div class="legend-row">
+          <label class="lg-toggle"><input type="checkbox" id="showRadar" checked> <i class="lg-radar"></i>เรดาร์ฝน <span class="muted" id="radarSt">(กำลังโหลด…)</span></label>
+          <label class="lg-toggle"><input type="checkbox" id="showCam" checked> <i class="lg-cam">▶</i>กล้อง CCTV <span class="muted" id="camSt">(กำลังโหลด…)</span></label>
+          <label class="lg-toggle"><input type="checkbox" id="showRisk" checked> <i class="lg-area"></i>แสดงพื้นที่เสี่ยง (ฝนหนัก/น้ำสูง)</label>
+          <label class="lg-toggle"><input type="checkbox" id="showTraffy" checked> <i class="lg-dot"></i>แสดงจุดที่แจ้งผ่าน Traffy Fondue อย่างเดียว</label>
+          <label class="lg-toggle"><input type="checkbox" id="showSpots" checked> <i class="lg-dot"></i><i class="lg-web">!</i>แสดงจุดที่มีรายงาน (ยกเลิกเพื่อดูเฉพาะถนนสีแดง)</label>
+        </div></details>
+        <p class="muted small" id="roadNote"></p>
+      </div>
+
+    </section>
+
+    <section class="card" hidden>
+      <div class="card-h"><h2>จุดที่น่าห่วงที่สุด</h2><span class="muted small" id="topNote"></span></div>
+      <ol id="top10" class="top10"></ol>
+      <button type="button" class="btn" id="topMore" hidden>ดูทั้ง 10 จุด ▾</button>
+    </section>
+
+    <!-- 3) ทุกจุด: แบ่งตามสภาพถนน -->
+    <section class="card">
+      <div class="card-h"><h2>จุดน้ำท่วมทั้งหมด</h2><span class="muted small" id="allCount"></span></div>
+      <div class="sfilter">
+        <input id="spotQ" type="search" placeholder="ค้นหาถนนหรือเขต เช่น วิภาวดี, บางเขน" aria-label="ค้นหาถนนหรือเขต">
+        <button type="button" class="btn" id="spotNear">📍 ใกล้ฉัน</button>
+        <label class="small"><input type="checkbox" id="spotOld"> ซ่อนรายงานที่เก่าเกิน 3 ชม.</label>
+      </div>
+      <div id="spots"></div>
+      <div class="risk-box">
+        <h3 class="subh">พื้นที่เสี่ยง (ยังไม่มีรายงานน้ำท่วม) <span class="tag t1" id="riskCount">0</span></h3>
+        <div id="riskSpots"></div>
+      </div>
+    </section>
+
+    <!-- แนวโน้มน้ำ 1 ชม. จากเซ็นเซอร์ถนนและคลอง -->
+    <section class="card" id="trendCard" hidden>
+      <div class="card-h"><h2>แนวโน้มน้ำ 1 ชม.</h2><a class="more" href="map.html">ดูบนแผนที่ →</a></div>
+      <p id="trendRiver" class="small"></p>
+      <div id="trendWarn"></div>
+      <div class="tr-grid">
+        <div class="tr-col"><h3>⬆ กำลังเพิ่ม <span class="tag t3" id="trUpN">0</span></h3><div id="trUp"></div></div>
+        <div class="tr-col"><h3>⏸ ใกล้จุดสูงสุด <span class="tag t2" id="trPeakN">0</span></h3><div id="trPeak"></div></div>
+        <div class="tr-col"><h3>⬇ กำลังลด <span class="tag t0" id="trDownN">0</span></h3><div id="trDown"></div></div>
+      </div>
+      <p class="muted small" id="trendNote"></p>
+    </section>
+
+    <!-- แนวโน้มน้ำจาก ThaiWater -->
+    <section class="card" id="outlook">
+      <div class="card-h"><h2>ฝนข้างหน้า และคลองใน กทม.</h2><a class="more" href="map.html">เจ้าพระยา/เขื่อน →</a></div>
+      <div class="ol-grid">
+        <div class="ol-box"><h3>🌧 พยากรณ์ฝน</h3>
+          <figure class="nowcast" id="nowcast"><a href="https://dds.bangkok.go.th/nowcast/" target="_blank" rel="noopener"><img alt="ภาพคาดการณ์ฝนล่วงหน้า 3 ชั่วโมง กทม." loading="lazy"></a>
+            <figcaption class="muted small">ภาพเคลื่อนไหวคาดการณ์ฝน 3 ชม. ข้างหน้า · สำนักการระบายน้ำ กทม. / Weathernews</figcaption></figure>
+          <div id="olTmd"></div><div id="olRain" class="muted small">กำลังโหลด…</div></div>
+        <div class="ol-box" hidden><h3>🌊 เจ้าพระยาช่วง กทม.</h3><div id="olRiver" class="muted small">กำลังโหลด…</div></div>
+        <div class="ol-box" hidden><h3>⛰ น้ำเหนือและเขื่อน</h3><div id="olNorth" class="muted small">กำลังโหลด…</div></div>
+        <div class="ol-box wide" id="olCity" hidden><h3>🏙 คลองและอุโมงค์ใน กทม. <small class="muted">สำนักการระบายน้ำ กทม.</small></h3><div id="olCityBody"></div></div>
+      </div>
+      <p class="muted small">ข้อมูลจากกรมอุตุนิยมวิทยา, สำนักการระบายน้ำ กทม. และ ThaiWater (สสน.)</p>
+    </section>
+
+    <details class="card how">
+      <summary><h2>อ่านหน้านี้อย่างไร</h2></summary>
+      <ul>
+        <li><b class="tag t3">ยืนยันแล้ว</b> เซ็นเซอร์ของ กทม. วัดน้ำบนถนนได้ ≥ 5 ซม. หรือหน่วยงาน/iTIC รายงาน หรือมีรายงานจาก 2 แหล่งขึ้นไปในรัศมี 500 ม.</li>
+        <li><b class="tag t2">มีรายงาน</b> ประชาชนปักหมุดแจ้งผ่านเว็บนี้ หรือแจ้งผ่าน Traffy Fondue หรือข่าวระบุสถานที่ (แหล่งเดียว ยังไม่มีการยืนยัน)</li>
+        <li><b class="tag t1">เสี่ยง</b> ฝนตกหนัก &gt; 35 มม. ใน 24 ชม. หรือระดับน้ำในคลอง/แม่น้ำ ≥ 90% ของตลิ่ง แต่ยังไม่มีรายงานน้ำท่วม</li>
+        <li>ถนนสีแดงคือช่วงถนนในรัศมีประมาณ 300 ม. จากจุดที่มีรายงาน (ข้อมูลถนนจาก OpenStreetMap) ไม่ได้หมายความว่าท่วมทั้งเส้น</li>
+        <li>จุดที่ไม่มีสีแดง ≠ ไม่มีน้ำท่วม อาจยังไม่มีใครรายงาน · เว็บนี้ไม่ใช่เว็บทางราชการ โปรดติดตามประกาศจาก กทม. (สายด่วน 1555)</li>
+      </ul>
+      <p class="muted small" id="sources"></p>
+    </details>
+  </main>
+
+  <script src="https://cdn.jsdelivr.net/npm/leaflet@1.9.4/dist/leaflet.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/hls.js@1.5.20/dist/hls.min.js" defer></script>
+  <script src="js/core.js" defer></script>
+  <script src="js/agg.js" defer></script>
+  <script src="js/summary.js" defer></script>
+  <script src="js/report.js" defer></script>
+</body>
+</html>

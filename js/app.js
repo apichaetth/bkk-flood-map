@@ -53,6 +53,17 @@
     web: L.layerGroup().addTo(map),
     elev: L.layerGroup(), // ความสูงพื้นดิน DeltaDTM (ปิดไว้ก่อน เปิดจากปุ่มชั้นแผนที่)
   };
+  // เปิดครั้งแรกแสดงเฉพาะน้ำท่วม (เซ็นเซอร์ หน่วยงาน Traffy หมุดประชาชน) ชั้นอื่นเปิดเองจากปุ่มชั้นแผนที่ แล้วจำค่าที่เลือกไว้ในเครื่อง
+  const LYR_KEY = 'bkkflood.layers', LYR_ON = ['sensor', 'event', 'traffy', 'web', 'districts'];
+  {
+    const saved = Flood.store.get(LYR_KEY) || {};
+    for (const [k, l] of Object.entries(layers)) {
+      const want = k in saved ? saved[k] : LYR_ON.includes(k);
+      if (want && !map.hasLayer(l)) map.addLayer(l); else if (!want && map.hasLayer(l)) map.removeLayer(l);
+    }
+    const save = (e, on) => { const k = Object.keys(layers).find((x) => layers[x] === e.layer); if (!k) return; const v = Flood.store.get(LYR_KEY) || {}; v[k] = on; Flood.store.set(LYR_KEY, v); };
+    map.on('overlayadd', (e) => save(e, true)); map.on('overlayremove', (e) => save(e, false));
+  }
   L.control.layers(null, {
     'เซ็นเซอร์น้ำท่วมถนน กทม.': layers.sensor,
     'รายงานน้ำท่วม (หน่วยงาน/iTIC)': layers.event,
@@ -921,6 +932,8 @@
   renderPlaces();
   // ลิงก์ map.html#places เปิดแท็บที่ของฉัน
   if (location.hash === '#places') { const t = document.querySelector('.tabs [data-tab="pl"]'); if (t) t.click(); }
+  // ลิงก์ map.html#report จากหน้าแรก: เปิดโหมดแจ้งน้ำท่วมทันที
+  if (location.hash === '#report') setTimeout(() => { const b = [...document.querySelectorAll('button')].find((x) => /แจ้งน้ำท่วม/.test(x.textContent)); if (b) b.click(); }, 600);
   refresh();
   // ให้ js/report.js (ระบบปักหมุดแจ้งน้ำท่วม) ใช้แผนที่และชั้นข้อมูลเดียวกัน
   window.FloodMap = { map, layers, setFeed, icon, minimizePanel, isMobile };

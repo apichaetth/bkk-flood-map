@@ -68,6 +68,9 @@ jobs:
           TMD_TOKEN: ${{ secrets.TMD_TOKEN || secrets.TMD_API_KEY }}
           YOUTUBE_API_KEY: ${{ secrets.YOUTUBE_API_KEY }}
 
+
+      - name: Summarise flood points for the home page
+        run: node scripts/build-home.mjs || echo "home summary failed (home page falls back to live feeds)"
       - name: Save data cache
         if: always()
         uses: actions/cache/save@v4
@@ -95,7 +98,7 @@ jobs:
       - name: Prepare site
         run: |
           mkdir -p _site
-          cp -r index.html districts.html map.html log.html traffy.html risk.html route.html about.html dds-test.html manifest.webmanifest sw.js icons css js data _site/
+          cp -r index.html details.html districts.html map.html log.html traffy.html risk.html route.html about.html dds-test.html manifest.webmanifest sw.js icons css js data _site/
           rm -f _site/data/news-cache.json _site/data/yt-state.json _site/data/geocache.json _site/data/roads.json _site/data/risk-history.json
           # ติดเลขเวอร์ชันให้ css/js ทุกครั้งที่ deploy เบราว์เซอร์จะไม่ใช้ไฟล์เก่าที่ไม่เข้ากับหน้าใหม่
           V=$(date +%s)

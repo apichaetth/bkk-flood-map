@@ -582,3 +582,32 @@ label.lg-toggle, .rk-filter label, .rt-opts label { display: inline-flex; align-
 .elev-lg .elev-bar { height: 10px; border-radius: 5px; margin: 6px 0 2px; background: linear-gradient(90deg, rgb(8,48,107), rgb(33,113,181) 20%, rgb(107,174,214) 36%, rgb(198,219,239) 50%, rgb(254,227,145) 64%, rgb(254,153,41) 80%, rgb(153,52,4)); }
 .elev-lg .elev-ticks { display: flex; justify-content: space-between; font-size: 12px; }
 .elev-lg .m { color: var(--ink2); font-size: 12px; margin-top: 4px; }
+/* ---------- หน้าแรกแบบง่าย ---------- */
+.h2wrap { max-width: 760px; margin: 0 auto; padding: 12px 12px 90px; display: grid; gap: 12px; }
+.h2wrap h2 { font-size: 20px; margin: 0 0 10px; }
+.h2wrap h2 em { font-style: normal; color: var(--critical); }
+.h2btns { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; margin-top: 10px; }
+.h2btns .btn { justify-content: center; text-align: center; text-decoration: none; display: flex; align-items: center; white-space: normal; padding: 10px 12px; font-size: 16px; line-height: 1.3; }
+.h2report { display: flex; justify-content: center; margin-top: 8px; text-decoration: none; }
+.h2v { display: flex; gap: 10px; align-items: flex-start; padding: 12px; border-radius: 12px; margin-bottom: 8px; background: color-mix(in srgb, var(--c, var(--good)) 10%, var(--surface)); border: 1px solid color-mix(in srgb, var(--c, var(--good)) 35%, transparent); }
+.h2v.lv3 { --c: var(--critical); } .h2v.lv2 { --c: var(--serious); } .h2v.lv0 { --c: var(--good); } .h2v.lv1 { --c: var(--warning); }
+.h2v .dot { flex: none; width: 14px; height: 14px; border-radius: 50%; background: var(--c); margin-top: 5px; }
+.h2v b { display: block; font-size: 17px; }
+.h2v .h2vt { font-size: 14px; color: var(--ink2); font-weight: 600; }
+.h2v small { display: block; color: var(--ink2); font-size: 14px; margin-top: 2px; }
+.h2chips { margin: 4px 0 10px; display: flex; flex-wrap: wrap; gap: 6px; align-items: center; }
+#hmap { height: 300px; border-radius: 12px; border: 1px solid var(--line); }
+.h2legend { display: flex; flex-wrap: wrap; gap: 12px; font-size: 13px; color: var(--ink2); margin-top: 6px; }
+.h2legend i { display: inline-block; width: 11px; height: 11px; border-radius: 50%; background: var(--c); border: 1.5px solid #fff; box-shadow: 0 0 0 1px var(--line); margin-right: 4px; vertical-align: -1px; }
+.h2latest input[type="search"] { width: 100%; min-height: 44px; font: inherit; padding: 8px 12px; border: 1px solid var(--line); border-radius: 10px; background: var(--surface); color: var(--ink); box-sizing: border-box; margin-bottom: 6px; }
+.h2list { display: grid; }
+.h2row { display: flex; gap: 10px; align-items: center; padding: 10px 2px; border-bottom: 1px solid var(--line); color: var(--ink); text-decoration: none; min-height: 48px; }
+.h2row:last-child { border-bottom: 0; }
+.h2row.old { opacity: .6; }
+.h2d { flex: none; width: 46px; height: 40px; border-radius: 10px; background: var(--c); color: #fff; font-weight: 700; display: flex; flex-direction: column; align-items: center; justify-content: center; line-height: 1; font-size: 16px; }
+.h2d small { font-size: 11px; font-weight: 500; }
+.h2t { min-width: 0; }
+.h2t b { display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.h2t small { color: var(--ink2); font-size: 13px; }
+.more-link { display: block; margin-top: 10px; padding: 10px 0; font-weight: 600; }
+.h2foot { text-align: center; }

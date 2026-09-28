@@ -500,7 +500,7 @@ window.Flood = (function () {
   };
 })();
 
-// ---------- เมนู: คอม = แถบบน 5 หน้า + "เพิ่มเติม ▾" · มือถือ = แถบล่าง 5 ปุ่ม (แบบแอป) ----------
+// ---------- เมนู: คอม = แถบบน 5 หน้า + "เพิ่มเติม ▾" · มือถือ = แถบล่าง 4 ปุ่ม (แบบแอป) ----------
 (function () {
   const nav = document.querySelector('nav.pages');
   if (!nav) return;
@@ -509,7 +509,7 @@ window.Flood = (function () {
   // [ลิงก์, ชื่อบนคอม, ชื่อบนมือถือ, ไอคอน]
   const MAIN = [['./', 'หน้าแรก', 'หน้าแรก', '🏠'], ['map.html', 'แผนที่ละเอียด', 'แผนที่', '🗺️'], ['route.html', 'เส้นทางเลี่ยงน้ำ', 'เส้นทาง', '🚗'],
     ['districts.html', 'เขต', 'เขต', '📍'], ['risk.html', 'ถนนเสี่ยง', 'ถนนเสี่ยง', '⚠️']];
-  const MORE = [['traffy.html', 'Traffy Fondue', '📣'], ['log.html', 'บันทึกการแจ้ง', '📝'], ['about.html', 'เกี่ยวกับ', 'ℹ️']];
+  const MORE = [['details.html', 'รายละเอียด (แนวโน้ม ฝน คลอง)', '📊'], ['traffy.html', 'Traffy Fondue', '📣'], ['log.html', 'บันทึกการแจ้ง', '📝'], ['about.html', 'เกี่ยวกับ', 'ℹ️']];
   const cur = (h) => (h === here ? ' aria-current="page"' : '');
   const inMore = MORE.some(([h]) => h === here);
   // คอม
@@ -518,8 +518,8 @@ window.Flood = (function () {
     + `<div class="pmenu" hidden>${MORE.map(([h, t, i]) => `<a href="${h}"${cur(h)}>${i} ${t}</a>`).join('')}</div></div>`;
   const pb = nav.querySelector('.pmore button'), pm = nav.querySelector('.pmenu');
   pb.onclick = (e) => { e.stopPropagation(); pm.hidden = !pm.hidden; pb.setAttribute('aria-expanded', String(!pm.hidden)); };
-  // มือถือ: แถบล่าง (หน้าแรก/แผนที่/เส้นทาง/เขต/อื่น ๆ) + แผ่นเมนูอื่น ๆ
-  const MOB = MAIN.slice(0, 4), SHEET = [MAIN[4], ...MORE.map(([h, t, i]) => [h, t, t, i])];
+  // มือถือ: แถบล่าง 4 ปุ่ม (หน้าแรก/แผนที่/เส้นทาง/อื่น ๆ) + แผ่นเมนูอื่น ๆ (เขต ถนนเสี่ยง รายละเอียด …)
+  const MOB = MAIN.slice(0, 3), SHEET = [MAIN[3], MAIN[4], ...MORE.map(([h, t, i]) => [h, t, t, i])];
   const bar = document.createElement('nav');
   bar.className = 'tabbar'; bar.setAttribute('aria-label', 'หน้า');
   bar.innerHTML = MOB.map(([h, , t, i]) => `<a href="${h}"${cur(h)}><span class="ti" aria-hidden="true">${i}</span><span>${t}</span></a>`).join('')
