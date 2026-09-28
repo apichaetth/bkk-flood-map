@@ -16,7 +16,7 @@ jobs:
         run: |
           mkdir snap && cd snap
           B=https://apichaetth.github.io/bkk-flood-map/data
-          for f in home.json risk-history.json risk-roads.json roads.json traffy.json traffy-archive.json traffy-24h.json trends.json meta.json bma-sensors.json tw-rain.json tw-wl.json events.json avoid.json tmd-forecast.json; do
+          for f in home.json news.json risk-history.json risk-roads.json roads.json traffy.json traffy-archive.json traffy-24h.json trends.json meta.json bma-sensors.json tw-rain.json tw-wl.json events.json avoid.json tmd-forecast.json; do
             curl -sfL --compressed "$B/$f?t=$(date +%s)" -o "$f" && echo "$f $(stat -c %s "$f")" || echo "$f MISSING"
           done
       - name: Publish to live-snapshot branch
