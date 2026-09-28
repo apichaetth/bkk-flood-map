@@ -6,3 +6,5 @@ data/yt-state.json
 data/roads.json
 data/risk-history.json
 .env
+promo-out/
+promo/shots/

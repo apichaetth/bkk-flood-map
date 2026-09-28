@@ -1,0 +1,159 @@
+<!doctype html>
+<html lang="th">
+<head>
+<meta charset="utf-8">
+<title>Promo infographic</title>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+Thai:wght@400;500;600;700&display=swap" rel="stylesheet">
+<!-- ภาพโฆษณาสำหรับ Facebook: เปิดด้วย ?f=square | portrait | story | c1..c5 แล้ว scripts/promo.mjs ถ่ายเป็น PNG
+     ภาพหน้าจอจริงอยู่ใน promo/shots/ (home, map, risk, route, districts) + qr.png -->
+<style>
+  :root {
+    --navy: #082f5c; --blue: #0f5ea8; --sky: #2f8fe0; --ice: #e8f2fc; --ink: #10233d; --ink2: #4a5d75;
+    --red: #d32f2f; --orange: #ef8a2c; --yellow: #f2cf45; --green: #2e9d4f;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  html, body { background: var(--navy); }
+  body { font-family: 'IBM Plex Sans Thai', 'Noto Sans Thai', sans-serif; color: #fff; -webkit-font-smoothing: antialiased; }
+  .cv { position: relative; overflow: hidden; background:
+      radial-gradient(1200px 700px at 85% -10%, rgba(47,143,224,.55), transparent 60%),
+      radial-gradient(900px 600px at -10% 110%, rgba(47,143,224,.35), transparent 60%),
+      linear-gradient(160deg, #0b4585 0%, #082f5c 55%, #06264b 100%); }
+  .wave { position: absolute; left: 0; right: 0; bottom: 0; height: 190px; opacity: .9; }
+  .brand { display: flex; align-items: center; gap: 14px; font-weight: 700; font-size: 30px; letter-spacing: .2px; }
+  .brand svg { width: 46px; height: 46px; flex: none; }
+  .brand small { display: block; font-size: 19px; font-weight: 500; opacity: .75; }
+  h1 { font-weight: 700; line-height: 1.12; letter-spacing: -.5px; }
+  h1 em { font-style: normal; color: #7cc4ff; }
+  .tag { color: #cfe3f8; line-height: 1.45; }
+  .pills { display: flex; flex-wrap: wrap; gap: 10px; }
+  .pill { background: rgba(255,255,255,.12); border: 1.5px solid rgba(255,255,255,.28); border-radius: 999px; padding: 6px 18px; font-size: 22px; font-weight: 600; white-space: nowrap; }
+  .pill.hot { background: var(--red); border-color: var(--red); }
+  /* ฟีเจอร์ */
+  .feats { display: grid; gap: 14px; }
+  .feat { display: flex; gap: 16px; align-items: center; background: rgba(255,255,255,.96); color: var(--ink); border-radius: 22px; padding: 16px 20px; box-shadow: 0 8px 24px rgba(0,0,0,.18); }
+  .feat .ic { flex: none; width: 58px; height: 58px; border-radius: 16px; display: grid; place-items: center; background: var(--c, var(--blue)); }
+  .feat .ic svg { width: 34px; height: 34px; }
+  .feat b { display: block; font-size: 27px; line-height: 1.2; }
+  .feat span { display: block; font-size: 20px; color: var(--ink2); line-height: 1.35; margin-top: 2px; }
+  .feats.grid { grid-template-columns: 1fr 1fr; }
+  .feats.grid .feat { flex-direction: column; align-items: flex-start; gap: 10px; padding: 20px; }
+  /* มือถือ */
+  .phone { position: absolute; background: #0d1522; border-radius: 58px; padding: 16px; box-shadow: 0 30px 70px rgba(0,0,0,.45), inset 0 0 0 2px #2b3a50; }
+  .phone::before { content: ''; position: absolute; top: 28px; left: 50%; transform: translateX(-50%); width: 110px; height: 30px; border-radius: 20px; background: #0d1522; z-index: 2; }
+  .phone .scr { width: 100%; height: 100%; border-radius: 44px; overflow: hidden; background: #f4f6f9; }
+  .phone img { width: 100%; height: 100%; object-fit: cover; object-position: top; display: block; }
+  .url { font-weight: 700; color: #fff; }
+  .qr { background: #fff; border-radius: 22px; padding: 14px; }
+  .qr img { display: block; width: 100%; height: 100%; }
+  .src { font-size: 18px; color: #a9c6e6; line-height: 1.5; }
+  .num { display: inline-block; background: #7cc4ff; color: var(--navy); font-weight: 700; border-radius: 999px; padding: 4px 18px; font-size: 24px; }
+  .abs { position: absolute; }
+  .callout { position: absolute; background: #fff; color: var(--ink); border-radius: 18px; padding: 12px 18px; font-size: 22px; font-weight: 600; box-shadow: 0 10px 28px rgba(0,0,0,.3); display: flex; align-items: center; gap: 10px; white-space: nowrap; }
+  .callout i { width: 16px; height: 16px; border-radius: 50%; background: var(--c); flex: none; }
+</style>
+</head>
+<body>
+<div id="root"></div>
+<script>
+(() => {
+  const P = new URLSearchParams(location.search), F = P.get('f') || 'square';
+  const SHOT = (n) => `shots/${n}.png`;
+  const URLTXT = 'apichaetth.github.io/bkk-flood-map';
+  const DROP = '<svg viewBox="0 0 32 32"><path d="M16 3C11 11 7 15.5 7 20a9 9 0 0 0 18 0c0-4.5-4-9-9-17z" fill="#7cc4ff"/><path d="M11.5 20.5a5 5 0 0 0 3.5 4.8" stroke="#fff" stroke-width="2.2" fill="none" stroke-linecap="round"/></svg>';
+  const I = {
+    pin: '<svg viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 22s7-6.2 7-12a7 7 0 0 0-14 0c0 5.8 7 12 7 12z"/><circle cx="12" cy="10" r="2.6"/></svg>',
+    map: '<svg viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 4 3 6.5v13.5L9 17.5l6 2.5 6-2.5V4l-6 2.5z"/><path d="M9 4v13.5M15 6.5V20"/></svg>',
+    warn: '<svg viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3 2 20h20z"/><path d="M12 10v4.5M12 17.3v.2"/></svg>',
+    route: '<svg viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><circle cx="6" cy="19" r="2.3"/><circle cx="18" cy="5" r="2.3"/><path d="M8.3 19H16a3.5 3.5 0 0 0 0-7H8a3.5 3.5 0 0 1 0-7h7.7"/></svg>',
+    chart: '<svg viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 20V10M10 20V4M16 20v-7M22 20H2"/><path d="m15 7 3-3 3 3M18 4v6"/></svg>',
+    mega: '<svg viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 10v4h4l6 4V6L7 10z"/><path d="M16.5 8.5a5 5 0 0 1 0 7M19.5 5.5a9 9 0 0 1 0 13"/></svg>',
+  };
+  const FEATS = [
+    ['pin', '#d32f2f', 'แถวบ้านท่วมไหม?', 'กดปุ่มเดียว รู้สถานการณ์รอบตัวในรัศมี 2 กม.'],
+    ['map', '#0f5ea8', 'แผนที่สดทั้งกรุงเทพฯ', 'เซ็นเซอร์ถนน ระดับน้ำคลอง 300+ สถานี ฝน และที่ประชาชนแจ้ง'],
+    ['warn', '#ef8a2c', 'ถนนที่อาจท่วม', 'คาดการณ์ล่วงหน้า 3 ชม. จากฝนและรายงานจริง'],
+    ['route', '#2e9d4f', 'เส้นทางเลี่ยงน้ำ', 'วางเส้นทางอ้อมจุดที่น้ำท่วมอยู่'],
+    ['chart', '#6a4fc9', 'สถานการณ์รายเขต', 'ดูว่าแต่ละเขตกำลังแย่ลงหรือดีขึ้น'],
+    ['mega', '#c2185b', 'ช่วยกันแจ้ง', 'ปักหมุดน้ำท่วม–น้ำลด ให้เพื่อนบ้านรู้ทัน'],
+  ];
+  const feat = ([ic, c, t, s], big) => `<div class="feat" style="--c:${c}"><div class="ic">${I[ic]}</div><div><b${big ? ` style="font-size:${big}px"` : ''}>${t}</b><span>${s}</span></div></div>`;
+  const phone = (shot, x, y, w, h, rot = 0, z = 1) => `<div class="phone" style="left:${x}px;top:${y}px;width:${w}px;height:${h}px;transform:rotate(${rot}deg);z-index:${z}"><div class="scr"><img src="${SHOT(shot)}"></div></div>`;
+  const brand = (sz = 30) => `<div class="brand" style="font-size:${sz}px">${DROP}<div>น้ำท่วม กทม. ตอนนี้<small>เว็บแอปเช็กน้ำท่วมกรุงเทพฯ</small></div></div>`;
+  const wave = `<svg class="wave" viewBox="0 0 1080 190" preserveAspectRatio="none"><path d="M0 80 C 180 20, 360 140, 540 80 S 900 20, 1080 80 V190 H0z" fill="rgba(47,143,224,.25)"/><path d="M0 120 C 200 70, 380 170, 560 120 S 920 70, 1080 120 V190 H0z" fill="rgba(47,143,224,.35)"/></svg>`;
+  const pills = `<div class="pills"><span class="pill">ฟรี</span><span class="pill">ไม่ต้องโหลดแอป</span><span class="pill">อัปเดตทุก 15 นาที</span></div>`;
+  const SRC = 'ข้อมูลจาก สำนักการระบายน้ำ กทม. · ThaiWater · Traffy Fondue · iTIC · กรมอุตุนิยมวิทยา';
+  const cv = (w, h, inner) => `<div class="cv" id="cv" style="width:${w}px;height:${h}px">${wave}${inner}</div>`;
+  const qr = (x, y, s) => `<div class="qr abs" style="left:${x}px;top:${y}px;width:${s}px;height:${s}px"><img src="${SHOT('qr')}"></div>`;
+
+  const L = {
+    square: () => cv(1080, 1080, `
+      <div class="abs" style="left:64px;top:60px;width:560px">${brand()}
+        <h1 style="font-size:66px;margin-top:34px">น้ำท่วมแถวบ้าน<br><em>เช็กได้ใน 1 คลิก</em></h1>
+        <p class="tag" style="font-size:25px;margin-top:16px">รู้ก่อนออกจากบ้านว่าถนนไหนท่วม<br>และเลี่ยงได้ทัน</p>
+        <div class="feats" style="margin-top:28px">${[0, 1, 2, 3].map((i) => feat(FEATS[i])).join('')}</div>
+      </div>
+      ${phone('map', 690, 150, 330, 690, 6, 1)}${phone('home', 610, 110, 370, 780, -3, 2)}
+      <div class="abs" style="left:64px;bottom:44px;right:64px;display:flex;align-items:center;justify-content:space-between">
+        ${pills}<div class="url" style="font-size:25px">${URLTXT}</div></div>`),
+
+    portrait: () => cv(1080, 1350, `
+      <div class="abs" style="left:64px;top:52px;right:64px">${brand()}
+        <h1 style="font-size:70px;margin-top:24px">น้ำท่วมแถวบ้าน<br><em>เช็กได้ใน 1 คลิก</em></h1>
+        <p class="tag" style="font-size:26px;margin-top:12px">รวมข้อมูลน้ำท่วมกรุงเทพฯ จากทุกแหล่งไว้ที่เดียว</p></div>
+      ${phone('map', 640, 440, 310, 600, 6, 1)}${phone('home', 130, 430, 320, 620, -5, 2)}${phone('risk', 385, 455, 310, 600, 0, 3)}
+      <div class="abs" style="left:48px;right:48px;top:1085px"><div class="feats" style="grid-template-columns:repeat(3,1fr);gap:12px">
+        ${FEATS.map((f) => `<div class="feat" style="--c:${f[1]};padding:12px 14px;gap:12px;border-radius:18px"><div class="ic" style="width:46px;height:46px;border-radius:13px">${I[f[0]]}</div><b style="font-size:22px">${f[2]}</b></div>`).join('')}</div></div>
+      <div class="abs" style="left:64px;right:64px;bottom:36px;display:flex;align-items:center;justify-content:space-between">${pills}<div class="url" style="font-size:25px">${URLTXT}</div></div>`),
+
+    story: () => cv(1080, 1920, `
+      <div class="abs" style="left:72px;top:190px;right:72px;text-align:center">${brand(34).replace('class="brand"', 'class="brand" style="justify-content:center"')}
+        <h1 style="font-size:92px;margin-top:34px">น้ำท่วมแถวบ้าน<br><em>เช็กได้ใน 1 คลิก</em></h1>
+        <p class="tag" style="font-size:32px;margin-top:18px">ฟรี · ไม่ต้องโหลดแอป · อัปเดตทุก 15 นาที</p></div>
+      ${phone('map', 560, 690, 380, 780, 6, 1)}${phone('home', 150, 660, 400, 830, -4, 2)}
+      <div class="callout" style="--c:var(--red);left:70px;top:1180px;z-index:5"><i></i>รู้ทันทีว่ารอบตัวท่วมไหม</div>
+      <div class="callout" style="--c:var(--sky);right:60px;top:780px;z-index:5"><i></i>เซ็นเซอร์ คลอง ฝน สด ๆ</div>
+      <div class="abs" style="left:72px;right:72px;top:1530px;display:flex;align-items:center;gap:34px">
+        ${'<div class="qr" style="width:210px;height:210px;flex:none"><img src="' + SHOT('qr') + '"></div>'}
+        <div><div style="font-size:40px;font-weight:700">สแกนเปิดดูเลย</div><div class="url" style="font-size:30px;margin-top:8px;color:#7cc4ff">${URLTXT}</div>
+        <div class="src" style="margin-top:12px;font-size:20px">${SRC}</div></div></div>`),
+  };
+  // Carousel 5 ภาพ (1080×1080): ปก + 3 ฟีเจอร์ + ปิดท้าย
+  const slide = (n, title, sub, bullets, shots, extra = '') => cv(1080, 1080, `
+    <div class="abs" style="left:64px;top:60px;width:540px">${brand(26)}
+      <div style="margin-top:44px"><span class="num">${n}/5</span></div>
+      <h1 style="font-size:60px;margin-top:18px">${title}</h1>
+      <p class="tag" style="font-size:26px;margin-top:14px">${sub}</p>
+      <div class="feats" style="margin-top:30px">${bullets.map((b) => feat(b)).join('')}</div></div>
+    ${shots}${extra}
+    <div class="abs url" style="left:64px;bottom:44px;font-size:24px">${URLTXT}</div>`);
+  L.c1 = () => cv(1080, 1080, `
+    <div class="abs" style="left:64px;top:64px;width:560px">${brand()}
+      <h1 style="font-size:78px;margin-top:60px">ฝนตกทีไร<br><em>ถนนไหนท่วม?</em></h1>
+      <p class="tag" style="font-size:30px;margin-top:22px">เปิดเว็บเดียว เห็นน้ำท่วมทั่วกรุงเทพฯ<br>อัปเดตทุก 15 นาที</p>
+      <div style="margin-top:40px">${pills}</div></div>
+    ${phone('home', 690, 150, 330, 690, 6, 1)}${phone('map', 610, 110, 370, 780, -3, 2)}
+    <div class="abs" style="left:64px;bottom:50px;font-size:30px;font-weight:700;color:#7cc4ff">เลื่อนดูว่าทำอะไรได้บ้าง →</div>`);
+  L.c2 = () => slide(2, 'แถวบ้าน<br><em>ท่วมไหม?</em>', 'กด "ดูรอบตัวฉัน" ปุ่มเดียว บอกเลยว่าในรัศมี 2 กม. มีน้ำท่วมตรงไหน ลึกแค่ไหน',
+    [FEATS[0], ['pin', '#0f5ea8', 'บันทึกบ้าน / ที่ทำงาน', 'เปิดมาเห็นสถานะที่ที่สำคัญของคุณทันที']], phone('home', 640, 110, 380, 800, 3, 2));
+  L.c3 = () => slide(3, 'แผนที่สด<br><em>ทั้งกรุงเทพฯ</em>', 'รวมข้อมูลจริงจากหลายหน่วยงานไว้บนแผนที่เดียว',
+    [FEATS[1], ['warn', '#ef8a2c', 'ลูกศรขึ้น–ลง', 'รู้ว่าน้ำกำลังเพิ่มหรือกำลังลด']], phone('map', 640, 110, 380, 800, 3, 2),
+    `<div class="callout" style="--c:var(--red);left:585px;top:905px;z-index:5"><i></i>น้ำท่วมถนน</div><div class="callout" style="--c:var(--sky);left:790px;top:905px;z-index:5"><i></i>ระดับน้ำคลอง / ฝน</div>`);
+  L.c4 = () => slide(4, 'วางแผน<br><em>ก่อนออกเดินทาง</em>', 'รู้ล่วงหน้าว่าถนนไหนเสี่ยง และหาทางอ้อมน้ำ',
+    [FEATS[2], FEATS[3]], phone('route', 720, 170, 320, 680, 6, 1) + phone('risk', 600, 110, 360, 770, -3, 2));
+  L.c5 = () => cv(1080, 1080, `
+    <div class="abs" style="left:64px;top:60px;width:560px">${brand(26)}
+      <div style="margin-top:44px"><span class="num">5/5</span></div>
+      <h1 style="font-size:60px;margin-top:18px">ช่วยกัน<br><em>ให้เมืองรู้ทัน</em></h1>
+      <div class="feats" style="margin-top:28px">${feat(FEATS[4])}${feat(FEATS[5])}</div>
+      <div style="display:flex;gap:26px;align-items:center;margin-top:34px">
+        <div class="qr" style="width:190px;height:190px;flex:none"><img src="${SHOT('qr')}"></div>
+        <div><div style="font-size:34px;font-weight:700;line-height:1.25">ใช้ฟรี<br>ไม่ต้องโหลดแอป</div><div style="font-size:22px;color:#cfe3f8;margin-top:6px">สแกนเปิดดูเลย</div></div></div>
+      <div class="url" style="font-size:26px;margin-top:18px;color:#7cc4ff;white-space:nowrap">${URLTXT}</div></div>
+    ${phone('districts', 640, 110, 380, 800, 3, 2)}
+    <div class="abs src" style="left:64px;right:64px;bottom:40px">${SRC}</div>`);
+
+  document.getElementById('root').innerHTML = (L[F] || L.square)();
+})();
+</script>
+</body>
+</html>

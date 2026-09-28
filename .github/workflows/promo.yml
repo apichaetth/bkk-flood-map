@@ -1,0 +1,33 @@
+name: promo
+# ภาพโฆษณา Facebook: ถ่ายหน้าจอจากเว็บจริง + เรนเดอร์ promo/infographic.html เป็น PNG แล้วเก็บไว้ที่ branch promo
+on:
+  push:
+    branches: [main]
+    paths: ['promo/infographic.html', 'scripts/promo.mjs', '.github/workflows/promo.yml']
+  workflow_dispatch:
+permissions:
+  contents: write
+concurrency:
+  group: promo
+  cancel-in-progress: true
+jobs:
+  promo:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - run: sudo apt-get install -y -qq fonts-thai-tlwg fonts-noto-color-emoji >/dev/null
+      - run: npm install --no-save playwright-core@1.49.1 qrcode@1.5.4
+      - run: node scripts/promo.mjs
+      - name: Publish images to promo branch
+        run: |
+          cd promo-out
+          git init -q -b promo
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add -A
+          git commit -qm "Promo images $(date -u +%FT%TZ)"
+          git push -qf "https://x-access-token:${{ github.token }}@github.com/${{ github.repository }}" promo
