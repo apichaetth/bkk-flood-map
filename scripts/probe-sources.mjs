@@ -22,6 +22,16 @@ async function probe(label, url, headers = {}) {
     } catch { console.log('text:', txt.slice(0, 1500)); return txt; }
   } catch (e) { console.log(`\n### ${label}\nERROR ${e.message} ${url}`); return null; }
 }
+// ความแม่นจริงบนเว็บ: การจับได้ (recall) และจุดที่พลาดบ่อย
+{
+  const j = await fetch('https://apichaetth.github.io/bkk-flood-map/data/risk-roads.json?t=' + Date.now()).then((r) => r.json());
+  const a = j.accuracy || {};
+  console.log('updated', j.updated, 'counts', JSON.stringify(j.counts));
+  console.log('total.rec', JSON.stringify(a.total && a.total.rec), 'runs', a.total && a.total.runs, 't3', JSON.stringify(a.total && a.total.t[3]), 'base', JSON.stringify(a.total && a.total.base));
+  for (const d of a.days || []) console.log('day', d.d, 'runs', d.runs, 'rain', d.rain, 'rec', JSON.stringify(d.rec), 't3', JSON.stringify(d.t[3]), 't2', JSON.stringify(d.t[2]));
+  console.log('miss7', a.miss7); console.log('missTop', JSON.stringify(a.missTop, null, 1));
+  process.exit(0);
+}
 // กล้อง: นับกล้องใน กทม. ของแต่ละแหล่ง
 {
   const cams = await fetch('https://camera.longdo.com/feed/?command=json').then((r) => r.json()).catch((e) => (console.log('longdo ERR', e.message), []));
