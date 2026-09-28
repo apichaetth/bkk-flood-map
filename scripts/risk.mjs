@@ -62,7 +62,7 @@ function roadKind(segIdx, la, lo) {
   let best = null;
   // หาจากจุดกลางช่วงในรัศมี roadNearM + ความยาวช่วง แล้ววัดระยะถึงตัวเส้นถนนจริง
   for (const s of near(segIdx, la, lo, P.roadNearM + P.segM)) {
-    if (distM(la, lo, s.la, s.lo) > P.roadNearM + P.segM) continue;
+    if (!s.name || distM(la, lo, s.la, s.lo) > P.roadNearM + P.segM) continue; // นับเฉพาะถนนที่มีชื่อ (ที่ระบบทาย)
     const dm = distToLine(la, lo, s.c);
     if (dm <= P.roadNearM && (!best || dm < best.dm)) best = { dm, s };
   }
@@ -214,6 +214,8 @@ export function scoreRoads(roads, input, now = Date.now()) {
     return sw ? sv / sw : null;
   };
   for (const s of roads.segments) {
+    // ทายเฉพาะถนน/ซอยที่มีชื่อ (ช่วงไม่มีชื่อบอกผู้ใช้ไม่ได้ว่าคือที่ไหน)
+    if (!s.name) continue;
     // E: หลักฐานใกล้เคียง (รวมแบบความน่าจะเป็น)
     let notE = 1, bestE = null;
     for (const r of near(repIdx, s.la, s.lo, P.evidenceRadiusM)) {

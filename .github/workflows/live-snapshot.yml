@@ -1,0 +1,29 @@
+name: live-snapshot
+# คัดลอกไฟล์ข้อมูลจากเว็บจริงไปไว้ที่ branch live-snapshot เพื่อวิเคราะห์/ทดสอบย้อนหลังแบบจำลองถนนเสี่ยง
+on:
+  push:
+    branches: [main]
+    paths: ['.github/workflows/live-snapshot.yml']
+  workflow_dispatch:
+permissions:
+  contents: write
+jobs:
+  snap:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Download live data
+        run: |
+          mkdir snap && cd snap
+          B=https://apichaetth.github.io/bkk-flood-map/data
+          for f in risk-history.json risk-roads.json roads.json traffy.json traffy-archive.json traffy-24h.json trends.json meta.json bma-sensors.json tw-rain.json tw-wl.json events.json avoid.json tmd-forecast.json; do
+            curl -sfL --compressed "$B/$f?t=$(date +%s)" -o "$f" && echo "$f $(stat -c %s "$f")" || echo "$f MISSING"
+          done
+      - name: Publish to live-snapshot branch
+        run: |
+          cd snap
+          git init -q -b live-snapshot
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add -A && git commit -qm "live snapshot $(date -u +%FT%TZ)"
+          git push -qf "https://x-access-token:${{ github.token }}@github.com/${{ github.repository }}" live-snapshot

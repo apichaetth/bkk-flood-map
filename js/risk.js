@@ -92,7 +92,7 @@
       return;
     }
     const T = a.total, t3 = T.t[3], t2 = T.t[2], rec = T.rec;
-    const recAll = ['main', 'soi', 'off'].reduce((x, k) => [x[0] + rec[k][0], x[1] + rec[k][1]], [0, 0]);
+    const recAll = ['main', 'soi'].reduce((x, k) => [x[0] + rec[k][0], x[1] + rec[k][1]], [0, 0]);
     const nDays = a.days.length;
     $('acc').textContent = pcs(t3[1], t3[0]);
     $('accSub').textContent = `(${nDays} วัน · ${n0(T.runs)} รอบ)`;
@@ -123,8 +123,8 @@
       <table><tbody>${T.drv.map((c, i) => row(DRV[i], c)).join('')}</tbody></table>
       <h3>น้ำท่วมจริง ทายไว้ล่วงหน้าได้กี่ %</h3>
       <table><thead><tr><th>รายงานน้ำท่วมใหม่ (นับเรื่องละครั้ง)</th><th class="n">เรื่อง</th><th class="n">ทายไว้ก่อน</th><th class="n">%</th></tr></thead><tbody>
-      ${recRow('บนถนนสายหลัก/รอง', rec.main)}${recRow('ในซอย', rec.soi)}${recRow('ไม่อยู่ใกล้ถนนที่ระบบดู', rec.off)}
-      ${recRow('<b>รวม</b>', recAll)}
+      ${recRow('บนถนนสายหลัก/รอง', rec.main)}${recRow('ในซอย', rec.soi)}${recRow('<b>รวม (ถนน/ซอยที่มีชื่อ)</b>', recAll)}
+      ${recRow('<span class="muted">ไม่อยู่ใกล้ถนนที่มีชื่อ (ระบบไม่ได้ทาย ไม่นับรวม)</span>', rec.off)}
       </tbody></table>
       ${(a.missTop || []).length ? `<h3>พลาดบ่อยที่สุด (7 วัน)</h3>
       <p class="muted small">น้ำท่วมจริงแต่ไม่ได้ทายไว้ล่วงหน้า รวม ${n0(a.miss7)} เรื่อง · ใช้ดูว่าต้องปรับตรงไหน</p>
@@ -134,7 +134,7 @@
       <h3>รายวัน</h3>
       <table><thead><tr><th>วัน</th><th class="n">ฝนสูงสุด<br>มม./ชม.</th><th class="n">ควรระวังมาก<br>ถูก</th><th class="n">ตัวเทียบ<br>ถูก</th><th class="n">ทายไว้ก่อน</th></tr></thead><tbody>
       ${a.days.slice(0, 14).map((d) => {
-        const r = ['main', 'soi', 'off'].reduce((x, k) => [x[0] + d.rec[k][0], x[1] + d.rec[k][1]], [0, 0]);
+        const r = ['main', 'soi'].reduce((x, k) => [x[0] + d.rec[k][0], x[1] + d.rec[k][1]], [0, 0]);
         return `<tr><td>${fmtDay(d.d)}</td><td class="n">${d.rain}</td><td class="n">${pcs(d.t[3][1], d.t[3][0])}</td><td class="n">${pcs(d.base[1], d.base[0])}</td><td class="n">${pcs(r[1], r[0])} <span class="muted small">(${r[0]})</span></td></tr>`;
       }).join('')}
       </tbody></table></div>`;
