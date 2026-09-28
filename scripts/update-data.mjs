@@ -261,13 +261,36 @@ async function geocode(name, cache) {
   return hit;
 }
 
-function pinsFor(analysis, districts, geo) {
+// ปักหมุดข่าวเฉพาะที่รู้ตำแหน่งแน่นอน: ระบุจุดชัด (แยก ปากซอย หน้า… ชุมชน อาคาร) หรือเป็นซอย/ถนนสั้น (≤ 600 ม. จากข้อมูลถนนของระบบ)
+// ถนนสายหลักหรือซอยยาวที่ไม่บอกจุด (เช่น "ถนนรามคำแหง", "ซอยลาดพร้าว 101") ไม่ปัก — precision 'area' (แสดงในรายการข่าวเท่านั้น)
+const SPECIFIC_RE = /แยก|ปากซอย|หน้า|ใกล้|ตรงข้าม|ชุมชน|หมู่บ้าน|ตลาด|โรงเรียน|วัด|สถานี|ห้าง|เคหะ|สะพาน|อาคาร|คอนโด|มหาวิทยาลัย|โรงพยาบาล|ศูนย์|บิ๊กซี|โลตัส|เซ็นทรัล|แฟลต|นิคม|สน\.|ม\.\s?\d|หมู่\s?\d/;
+const ROADISH_RE = /^(ถนน|ถ\.|ซอย|ซ\.|ทางหลวง|ทางด่วน|มอเตอร์เวย์|คลอง|แม่น้ำ|เขต|แขวง)/;
+const normRoad = (t) => String(t || '').replace(/^ถ\.\s*/, 'ถนน').replace(/^ซ\.\s*/, 'ซอย').replace(/\s+/g, '');
+let roadLenCache = null;
+async function roadLengths() {
+  if (roadLenCache) return roadLenCache;
+  const r = await readJSON('roads.json', null);
+  const m = new Map();
+  for (const sg of (r && r.segments) || []) if (sg.name) { const k = normRoad(sg.name); m.set(k, (m.get(k) || 0) + 150); }
+  return (roadLenCache = m);
+}
+function placePrecision(name, lens) {
+  if (SPECIFIC_RE.test(name)) return 'place';
+  const n = normRoad(name);
+  // "ถนนสุขุมวิท ซอย 71" = "ซอยสุขุมวิท 71" ในแผนที่
+  const soi = /^ถนน(.+?)ซอย(.+)$/.exec(n);
+  const cand = [n, n.replace(/^ถนน/, ''), 'ถนน' + n, soi ? 'ซอย' + soi[1] + soi[2] : ''].filter(Boolean);
+  const len = cand.map((k) => lens.get(k)).find((v) => v != null);
+  if (len != null) return len <= 600 ? 'place' : 'area';
+  return ROADISH_RE.test(name) ? 'area' : 'place'; // ถนน/ซอยที่ไม่รู้ความยาว ไม่ปัก · ชื่อสถานที่อื่น ๆ ปักได้
+}
+function pinsFor(analysis, districts, geo, lens = new Map()) {
   const pins = [];
   for (const p of analysis.places || []) {
     const d = districts.find((x) => x.name === String(p.district || '').replace(/^เขต/, '').trim());
     const g = p.name ? geo[p.name] : null;
     // ใช้ตำแหน่งจาก geocode ถ้าอยู่ใกล้เขตที่ข่าวระบุ ไม่งั้นใช้จุดกึ่งกลางเขต
-    if (g && (!d || distKm(g.lat, g.lng, d.lat, d.lng) < 8)) pins.push({ lat: g.lat, lng: g.lng, label: p.name, precision: 'place', district: d?.name || '' });
+    if (g && (!d || distKm(g.lat, g.lng, d.lat, d.lng) < 8)) pins.push({ lat: g.lat, lng: g.lng, label: p.name, precision: placePrecision(p.name, lens), district: d?.name || '' });
     else if (d) pins.push({ lat: d.lat, lng: d.lng, label: p.name || 'เขต' + d.name, precision: 'district', district: d.name });
   }
   const seen = new Set();
@@ -278,6 +301,7 @@ async function updateNews(meta) {
   const districts = await readJSON('districts.json', []);
   const cache = await readJSON('news-cache.json', {}); // ผลวิเคราะห์เดิม เพื่อไม่เรียก AI ซ้ำ
   const geo = await readJSON('geocache.json', {});
+  const lens = await roadLengths();
   const prev = await readJSON('news.json', { items: [] });
   let newsErr = null;
   let newsItems = await fetchNews().catch((e) => { newsErr = e; return null; });
@@ -311,7 +335,7 @@ async function updateNews(meta) {
     const a = cache[n.id];
     if (!a.relevant) continue;
     for (const p of a.places || []) if (p.name) await geocode(p.name, geo);
-    out.push({ ...n, summary: a.summary || '', severity: a.severity || 'กลาง', type: newsType(n, a), ai: !!a.ai, pins: pinsFor(a, districts, geo) });
+    out.push({ ...n, summary: a.summary || '', severity: a.severity || 'กลาง', type: newsType(n, a), ai: !!a.ai, pins: pinsFor(a, districts, geo, lens) });
   }
   const merged = dedupeNews(out);
 
