@@ -25,7 +25,7 @@ async function probe(label, url, headers = {}) {
 // ขนาดและเวลาโหลดไฟล์ข้อมูลบนเว็บจริง + แหล่งภายนอกที่หน้าแผนที่เรียก
 {
   const B = 'https://apichaetth.github.io/bkk-flood-map/';
-  const files = ['map.html', 'js/app.js', 'js/core.js', 'css/style.css', 'data/meta.json', 'data/bma-sensors.json', 'data/trends.json', 'data/traffy-24h.json', 'data/traffy.json', 'data/tw-rain.json', 'data/tw-wl.json', 'data/thaiwater.json', 'data/news.json', 'data/tmd.json', 'data/tmd-forecast.json', 'data/tide.json', 'data/tw-warn.json', 'data/districts.geojson', 'data/risk-roads.json', 'data/avoid.json', 'data/facebook-pages.json',
+  const files = ['map.html', 'js/app.js', 'js/core.js', 'css/style.css', 'data/meta.json', 'data/bma-sensors.json', 'data/trends.json', 'data/traffy-24h.json', 'data/traffy.json', 'data/events.json', 'data/tw-rain.json', 'data/tw-wl.json', 'data/thaiwater.json', 'data/news.json', 'data/tmd.json', 'data/tmd-forecast.json', 'data/tide.json', 'data/tw-warn.json', 'data/districts.geojson', 'data/risk-roads.json', 'data/avoid.json', 'data/facebook-pages.json',
     'https://event.longdo.com/feed/json', 'https://camera.longdo.com/feed/?command=json', 'https://api.rainviewer.com/public/weather-maps.json', 'https://cdn.jsdelivr.net/npm/leaflet@1.9.4/dist/leaflet.js'];
   for (const f of files) {
     const t0 = Date.now();
