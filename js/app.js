@@ -32,6 +32,9 @@
     L.circle([la, lo], { radius: 250, color: cssVar('--critical'), weight: 2, dashArray: '6 5', fill: false, interactive: false }).addTo(map);
   })();
 
+  // canvas สำหรับจุดจำนวนมาก (tolerance = พื้นที่กดรอบจุดเล็ก ๆ บนจอสัมผัส)
+  const fastR = L.canvas({ padding: 0.3, tolerance: isMobile ? 10 : 4 });
+  const LEVEL_VAR = { 0: '--good', 1: '--warning', 2: '--serious', 3: '--critical' };
   const layers = {
     districts: L.layerGroup().addTo(map),
     radar: L.layerGroup().addTo(map),
@@ -123,7 +126,8 @@
   const TRL = { fast: ['⬆⬆', 'เพิ่มขึ้นมาก'], up: ['⬆', 'เพิ่มขึ้น'], peak: ['⏸', 'ใกล้จุดสูงสุด'], flat: ['➖', 'ทรงตัว'], down: ['⬇', 'ลดลง'], dfast: ['⬇⬇', 'ลดลงมาก'] };
   async function loadTrends() {
     const d = await Flood.getJSON('data/trends.json', 20000, { cache: 'no-cache' }).catch(() => null);
-    S.trend = d && Date.now() - new Date(d.updated) < 90 * 6e4 ? { road: new Map(d.road.map((x) => [x.c, x])), canal: new Map(d.canal.map((x) => [x.c, x])) } : null;
+    S.trend = d && Date.now() - new Date(d.updated) < 90 * 6e4 ? { road: new Map(d.road.map((x) => [x.c, x])), canal: new Map(d.canal.map((x) => [x.c, x])),
+      rain: new Map((d.rain || []).map((x) => [x.c, x])), rainList: d.rain || [] } : null;
     if (S.trend && S.sensor) {
       // ค่าจาก ThaiWater/เครื่องในไทยใหม่กว่าค่าจากระบบแจ้งเตือน: ใช้ค่าที่ใหม่กว่า
       for (const x of S.sensor) {
@@ -131,7 +135,7 @@
         if (tr && tr.t > (x.t ? +x.t : 0)) { x.cm = tr.v; x.t = new Date(tr.t); x.stale = false; x.lv = Flood.sensorLevel(tr.v); }
       }
     }
-    drawSensors(); drawRelay(); listTrends(d);
+    drawSensors(); drawRelay(); if (S.rain) drawRain(); listTrends(d);
   }
   // รายการแนวโน้มในแผง: กดแล้วไปที่หมุด
   function listTrends(d) {
@@ -156,6 +160,7 @@
         right: `${(+x.v).toFixed(dp)}${unit} (${x.d30 > 0 ? '+' : ''}${(+x.d30).toFixed(dp)})` };
     }, 'น้ำทรงตัวทุกจุด ไม่มีจุดที่กำลังเพิ่มหรือลด');
   }
+  const rainTrHtml = (x) => (x && x.tr !== 'flat' ? `<div class="m" style="margin-top:4px"><b>🌧${TRL[x.tr][0]} ฝน${{ fast: 'แรงขึ้นมาก', up: 'แรงขึ้น', down: 'เบาลง', dfast: 'เบาลงมาก' }[x.tr]}</b> (${x.d60 > 0 ? '+' : ''}${x.d60} มม. เทียบชั่วโมงก่อน)</div>` : '');
   const trendHtml = (tr, unit, dp) => {
     if (!tr) return '';
     const hh = (t) => new Intl.DateTimeFormat('th-TH', { timeZone: Flood.TZ, hour: '2-digit', minute: '2-digit' }).format(new Date(t));
@@ -223,14 +228,17 @@
   function drawTraffy() {
     layers.traffy.clearLayers();
     if (!S.traffy) { $('kTraffy').textContent = '–'; return; }
+    const col = [0, 1, 2, 3].map((l) => cssVar(LEVEL_VAR[l]));
+    // วาดบน canvas: จุด Traffy มีได้หลายพันจุด แบบ HTML ทีละจุดทำให้แผนที่ช้ามากบนมือถือ
     for (const x of S.traffy) {
       const r = x.r;
-      const html = `<div class="pp">${badge(x.lv)} <span class="m">ประชาชนแจ้ง · ยังไม่ยืนยัน</span>
+      const html = () => `<div class="pp">${badge(x.lv)} <span class="m">ประชาชนแจ้ง · ยังไม่ยืนยัน</span>
         <div style="margin-top:6px">${esc((r.description || '').slice(0, 320))}</div>
         ${r.photo_url ? `<img loading="lazy" src="${esc(r.photo_url)}" alt="ภาพจากผู้แจ้ง" referrerpolicy="no-referrer">` : ''}
         <div class="m" style="margin-top:6px">${esc(r.address || '')}<br>แจ้งเมื่อ ${fmtDT(x.t)} (${ago(x.t)}) · สถานะ: ${esc(r.state || '')}<br>
         <a href="https://share.traffy.in.th/teamchadchart/${encodeURIComponent(r.ticket_id)}" target="_blank" rel="noopener">ดูเรื่อง ${esc(r.ticket_id)}</a></div></div>`;
-      x.marker = L.marker([x.la, x.lo], { icon: icon('traffy', LEVEL[x.lv].color, '', 10), zIndexOffset: 400 }).bindPopup(html, { maxWidth: 300 }).addTo(layers.traffy);
+      x.marker = L.circleMarker([x.la, x.lo], { renderer: fastR, keepSize: true, radius: isMobile ? 4 : 5, color: col[x.lv], weight: 2, fillColor: '#fff', fillOpacity: 1 })
+        .bindPopup(html, { maxWidth: 300 }).addTo(layers.traffy);
     }
     $('kTraffy').textContent = S.traffy.length;
     renderFloodList(); renderCams();
@@ -256,6 +264,7 @@
         ${s.mm > RAIN_HEAVY_MM ? badge(3, 'ฝน' + st[2]) : ''}
         <div><span class="big">${s.mm}</span> มม. / 24 ชม. (${st[2]})${s.mm1 != null ? ` · ${s.mm1} มม. ชั่วโมงล่าสุด` : ''}</div>
         ${s.mm1 >= 10 ? badge(3, 'ตอนนี้ฝน' + rain1(s.mm1)[1]) : ''}
+        ${rainTrHtml(S.trend && S.trend.rain.get('tw:' + s.x.station.id))}
         <div class="m">${esc(loc(s))} · ${fmtDT(s.t)} (${ago(s.t)})</div></div>`;
       // ฝนตกหนักในชั่วโมงล่าสุด: วงแดงรอบจุด ให้เห็นว่าตอนนี้ฝนกำลังหนัก
       if (s.mm1 >= 10) L.circleMarker([s.la, s.lo], { radius: 9 + Math.min(8, s.mm1 / 5), color: cssVar('--critical'), weight: 2.5, fill: false, dashArray: '4 3', interactive: false }).addTo(layers.rain);
@@ -272,6 +281,12 @@
       s.marker = L.circleMarker([s.la, s.lo], { ...style, fillColor: heavy ? heavyRed(s.mm) : cssVar(st[1].slice(4, -1)) })
         .bindPopup(html).addTo(layers.rain);
       if (heavy) s.marker.bringToFront();
+    }
+    // ป้ายลูกศรฝนแรงขึ้น/เบาลง (ทุกสถานีทั้ง ThaiWater และ กทม.) เทียบฝน 1 ชม. กับชั่วโมงก่อน
+    for (const x of (S.trend && S.trend.rainList) || []) {
+      if (x.tr === 'flat') continue;
+      L.marker([x.la, x.lo], { icon: L.divIcon({ className: '', iconSize: [30, 16], iconAnchor: [-2, 18], html: `<span class="rtr ${x.tr}">🌧${TRL[x.tr][0]}</span>` }),
+        zIndexOffset: 300, interactive: false, keyboard: false }).addTo(layers.rain);
     }
     const top = [...S.rain].sort((a, b) => b.mm - a.mm);
     $('kRain').textContent = top.length ? top[0].mm.toFixed(0) : '–';
@@ -367,10 +382,16 @@
       minimizePanel();
     });
   }
+  // แนวโน้มสถานี ThaiWater: เทียบกับค่าก่อนหน้าของสถานี (ม.) ⬆⬆ ≥ 0.10 · ⬆ ≥ 0.03 · ⬇ ≤ −0.03 · ⬇⬇ ≤ −0.10
+  function wlTr(s) {
+    if (s.msl == null || s.prev == null || s.stale) return '';
+    const d = s.msl - s.prev;
+    return d >= 0.1 ? 'fast' : d >= 0.03 ? 'up' : d <= -0.1 ? 'dfast' : d <= -0.03 ? 'down' : 'flat';
+  }
   function trend(s) {
     if (s.msl == null || s.prev == null) return '';
-    const d = s.msl - s.prev;
-    return Math.abs(d) < 0.005 ? 'ทรงตัว' : d > 0 ? `▲ ขึ้น ${d.toFixed(2)} ม.` : `▼ ลง ${(-d).toFixed(2)} ม.`;
+    const d = s.msl - s.prev, k = wlTr(s) || 'flat';
+    return `${TRL[k][0]} ${TRL[k][1]}${Math.abs(d) >= 0.005 ? ` (${d > 0 ? '+' : ''}${d.toFixed(2)} ม. จากค่าก่อนหน้า)` : ''}`;
   }
   function drawWl() {
     layers.wl.clearLayers();
@@ -382,7 +403,8 @@
         ${s.pct != null ? badge(lv, `${s.pct.toFixed(0)}% ของตลิ่ง`) : ''} ${s.stale ? '<span class="badge" style="--c:var(--stale)">ค่าเก่า</span>' : ''}
         <div style="margin-top:4px"><span class="big">${s.msl != null ? s.msl.toFixed(2) : '–'}</span> ม.รทก. <span class="m">${trend(s)}</span></div>
         <div class="m">ตลิ่งต่ำสุด ${s.bank != null ? s.bank.toFixed(2) + ' ม.รทก.' : '–'} · ${esc(loc(s))}<br>${fmtDT(s.t)} (${ago(s.t)})</div></div>`;
-      s.marker = L.marker([s.la, s.lo], { icon: icon('wl', LEVEL[lv].color, '', 18, s.stale ? 'stale' : ''), zIndexOffset: 200 }).bindPopup(html).addTo(layers.wl);
+      const k = wlTr(s);
+      s.marker = L.marker([s.la, s.lo], { icon: icon('wl', LEVEL[lv].color, '', 18, s.stale ? 'stale' : '', k && k !== 'flat' ? TRL[k][0] : ''), zIndexOffset: 200 }).bindPopup(html).addTo(layers.wl);
     }
     const hi = allWl.filter((s) => !s.stale && s.pct != null).sort((a, b) => b.pct - a.pct).slice(0, 6);
     listInto('listWl', hi, (s) => ({ dot: LEVEL[wlLevel(s.pct)].color, title: th(s.x.station.tele_station_name), sub: `${s.edge ? loc(s) + ' · ' : ''}${trend(s) || 'ไม่มีแนวโน้ม'} · ${fmtTime(s.t)}`, right: s.pct.toFixed(0) + '%', go: s }), 'ไม่มีสถานีที่มีค่าล่าสุด');
@@ -710,7 +732,93 @@
       ...(S.sensor || []).filter((x) => x.lv > 0).map((x) => ({ dot: LEVEL[x.lv].color, lv: x.lv, title: x.s.name || x.s.road, sub: `เซ็นเซอร์ กทม. · ${LEVEL[x.lv].label} · ${fmtTime(x.t)}`, right: Math.round(x.cm) + ' ซม.', go: x, t: x.t })),
       ...(S.event || []).map((x) => ({ dot: LEVEL[x.lv].color, lv: x.lv, title: String(x.e.title).replace(/^น้ำท่วม\s*/, ''), sub: `${x.why} · ${fmtTime(x.start)}`, right: LEVEL[x.lv].label, go: x, t: x.start })),
     ].sort((a, b) => b.lv - a.lv || (b.t || 0) - (a.t || 0));
+    renderPlaces();
     listInto('listFlood', all.slice(0, 15), (r) => r, S.sensor || S.event ? 'ยังไม่มีรายงานถนนน้ำท่วมจากเซ็นเซอร์และหน่วยงานในขณะนี้' : 'กำลังโหลด หรือดึงข้อมูลไม่สำเร็จ');
+  }
+
+
+  // ---------- ⭐ ที่ของฉัน (บันทึกในเครื่องนี้เท่านั้น) ----------
+  const PL_KEY = 'bkkflood.places', PL_ICON = { home: '🏠', work: '🏢', other: '📍' }, PL_NAME = { home: 'บ้าน', work: 'ที่ทำงาน', other: 'ที่ของฉัน' };
+  let places = Flood.store.get(PL_KEY) || [], avoidPts = null;
+  const savePlaces = () => Flood.store.set(PL_KEY, places);
+  layers.places = L.layerGroup().addTo(map);
+  getJSON('data/avoid.json', 20000, { cache: 'no-cache' }).then((d) => { avoidPts = d.p || []; renderPlaces(); }).catch(() => { avoidPts = []; });
+  // จุดน้ำท่วมทุกแหล่งบนแผนที่: เซ็นเซอร์ที่ท่วม, หน่วยงาน, Traffy, หมุดประชาชน
+  const floodPts = () => [
+    ...(S.sensor || []).filter((x) => x.lv > 0).map((x) => ({ la: x.la, lo: x.lo, lv: x.lv, name: (x.s.name || x.s.road || 'เซ็นเซอร์ กทม.') + ` ${Math.round(x.cm)} ซม.` })),
+    ...(S.event || []).map((x) => ({ la: x.la, lo: x.lo, lv: x.lv, name: String(x.e.title || '').replace(/^น้ำท่วม\s*/, '') })),
+    ...(S.traffy || []).map((x) => ({ la: x.la, lo: x.lo, lv: x.lv, name: 'ประชาชนแจ้ง (Traffy)' })),
+    ...(S.web || []).map((x) => ({ la: x.la, lo: x.lo, lv: x.lv || 2, name: 'ประชาชนปักหมุด' })),
+  ].filter((x) => x.la && x.lo);
+  // สถานะรอบที่: น้ำท่วมใน 500 ม. / รายงานใน 1 กม. / ถนนควรระวังมากใน 300 ม. / ปกติ
+  function placeStatus(p, pts) {
+    let n = null;
+    for (const c of pts) { const km = distKm(p.la, p.lo, c.la, c.lo); if (!n || km < n.km || (km <= 0.5 && c.lv > n.c.lv && n.km <= 0.5)) n = { c, km }; }
+    const m = (km) => (km < 1 ? Math.round(km * 1000) + ' ม.' : km.toFixed(1) + ' กม.');
+    const cnt = pts.filter((c) => distKm(p.la, p.lo, c.la, c.lo) <= 1).length;
+    if (n && n.km <= 0.5) return [3, `น้ำท่วมห่าง ${m(n.km)} · ${n.c.name}${cnt > 1 ? ` · ในรัศมี 1 กม. มี ${cnt} จุด` : ''}`];
+    if (n && n.km <= 1) return [2, `มีรายงานน้ำท่วมห่าง ${m(n.km)} · ${n.c.name}`];
+    if ((avoidPts || []).some(([la, lo, k]) => k === 1 && distKm(p.la, p.lo, la, lo) <= 0.3)) return [1, 'ถนนใกล้ ๆ อยู่ในระดับควรระวังมาก'];
+    return [0, n ? `ปกติ · จุดน้ำท่วมใกล้สุดห่าง ${m(n.km)}` : 'ปกติ · ไม่มีรายงานน้ำท่วมใกล้ ๆ'];
+  }
+  function renderPlaces() {
+    const el = $('plList');
+    layers.places.clearLayers();
+    if (!el) return;
+    if (!places.length) {
+      el.innerHTML = '<p class="small">เพิ่มบ้านหรือที่ทำงาน แล้วทุกครั้งที่เปิดแผนที่จะเห็นทันทีว่ารอบ ๆ มีน้ำท่วมไหม</p>';
+      return;
+    }
+    const pts = floodPts();
+    const st = places.map((p) => placeStatus(p, pts));
+    el.innerHTML = places.map((p, i) => {
+      const [lv, text] = st[i];
+      const to = `route.html?to=${p.la.toFixed(5)},${p.lo.toFixed(5)}&name=${encodeURIComponent(p.name)}`;
+      return `<div class="pl-row lv${lv}"><span class="pl-ic" aria-hidden="true">${PL_ICON[p.kind] || '📍'}</span>
+        <div class="pl-t"><b>${esc(p.name)}</b><span><span class="dot" style="--c:${LEVEL[lv].color}"></span> ${esc(text)}</span></div>
+        <div class="pl-act"><a class="btn sm" href="${to}" title="หาเส้นทางเลี่ยงน้ำไปที่นี่">🚗</a><button type="button" class="btn sm" data-map="${i}" title="ดูบนแผนที่">🗺</button><button type="button" class="btn sm" data-del="${i}" title="ลบ" aria-label="ลบ ${esc(p.name)}">✕</button></div></div>`;
+    }).join('');
+    el.querySelectorAll('[data-map]').forEach((b) => b.onclick = () => { const p = places[+b.dataset.map]; map.setView([p.la, p.lo], 15); p.marker && p.marker.openPopup(); minimizePanel(); });
+    el.querySelectorAll('[data-del]').forEach((b) => b.onclick = () => { if (confirm('ลบ "' + places[+b.dataset.del].name + '" ?')) { places.splice(+b.dataset.del, 1); savePlaces(); renderPlaces(); } });
+    // หมุดบนแผนที่: ไอคอนตามประเภท ขอบสีตามสถานะ + วงรัศมี 1 กม.
+    places.forEach((p, i) => {
+      const [lv, text] = st[i];
+      L.circle([p.la, p.lo], { radius: 1000, color: LEVEL[lv].color, weight: 1, dashArray: '4 4', fill: false, interactive: false }).addTo(layers.places);
+      p.marker = L.marker([p.la, p.lo], { icon: L.divIcon({ className: '', iconSize: [30, 30], iconAnchor: [15, 15], html: `<div class="plm" style="--c:${LEVEL[lv].color}">${PL_ICON[p.kind] || '📍'}</div>` }), zIndexOffset: 2000 })
+        .bindPopup(`<div class="pp"><div class="m">⭐ ที่ของฉัน</div><h3>${esc(p.name)}</h3>${badge(lv, lv ? undefined : 'ปกติ')}<div class="m" style="margin-top:4px">${esc(text)}</div>
+          <div style="margin-top:6px"><a href="route.html?to=${p.la.toFixed(5)},${p.lo.toFixed(5)}&name=${encodeURIComponent(p.name)}">🚗 หาเส้นทางเลี่ยงน้ำไปที่นี่</a></div></div>`).addTo(layers.places);
+    });
+  }
+  {
+    const form = $('plForm'), msg = (t) => { $('plMsg').textContent = t; };
+    const kind = () => document.querySelector('input[name="plKind"]:checked').value;
+    const add = (la, lo, label) => {
+      if (places.length >= 8) { msg('บันทึกได้สูงสุด 8 ที่'); return; }
+      const name = $('plName').value.trim() || (kind() === 'other' ? label : PL_NAME[kind()]);
+      places.push({ kind: kind(), name: name.slice(0, 40), la: +la.toFixed(5), lo: +lo.toFixed(5) });
+      savePlaces(); form.hidden = true; $('plName').value = $('plQ').value = ''; $('plSug').hidden = true; renderPlaces();
+    };
+    $('plAdd').onclick = () => { form.hidden = !form.hidden; msg(''); if (!form.hidden) $('plQ').focus(); };
+    $('plCancel').onclick = () => { form.hidden = true; };
+    $('plHere').onclick = () => {
+      if (!navigator.geolocation) { msg('เบราว์เซอร์นี้หาตำแหน่งไม่ได้'); return; }
+      msg('กำลังหาตำแหน่ง…');
+      navigator.geolocation.getCurrentPosition((p) => add(p.coords.latitude, p.coords.longitude, 'ตำแหน่งที่บันทึก'), () => msg('หาตำแหน่งไม่ได้ (ต้องอนุญาตให้เว็บเข้าถึงตำแหน่ง)'), { enableHighAccuracy: true, timeout: 15000 });
+    };
+    let timer = null;
+    $('plQ').addEventListener('input', (e) => {
+      clearTimeout(timer);
+      const q = e.target.value.trim(), box = $('plSug');
+      if (q.length < 3) { box.hidden = true; return; }
+      timer = setTimeout(async () => {
+        try {
+          const r = await getJSON('https://nominatim.openstreetmap.org/search?format=jsonv2&limit=6&accept-language=th&countrycodes=th&bounded=1&viewbox=100.2,14.1,101.0,13.4&q=' + encodeURIComponent(q), 15000);
+          box.innerHTML = r.length ? r.map((x, i) => `<button type="button" data-i="${i}">${esc(x.display_name)}</button>`).join('') : '<p class="muted small" style="padding:8px">ไม่พบสถานที่</p>';
+          box.hidden = false;
+          box.querySelectorAll('button').forEach((b) => b.onclick = () => { const x = r[+b.dataset.i]; add(+x.lat, +x.lon, x.name || x.display_name.split(',')[0]); });
+        } catch (err) { msg('ค้นหาไม่ได้ขณะนี้ ลองใช้ตำแหน่งปัจจุบันแทน'); }
+      }, 450);
+    });
   }
 
   // ---------- UI ----------
@@ -762,6 +870,9 @@
   document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'visible' && Date.now() - last > REFRESH_MS) refresh(); });
   setInterval(refresh, REFRESH_MS);
   loadDistricts();
+  renderPlaces();
+  // ลิงก์ map.html#places เปิดแท็บที่ของฉัน
+  if (location.hash === '#places') { const t = document.querySelector('.tabs [data-tab="pl"]'); if (t) t.click(); }
   refresh();
   // ให้ js/report.js (ระบบปักหมุดแจ้งน้ำท่วม) ใช้แผนที่และชั้นข้อมูลเดียวกัน
   window.FloodMap = { map, layers, setFeed, icon, minimizePanel, isMobile };

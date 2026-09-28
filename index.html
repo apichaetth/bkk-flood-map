@@ -50,6 +50,7 @@
           <div class="quick-btns">
             <button type="button" class="btn" id="heroNear">📍 ใกล้ฉัน</button>
             <a class="btn primary-blue" href="route.html">🚗 หาเส้นทางเลี่ยงน้ำ</a>
+            <a class="btn" href="map.html#places">⭐ ที่ของฉัน</a>
           </div>
         </form>
       </div>
@@ -62,23 +63,6 @@
     </section>
 
     <!-- ที่ของฉัน: บ้าน/ที่ทำงาน ที่บันทึกไว้ในเครื่อง พร้อมสถานะน้ำท่วมรอบ ๆ -->
-    <section class="card places" id="places">
-      <div class="card-h"><h2>⭐ ที่ของฉัน</h2><button type="button" class="btn sm" id="plAdd">＋ เพิ่มที่</button></div>
-      <div id="plList"></div>
-      <div id="plForm" class="pl-form" hidden>
-        <div class="pl-kind" role="radiogroup" aria-label="ประเภท">
-          <label><input type="radio" name="plKind" value="home" checked> 🏠 บ้าน</label>
-          <label><input type="radio" name="plKind" value="work"> 🏢 ที่ทำงาน</label>
-          <label><input type="radio" name="plKind" value="other"> 📍 อื่น ๆ</label>
-        </div>
-        <input id="plName" type="text" maxlength="40" placeholder="ชื่อที่ (ไม่ใส่ก็ได้) เช่น บ้านแม่, ร้าน" aria-label="ชื่อที่">
-        <input id="plQ" type="search" placeholder="🔎 ค้นหาสถานที่ หรือกดใช้ตำแหน่งปัจจุบัน" aria-label="ค้นหาสถานที่" autocomplete="off">
-        <div id="plSug" class="rt-sug" hidden></div>
-        <div class="quick-btns"><button type="button" class="btn" id="plHere">📍 ใช้ตำแหน่งปัจจุบัน</button><button type="button" class="btn" id="plCancel">ยกเลิก</button></div>
-        <p id="plMsg" class="small muted"></p>
-      </div>
-      <p class="muted small">บันทึกไว้ในเครื่องนี้เท่านั้น ไม่ได้ส่งไปที่ใด</p>
-    </section>
 
     <div id="warn" class="warn" hidden></div>
 

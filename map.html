@@ -52,10 +52,11 @@
       <button id="grab" class="grab" type="button" aria-label="ย่อ/ขยายแผง"><span></span></button>
       <nav class="tabs" role="tablist">
         <button role="tab" class="on" data-tab="sum">สรุป</button>
+        <button role="tab" data-tab="pl">⭐ ที่ของฉัน</button>
         <button role="tab" data-tab="news">ข่าว</button>
         <button role="tab" data-tab="fb">Facebook</button>
         <button role="tab" data-tab="cam">กล้อง</button>
-        <button role="tab" data-tab="src">แหล่งข้อมูล</button>
+        <button role="tab" data-tab="src">แหล่งที่มา</button>
       </nav>
 
       <div class="tab on" id="tab-sum">
@@ -101,12 +102,32 @@
           <div><i class="sym news" style="--c:var(--news)"></i>ข่าวเตือนภัย / ฝนตก / น้ำลดแล้ว</div>
           <div><i class="sym yt" style="--c:var(--yt)"></i>ตำแหน่งจากคลิป YouTube (สรุปโดย AI)</div>
           <div><i class="sym cam"></i>กล้อง CCTV สาธารณะ</div>
-          <div><i class="sym sensor" style="--c:var(--serious)"></i><b class="mk-tr two" style="position:static">⬆⬆</b> ป้ายลูกศรบนหมุดเซ็นเซอร์ถนน/คลอง = แนวโน้มน้ำ 30 นาที: ⬆⬆ เพิ่มมาก · ⬆ เพิ่ม · ⏸ ใกล้สูงสุด · ⬇ ลด · ⬇⬇ ลดมาก (สีหมุด = ระดับน้ำตอนนี้)</div>
+          <div><i class="sym sensor" style="--c:var(--serious)"></i><b class="mk-tr two" style="position:static">⬆⬆</b> ป้ายลูกศรบนหมุดเซ็นเซอร์ถนน/คลอง/สถานีระดับน้ำ = แนวโน้มน้ำ: ⬆⬆ เพิ่มมาก · ⬆ เพิ่ม · ⏸ ใกล้สูงสุด · ⬇ ลด · ⬇⬇ ลดมาก (สีหมุด = ระดับน้ำตอนนี้)</div>
+          <div><span class="rtr up" style="position:static">🌧⬆</span> ฝนแรงขึ้น · <span class="rtr" style="position:static">🌧⬇</span> ฝนเบาลง (ฝน 1 ชม. เทียบกับชั่วโมงก่อน: ลูกศรเดียว ≥ 3 มม. · สองอัน ≥ 10 มม.) · สถานี ThaiWater ใช้ลูกศรเดียวกัน เทียบกับค่าก่อนหน้า (0.03 / 0.10 ม.)</div>
           <div class="scale">
             <span style="--c:var(--good)">ปกติ</span><span style="--c:var(--warning)">เล็กน้อย</span><span style="--c:var(--serious)">ท่วม</span><span style="--c:var(--critical)">ท่วมสูง</span>
           </div>
           <p class="muted small">เซ็นเซอร์ถนน: เล็กน้อย 5–10 ซม. · ท่วม 10–15 ซม. · ท่วมสูง ≥15 ซม.<br>ระดับน้ำ: % เทียบความจุลำน้ำ (ตลิ่ง) · ≥90% เฝ้าระวัง · ≥100% ล้นตลิ่ง</p>
         </div>
+      </div>
+
+      <div class="tab places" id="tab-pl">
+        <div class="card-h"><h2>⭐ ที่ของฉัน</h2><button type="button" class="btn sm" id="plAdd">＋ เพิ่มที่</button></div>
+        <p class="muted small">สถานะน้ำท่วมรอบ ๆ แต่ละที่ (รัศมี 1 กม.) อัปเดตพร้อมแผนที่ · กด 🗺 เพื่อดูบนแผนที่ · 🚗 หาเส้นทางเลี่ยงน้ำ</p>
+        <div id="plList"></div>
+        <div id="plForm" class="pl-form" hidden>
+          <div class="pl-kind" role="radiogroup" aria-label="ประเภท">
+            <label><input type="radio" name="plKind" value="home" checked> 🏠 บ้าน</label>
+            <label><input type="radio" name="plKind" value="work"> 🏢 ที่ทำงาน</label>
+            <label><input type="radio" name="plKind" value="other"> 📍 อื่น ๆ</label>
+          </div>
+          <input id="plName" type="text" maxlength="40" placeholder="ชื่อที่ (ไม่ใส่ก็ได้) เช่น บ้านแม่, ร้าน" aria-label="ชื่อที่">
+          <input id="plQ" type="search" placeholder="🔎 ค้นหาสถานที่ หรือกดใช้ตำแหน่งปัจจุบัน" aria-label="ค้นหาสถานที่" autocomplete="off">
+          <div id="plSug" class="rt-sug" hidden></div>
+          <div class="quick-btns"><button type="button" class="btn" id="plHere">📍 ใช้ตำแหน่งปัจจุบัน</button><button type="button" class="btn" id="plCancel">ยกเลิก</button></div>
+          <p id="plMsg" class="small muted"></p>
+        </div>
+        <p class="muted small">บันทึกไว้ในเครื่องนี้เท่านั้น ไม่ได้ส่งไปที่ใด</p>
       </div>
 
       <div class="tab" id="tab-news">

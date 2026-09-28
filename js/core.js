@@ -135,25 +135,32 @@ window.Flood = (function () {
     }
     return relayP;
   }
+  // ใช้ไฟล์ที่ระบบดึงไว้ (ThaiWater ทุก 15 นาที / เครื่องในไทย) ก่อน เพราะเร็วและไม่ค้าง
+  // เรียกเซิร์ฟเวอร์ กทม. ตรง ๆ เฉพาะเมื่อไฟล์เก่าเกิน 30 นาทีหรือไม่มี (เซิร์ฟเวอร์นั้นตอบช้า/503 บ่อย)
+  function sensorsFromRelay(b) {
+    let newest = null;
+    const mk = (s, la, lo, cm, tms, off) => {
+      const t = tms ? new Date(tms) : null;
+      if (t && (!newest || t > newest)) newest = t;
+      const stale = off || !t || Date.now() - t > SENSOR_STALE_H * 36e5;
+      return { s, la, lo, cm, t, stale, lv: stale || cm == null ? 0 : sensorLevel(cm) };
+    };
+    // ระบบ DDS/ThaiWater มีสถานะปัจจุบันของทุกจุด ใช้ก่อน ถ้าไม่มีใช้ระบบแจ้งเตือน floodbangkok
+    const items = (b.road || []).length
+      ? b.road.filter((x) => !x.tunnel).map((x) => mk({ code: x.c, name: x.n, road: x.road, district: x.d }, x.la, x.lo, x.cm, x.t, x.st === 'off'))
+      : (b.sensors || []).map((x) => mk({ id: x.id, code: x.code, name: x.name, road: x.road, district: x.district }, x.la, x.lo, x.cm, x.t, false));
+    const via = b.source === 'thaiwater' ? 'ผ่าน ThaiWater' : 'ผ่านเครื่องสำรองในไทย';
+    return items.length ? { items, newest, msg: `${items.length} จุด (${via})` } : null;
+  }
   async function fetchSensors() {
+    const b = await fetchBmaRelay();
+    const fromFile = b && Date.now() - new Date(b.updated) < 30 * 6e4 ? sensorsFromRelay(b) : null;
+    if (fromFile) return fromFile;
     try { return await fetchSensorsDirect(); }
     catch (e) {
-      // สำรอง: ใช้ไฟล์จากเครื่องในไทย เมื่อเปิดเว็บจากต่างประเทศหรือระบบ กทม. ไม่ตอบ
-      const b = await fetchBmaRelay();
-      if (!b) throw e;
-      let newest = null;
-      const mk = (s, la, lo, cm, tms, off) => {
-        const t = tms ? new Date(tms) : null;
-        if (t && (!newest || t > newest)) newest = t;
-        const stale = off || !t || Date.now() - t > SENSOR_STALE_H * 36e5;
-        return { s, la, lo, cm, t, stale, lv: stale || cm == null ? 0 : sensorLevel(cm) };
-      };
-      // ระบบ DDS มีสถานะปัจจุบันของทุกจุด ใช้ก่อน ถ้าไม่มีใช้ระบบแจ้งเตือน floodbangkok
-      const items = (b.road || []).length
-        ? b.road.filter((x) => !x.tunnel).map((x) => mk({ code: x.c, name: x.n, road: x.road, district: x.d }, x.la, x.lo, x.cm, x.t, x.st === 'off'))
-        : (b.sensors || []).map((x) => mk({ id: x.id, code: x.code, name: x.name, road: x.road, district: x.district }, x.la, x.lo, x.cm, x.t, false));
-      if (!items.length) throw e;
-      return { items, newest, msg: `${items.length} จุด (ผ่านเครื่องสำรองในไทย)` };
+      const r = b && sensorsFromRelay(b);
+      if (!r) throw e;
+      return r;
     }
   }
   async function fetchSensorsDirect() {
@@ -185,7 +192,11 @@ window.Flood = (function () {
 
   // 2) รายงานน้ำท่วมจากหน่วยงาน / iTIC / Longdo
   async function fetchEvents() {
-    const d = await getJSON(URL.events);
+    // สำเนาย่อที่ระบบดึงไว้ทุก 15 นาที (เล็กกว่าต้นฉบับมาก) ถ้าเก่าเกิน 40 นาทีค่อยดึงตรง
+    let d = null;
+    const f = await getJSON('data/events.json', 15000, { cache: 'no-cache' }).catch(() => null);
+    if (f && Array.isArray(f.items) && Date.now() - new Date(f.updated) < 40 * 6e4) d = f.items;
+    else d = await getJSON(URL.events).catch((e) => { if (f && Array.isArray(f.items)) return f.items; throw e; });
     if (!Array.isArray(d)) throw new Error('รูปแบบข้อมูลไม่ถูกต้อง');
     const now = Date.now();
     let newest = null;

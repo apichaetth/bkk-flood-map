@@ -368,9 +368,17 @@ async function updateTraffy(meta) {
   const since = Math.min(...[oldestFetched, prevSince].filter((v) => v != null && isFinite(v)));
   await writeJSON('traffy.json', { acc: 2, updated: now.toISOString(), fetched: d.results.length, since: isFinite(since) ? new Date(Math.max(since, cutoff)).toISOString() : null, results: items });
   // ไฟล์ย่อสำหรับหน้าแรก/แผนที่/เขต (ใช้แค่ 24 ชม. ที่ยังไม่เสร็จ) — traffy.json เต็ม 7 วันหลาย MB โหลดเฉพาะหน้า Traffy
-  const c24 = now - 26 * 36e5;
+  // เก็บเฉพาะช่องที่หน้าเว็บใช้ + ย่อข้อความ (ทุกเรื่องในไฟล์ผ่านตัวกรองน้ำท่วมแล้ว จึงใส่ประเภทแบบสั้น)
+  const c24 = now - 24.5 * 36e5;
+  const slim = (x) => {
+    const o = { ticket_id: x.ticket_id, timestamp: x.timestamp, coords: x.coords.map((v) => +(+v).toFixed(5)), state: x.state,
+      description: String(x.description || '').slice(0, 220), problem_type_abdul: ['น้ำท่วม'] };
+    if (x.address) o.address = String(x.address).slice(0, 90);
+    if (x.photo_url) o.photo_url = x.photo_url;
+    return o;
+  };
   await writeJSON('traffy-24h.json', { acc: 2, updated: now.toISOString(), since: isFinite(since) ? new Date(Math.max(since, c24)).toISOString() : null,
-    results: items.filter((x) => ts(x) >= c24 && x.state !== 'เสร็จสิ้น').map((x) => ({ ...x, description: String(x.description || '').slice(0, 300) })) });
+    results: items.filter((x) => ts(x) >= c24 && x.state !== 'เสร็จสิ้น').map(slim) });
   meta.sources.traffy = { ok: true, fetched: d.results.length, flood: fresh.length, kept: items.length };
 }
 
@@ -532,7 +540,7 @@ async function updateRisk(meta) {
       alertOnly.push({ c: x.code, la: x.la, lo: x.lo, t: x.t, src: 'bma', lv: lvOf(x.cm) });
     }
     // ฝนจากสถานี กทม. (ถี่และใหม่กว่า) รวมกับ ThaiWater
-    for (const x of b.rain || []) if (x.ok !== false && fresh(x.t, 1.5) && x.r1 != null) rain.push({ la: x.la, lo: x.lo, mm1: x.r1, mm24: x.r24 || 0 });
+    for (const x of b.rain || []) if (x.ok !== false && fresh(x.t, 1.5) && x.r1 != null) rain.push({ c: 'bma:' + (x.c || x.n), n: x.n, d: x.d, t: x.t, la: x.la, lo: x.lo, mm1: x.r1, mm24: x.r24 || 0 });
     // คลองตามสถานะของ กทม.: วิกฤต/เตือนภัย ส่งผลในรัศมีแคบ (300 ม.) และน้ำหนักต่ำ (วิกฤต 0.3 เตือนภัย 0.15) ไม่พอทำให้ติดระดับได้เอง ต้องมีฝนหรือรายงานประกอบ
     for (const x of b.canal || []) {
       if (fresh(x.t, 3) && x.st >= 0) {
@@ -612,6 +620,12 @@ async function updateRisk(meta) {
   // iTIC / Longdo
   try {
     const ev = JSON.parse(await fetchText('https://event.longdo.com/feed/json', {}, 45000));
+    // สำเนาย่อสำหรับหน้าเว็บ: เฉพาะเหตุน้ำท่วมใน กทม. ที่ยังมีผล (ต้นฉบับ ~2 MB)
+    const evKeep = ev.filter((e) => (String(e.type) === '6' || e.icon === 'flood') && inBkk(+e.latitude, +e.longitude)
+      && (isNaN(bkkTime(e.stop)) || bkkTime(e.stop) >= now.getTime() - 36e5))
+      .map((e) => ({ type: e.type, icon: e.icon, latitude: e.latitude, longitude: e.longitude, start: e.start, stop: e.stop,
+        title: String(e.title || '').slice(0, 200), description: String(e.description || '').slice(0, 500), contributor: e.contributor }));
+    await writeJSON('events.json', { updated: now.toISOString(), items: evKeep });
     for (const e of ev) {
       if (!(String(e.type) === '6' || e.icon === 'flood')) continue;
       const la = +e.latitude, lo = +e.longitude, t = bkkTime(e.start), stop = bkkTime(e.stop);
@@ -648,7 +662,7 @@ async function updateRisk(meta) {
       if (!x.station || !nearBkk(+x.station.tele_station_lat, +x.station.tele_station_long)) continue;
       const t = bkkTime(x.rainfall_datetime);
       if (isNaN(t) || now - t > 6 * 36e5) continue;
-      rain.push({ la: +x.station.tele_station_lat, lo: +x.station.tele_station_long, mm1: +x.rain_1h || 0, mm24: +x.rain_24h || 0 });
+      rain.push({ c: 'tw:' + x.station.id, n: (x.station.tele_station_name && x.station.tele_station_name.th) || '', t, la: +x.station.tele_station_lat, lo: +x.station.tele_station_long, mm1: +x.rain_1h || 0, mm24: +x.rain_24h || 0 });
     }
     src.rain = rain.length;
   } catch (e) { src.rain = 'error: ' + e.message; }
@@ -740,6 +754,7 @@ async function updateRisk(meta) {
 const TREND_KEEP_H = 3;
 function updateTrends(state, roadNow, canalNow, rain, fc) {
   const tr = (state.tr ||= { road: {}, canal: {} });
+  tr.rain ||= {};
   const add = (store, now) => {
     for (const [c, x] of now) {
       if (x.v == null || !x.t) continue;
@@ -753,6 +768,8 @@ function updateTrends(state, roadNow, canalNow, rain, fc) {
   };
   const now_ = now.getTime();
   add(tr.road, roadNow); add(tr.canal, canalNow);
+  // ฝน: ฝนสะสม 1 ชม. ของแต่ละสถานี (ใช้เทียบกับชั่วโมงก่อน)
+  add(tr.rain, new Map(rain.filter((r) => r.c && r.t).map((r) => [r.c, { v: r.mm1, t: r.t }])));
   // ค่าเมื่อ ~m นาทีก่อนค่าล่าสุด (จุดที่ใกล้ที่สุดที่เก่ากว่าอย่างน้อย m-10 นาที)
   const ago = (a, m) => { const tEnd = a[a.length - 1][0]; let best = null; for (const p of a) if (tEnd - p[0] >= (m - 10) * 6e4) best = p; return best; };
   const nearVal = (list, la, lo, km, key) => { let best = null, bd = km; for (const s of list) { const d = distKm(la, lo, s.la, s.lo); if (d <= bd) { bd = d; best = s[key]; } } return best; };
@@ -790,8 +807,20 @@ function updateTrends(state, roadNow, canalNow, rain, fc) {
     const o = { c, n: x.n, d: x.d, la: x.la, lo: x.lo, v: x.v, t: x.t, warn: x.warn, crit: x.crit, st: x.st, ...k, eta: eta != null && eta <= 6 ? eta : null, s: a.slice(-12) };
     canal.set(c, o); out.canal.push(o);
   }
+  // ฝนแรงขึ้น/เบาลง: ฝน 1 ชม. ตอนนี้เทียบกับเมื่อ ~1 ชม. ก่อน (มม.) · ข้ามสถานีที่แห้งทั้งสองช่วง
+  out.rain = [];
+  const rainBy = new Map(rain.filter((r) => r.c).map((r) => [r.c, r]));
+  for (const [c, a] of Object.entries(tr.rain)) {
+    const x = rainBy.get(c); if (!x) continue;
+    const last = a[a.length - 1], p60 = ago(a, 60);
+    if (!p60 || now_ - last[0] > 90 * 6e4) continue;
+    if (last[1] < 2 && p60[1] < 2) continue;
+    const d = last[1] - p60[1];
+    const t = d >= 10 ? 'fast' : d >= 3 ? 'up' : d <= -10 ? 'dfast' : d <= -3 ? 'down' : 'flat';
+    out.rain.push({ c, n: x.n, d: x.d, la: x.la, lo: x.lo, v: +(+last[1]).toFixed(1), d60: +d.toFixed(1), tr: t });
+  }
   const cnt = (arr) => Object.fromEntries(['fast', 'up', 'peak', 'flat', 'down', 'dfast'].map((k) => [k, arr.filter((x) => x.tr === k).length]));
-  meta.sources.trends = { road: cnt(out.road), canal: cnt(out.canal) };
+  meta.sources.trends = { road: cnt(out.road), canal: cnt(out.canal), rain: cnt(out.rain) };
   return { out, road, canal };
 }
 
