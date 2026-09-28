@@ -648,3 +648,10 @@ label.lg-toggle, .rk-filter label, .rt-opts label { display: inline-flex; align-
   .h2t b { font-size: 17px; }
   .h2city #hmap { min-height: 520px; }
 }
+/* หน้าเขต: ป้ายแนวโน้ม */
+.dtr { display: inline-block; padding: 1px 8px; border-radius: 11px; font-size: 12.5px; font-weight: 700; line-height: 18px; white-space: nowrap; border: 1.5px solid #fff; box-shadow: 0 1px 3px rgba(0,0,0,.25); }
+.dtr.worse { background: #c62828; color: #fff; }
+.dtr.better { background: #2e7d32; color: #fff; }
+.dtr.steady { background: #e4e7ec; color: #1d2330; }
+.dlegend .dtr { margin-left: 4px; }
+.dtr.sm { padding: 1px 5px; font-size: 12px; }

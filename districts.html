@@ -39,8 +39,8 @@
       <div class="card-h"><h2>สถานการณ์รายเขต</h2><span class="muted small" id="dNote"></span></div>
       <div id="dmap" role="region" aria-label="แผนที่เขตระบายสีตามสถานการณ์น้ำท่วม"></div>
       <div class="dlegend" id="dLegend"></div>
-      <p class="muted small" id="dTrendLg" hidden>สี = สถานการณ์ตอนนี้ · ลูกศรกลางเขต = แนวโน้มน้ำ 30 นาทีล่าสุด: <b>⬆⬆</b> เพิ่มขึ้นมาก · <b>⬆</b> เพิ่มขึ้น · <b>⏸</b> ใกล้จุดสูงสุด · <b>➖</b> ทรงตัว · <b>⬇</b> ลดลง · <b>⬇⬇</b> ลดลงมาก · เขตที่ไม่มีลูกศร = ไม่มีเซ็นเซอร์ถนน/คลองของ กทม. ที่มีน้ำ (ถนนแห้ง) จึงบอกแนวโน้มไม่ได้</p>
-      <p class="muted small">สีคิดจากคะแนนรวมของแต่ละเขต: จุดยืนยันแล้ว ×3 + จุดที่มีรายงาน ×1 + ข่าวระบุเขต ×0.5 + พื้นที่เสี่ยง ×0.3 · กดที่เขตเพื่อดูจุดในเขตนั้น</p>
+      <p class="muted small">สี = สถานการณ์ตอนนี้ จากรายงานและเซ็นเซอร์ใน <b>3 ชม. ล่าสุด</b> (แดง: ยืนยันแล้ว ≥ 3 จุด หรือน้ำลึก ≥ 30 ซม. · ส้ม: รายงาน ≥ 3 เรื่อง หรือ ≥ 10 ซม. · เหลือง: มีรายงานบ้าง · เทาลาย: มีแต่รายงานเก่า อาจลดแล้ว)<br>
+        ป้ายกลางเขต = แนวโน้ม รวมจาก 3 สัญญาณ: จำนวนรายงานใหม่ชั่วโมงนี้เทียบชั่วโมงก่อน · ระดับน้ำจากเซ็นเซอร์ถนน/คลอง · ฝนแรงขึ้นหรือเบาลง · กดที่เขตเพื่อดูเหตุผลและจุดในเขต</p>
     </section>
     <section class="card">
       <div class="card-h"><h2>อันดับเขต</h2><span class="muted small" id="dCount"></span></div>
@@ -49,7 +49,6 @@
   </main>
   <script src="https://cdn.jsdelivr.net/npm/leaflet@1.9.4/dist/leaflet.js"></script>
   <script src="js/core.js" defer></script>
-  <script src="js/agg.js" defer></script>
   <script src="js/districts.js" defer></script>
 </body>
 </html>
