@@ -660,3 +660,6 @@ label.lg-toggle, .rk-filter label, .rt-opts label { display: inline-flex; align-
 .trh[hidden] { display: none; }
 .trh button { border: 1px solid var(--line); background: var(--surface); color: var(--ink); border-radius: 8px; padding: 4px 8px; min-height: 32px; font: inherit; cursor: pointer; }
 .trh button.on { background: var(--accent); border-color: var(--accent); color: #fff; font-weight: 600; }
+/* หลอดระดับน้ำที่ปกติ (น้ำเงิน) ซูมไกลให้จางและเล็กลง เด่นเฉพาะที่เตือนภัย/วิกฤต */
+.zlow .mkhit.gn .gauge { opacity: .6; transform: scale(.8); }
+.zlow .mkhit.gn .mk-tr { display: none; }

@@ -52,8 +52,8 @@
     web: L.layerGroup().addTo(map),
     elev: L.layerGroup(), // ความสูงพื้นดิน DeltaDTM (ปิดไว้ก่อน เปิดจากปุ่มชั้นแผนที่)
   };
-  // เปิดครั้งแรกแสดงเฉพาะน้ำท่วม (เซ็นเซอร์ หน่วยงาน Traffy หมุดประชาชน) ชั้นอื่นเปิดเองจากปุ่มชั้นแผนที่ แล้วจำค่าที่เลือกไว้ในเครื่อง
-  const LYR_KEY = 'bkkflood.layers', LYR_ON = ['sensor', 'event', 'traffy', 'web', 'districts'];
+  // เปิดครั้งแรก: เซ็นเซอร์น้ำท่วมถนน + ระดับน้ำคลอง/แม่น้ำ + ฝน ชั้นอื่นเปิดเองจากปุ่มชั้นแผนที่ แล้วจำค่าที่เลือกไว้ในเครื่อง
+  const LYR_KEY = 'bkkflood.layers2', LYR_ON = ['sensor', 'wl', 'canal', 'rain'];
   {
     const saved = Flood.store.get(LYR_KEY) || {};
     for (const [k, l] of Object.entries(layers)) {
@@ -404,23 +404,24 @@
     return staffScale(s.msl, s.bank, g != null && s.bank != null && s.bank > g ? s.bank - 0.1 * (s.bank - g) : null);
   };
   function gaugeSvg(frac, marks, ticks, lv, stale, big, tw) {
-    const H = big ? 30 : 24, TW = 4, W = (big ? 13 : 11) + TW;
+    // ขนาดเล็กลงไม่ให้ลายตา: ปกติ 16 px · เตือนภัย/วิกฤต 22 px (พื้นที่กดยังกว้างเท่าเดิม)
+    const H = big ? 22 : 16, TW = 3, W = (big ? 10 : 8) + TW;
     const col = stale ? '#9aa4b1' : lv >= 3 ? 'var(--critical)' : lv >= 2 ? 'var(--serious)' : '#1e7fd6';
     const f = stale || frac == null ? 0 : Math.max(0.04, Math.min(1, frac)), ih = H - 4, fh = Math.round(ih * f);
     const y = (fr) => 2 + Math.round(ih * (1 - Math.max(0, Math.min(1, fr))));
     return `<svg class="gauge" width="${W}" height="${H}" viewBox="0 0 ${W} ${H}" style="overflow:visible" aria-hidden="true">`
-      + `<rect x="${TW + 1}" y="1" width="${W - TW - 2}" height="${H - 2}" rx="3" style="fill:#fff;stroke:${col};stroke-width:1.6"/>`
-      + `<rect x="${TW + 2.5}" y="${2 + ih - fh}" width="${W - TW - 5}" height="${fh}" rx="1.5" style="fill:${col}"/>`
+      + `<rect x="${TW + 1}" y="1" width="${W - TW - 2}" height="${H - 2}" rx="2.5" style="fill:#fff;stroke:${col};stroke-width:1.3"/>`
+      + `<rect x="${TW + 2.2}" y="${2 + ih - fh}" width="${W - TW - 4.4}" height="${fh}" rx="1.2" style="fill:${col}"/>`
       + (ticks || []).map((t) => `<line x1="0.5" x2="${TW + 1}" y1="${y(t)}" y2="${y(t)}" style="stroke:#1d2330;stroke-width:1"/>`).join('')
       + `<line x1="0.5" x2="0.5" y1="2" y2="${H - 2}" style="stroke:#1d2330;stroke-width:1"/>`
-      + (marks || []).filter((m) => m[0] >= 0 && m[0] <= 1).map(([fr, c]) => `<line x1="0" x2="${W}" y1="${y(fr)}" y2="${y(fr)}" style="stroke:${c};stroke-width:1.8"/>`).join('')
-      + `${tw ? `<rect x="${TW + 2}" y="-1.5" width="${W - TW - 4}" height="3" rx="1" style="fill:#1d2330"/>` : ''}`
-      + `${frac > 1 && !stale ? `<path d="M${TW + (W - TW) / 2} ${tw ? -3 : -2}l3.5 3.5h-7z" style="fill:${col}"/>` : ''}</svg>`;
+      + (marks || []).filter((m) => m[0] >= 0 && m[0] <= 1).map(([fr, c]) => `<line x1="0" x2="${W}" y1="${y(fr)}" y2="${y(fr)}" style="stroke:${c};stroke-width:1.5"/>`).join('')
+      + `${tw ? `<rect x="${TW + 1.5}" y="-1.2" width="${W - TW - 3}" height="2.5" rx="1" style="fill:#1d2330"/>` : ''}`
+      + `${frac > 1 && !stale ? `<path d="M${TW + (W - TW) / 2} ${tw ? -3.5 : -2.5}l3 3h-6z" style="fill:${col}"/>` : ''}</svg>`;
   }
   function gaugeIcon(frac, marks, ticks, lv, stale, tr, big, tw) {
-    const H = big ? 30 : 24, hit = Math.max(H, touch ? 34 : 26);
+    const H = big ? 22 : 16, hit = Math.max(H, touch ? 30 : 20);
     return L.divIcon({ className: '', iconSize: [hit, hit], iconAnchor: [hit / 2, hit / 2], popupAnchor: [0, -H / 2],
-      html: `<div class="mkhit" style="width:${hit}px;height:${hit}px">${gaugeSvg(frac, marks, ticks, lv, stale, big, tw)}`
+      html: `<div class="mkhit${lv >= 2 ? '' : ' gn'}" style="width:${hit}px;height:${hit}px">${gaugeSvg(frac, marks, ticks, lv, stale, big, tw)}`
         + `${tr ? `<span class="mk-tr${tr.length > 1 ? ' two' : ''}">${tr}</span>` : ''}</div>` });
   }
   // คำอธิบายสัญลักษณ์ใช้หลอดเดียวกับบนแผนที่ (ปกติ / เกินเตือนภัย / เกินวิกฤต)
