@@ -22,6 +22,21 @@ async function probe(label, url, headers = {}) {
     } catch { console.log('text:', txt.slice(0, 1500)); return txt; }
   } catch (e) { console.log(`\n### ${label}\nERROR ${e.message} ${url}`); return null; }
 }
+// แหล่งความสูงพื้นดิน (DTM) สำหรับ กทม.: DeltaDTM (4TU, CC BY 4.0) — รายการไฟล์และขนาด
+{
+  const ID = '1da2e70f-6c4d-4b03-86bd-b53e789cc629';
+  for (const u of [`https://data.4tu.nl/v2/articles/${ID}`, `https://data.4tu.nl/v2/articles/${ID}/files`, `https://data.4tu.nl/v2/articles/${ID}/versions`]) {
+    try {
+      const r = await fetch(u, { headers: { Accept: 'application/json' } }); const t = await r.text();
+      console.log('\n###', r.status, u);
+      try { const j = JSON.parse(t);
+        if (Array.isArray(j)) for (const f of j) console.log(JSON.stringify({ name: f.name, size: f.size, url: f.download_url || f.url, id: f.id, ver: f.version }).slice(0, 300));
+        else console.log(JSON.stringify({ title: j.title, version: j.version, license: j.license, files: (j.files || []).map((f) => [f.name, f.size, f.download_url]) }).slice(0, 3000));
+      } catch { console.log(t.slice(0, 1500)); }
+    } catch (e) { console.log('ERR', u, e.message); }
+  }
+  process.exit(0);
+}
 // ขนาดและเวลาโหลดไฟล์ข้อมูลบนเว็บจริง + แหล่งภายนอกที่หน้าแผนที่เรียก
 {
   const B = 'https://apichaetth.github.io/bkk-flood-map/';
