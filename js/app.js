@@ -560,7 +560,8 @@
       if (NTYPE(n) === 'อื่น ๆ') return; // ข่าวเศรษฐกิจ/ความเห็น ไม่ปักบนแผนที่
       const lv = SEV_LV[n.severity] || 2;
       const th = ytThumb(n);
-      n.markers = (n.pins || []).map((p) => {
+      // ปักเฉพาะข่าวที่ระบุสถานที่ชัดเจน (ถนน/ซอย/ชุมชน) ข่าวที่รู้แค่เขตไม่ปัก (หมุดกลางเขตทำให้เข้าใจผิด)
+      n.markers = (n.pins || []).filter((p) => p.precision === 'place').map((p) => {
         const html = `<div class="pp">${badge(lv, 'ความรุนแรง' + (n.severity || ''))} <span class="m">${isYt(n) ? '▶ YouTube · ' : ''}${esc(n.source)} · ${fmtDT(new Date(n.published))}</span>
           <h3>${esc(n.title)}</h3>
           ${th ? `<a href="${esc(n.link)}" target="_blank" rel="noopener"><img loading="lazy" src="${esc(th)}" alt="ภาพตัวอย่างคลิป"></a>` : ''}
@@ -590,7 +591,7 @@
         ${th ? `<button type="button" class="yt-thumb" data-v="${esc(n.videoId)}" aria-label="เล่นคลิป ${esc(n.title)}"><img loading="lazy" src="${esc(th)}" alt=""><span>▶</span></button>` : ''}
         ${n.summary ? `<p>${esc(n.summary)}</p>` : ''}
         ${(n.more || []).length ? `<p class="small muted">ข่าวเดียวกันจาก: ${n.more.map((o) => `<a href="${esc(o.link)}" target="_blank" rel="noopener">${esc(o.source)}</a>`).join(', ')}</p>` : ''}
-        ${(n.pins || []).length && n.markers.length ? `<div class="pins">${n.pins.map((p, j) => `<button type="button" data-n="${i}" data-p="${j}">📍 ${esc(p.label)}</button>`).join('')}</div>` : ''}
+        ${n.markers.length ? `<div class="pins">${n.pins.filter((p) => p.precision === 'place').map((p, j) => `<button type="button" data-n="${i}" data-p="${j}">📍 ${esc(p.label)}</button>`).join('')}</div>` : (n.pins || []).length ? `<p class="small muted">พื้นที่: ${n.pins.map((p) => esc(p.label)).join(', ')} (ไม่ทราบตำแหน่งแน่นอน จึงไม่ปักบนแผนที่)</p>` : ''}
       </article>`;
     }).join('') : '<div class="muted small">ยังไม่พบข่าวหรือคลิปน้ำท่วมใน กทม. ช่วง 48 ชม.</div>';
     $('listNews').querySelectorAll('.pins button').forEach((b) => b.onclick = () => {
