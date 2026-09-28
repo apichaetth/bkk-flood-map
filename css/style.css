@@ -581,7 +581,7 @@ label.lg-toggle, .rk-filter label, .rt-opts label { display: inline-flex; align-
 .elev-lg .elev-ticks { display: flex; justify-content: space-between; font-size: 12px; }
 .elev-lg .m { color: var(--ink2); font-size: 12px; margin-top: 4px; }
 /* ---------- หน้าแรกแบบง่าย ---------- */
-.h2wrap { max-width: 760px; margin: 0 auto; padding: 12px 12px 90px; display: grid; gap: 12px; }
+.h2wrap { width: 100%; box-sizing: border-box; max-width: 760px; margin: 0 auto; padding: 12px 12px 90px; display: grid; gap: 12px; }
 .h2wrap h2 { font-size: 20px; margin: 0 0 10px; }
 .h2wrap h2 em { font-style: normal; color: var(--critical); }
 .h2btns { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; margin-top: 10px; }
@@ -593,7 +593,7 @@ label.lg-toggle, .rk-filter label, .rt-opts label { display: inline-flex; align-
 .h2v b { display: block; font-size: 17px; }
 .h2v .h2vt { font-size: 14px; color: var(--ink2); font-weight: 600; }
 .h2v small { display: block; color: var(--ink2); font-size: 14px; margin-top: 2px; }
-.h2chips { margin: 4px 0 10px; display: flex; flex-wrap: wrap; gap: 6px; align-items: center; }
+.h2chips { margin: 10px 0 2px; display: flex; flex-wrap: wrap; gap: 6px; align-items: center; }
 #hmap { height: 300px; border-radius: 12px; border: 1px solid var(--line); }
 .h2legend { display: flex; flex-wrap: wrap; gap: 12px; font-size: 13px; color: var(--ink2); margin-top: 6px; }
 .h2legend i { display: inline-block; width: 11px; height: 11px; border-radius: 50%; background: var(--c); border: 1.5px solid #fff; box-shadow: 0 0 0 1px var(--line); margin-right: 4px; vertical-align: -1px; }
@@ -616,3 +616,27 @@ label.lg-toggle, .rk-filter label, .rt-opts label { display: inline-flex; align-
 .mkhit.dry { opacity: .55; }
 .lgsym { display: inline-flex; align-items: flex-end; gap: 3px; margin-right: 6px; vertical-align: -3px; }
 .h2src { display: block; margin-top: 2px; font-size: 13px; font-weight: 600; padding: 4px 0; }
+/* หน้าแรก: แผนที่สูงตามจอมือถือ · คอมจอกว้างแบ่ง 2 คอลัมน์ (ซ้าย = แถวคุณ + ล่าสุด, ขวา = แผนที่ใหญ่ติดจอ) */
+#hmap { height: clamp(300px, 52vh, 560px); }
+@media (min-width: 1000px) {
+  .h2wrap { max-width: 1320px; grid-template-columns: minmax(380px, 460px) minmax(0, 1fr); align-items: start; padding: 16px 20px 40px; gap: 16px; }
+  .h2me { grid-column: 1; grid-row: 1; }
+  .h2latest { grid-column: 1; grid-row: 2; }
+  .h2city { grid-column: 2; grid-row: 1 / span 2; position: sticky; top: 84px; }
+  .h2city #hmap { height: calc(100vh - 360px); min-height: 440px; }
+  .h2foot { grid-column: 1 / -1; }
+  .h2wrap h2 { font-size: 22px; }
+}
+/* มือถือ: แผนที่สูงขึ้น และลดช่องว่างบนจอเล็ก ให้แผนที่ขึ้นมาเร็วขึ้น */
+@media (max-width: 999px) { #hmap { height: clamp(320px, 60vh, 620px); } .h2city h2 { margin-bottom: 8px; } }
+@media (max-width: 480px) {
+  .h2wrap { padding: 8px 8px 90px; gap: 8px; }
+  .h2wrap .card { padding: 12px; }
+  .h2wrap h2 { font-size: 18px; margin-bottom: 8px; }
+  .h2v { padding: 10px; margin-bottom: 6px; }
+  .h2v b { font-size: 16px; }
+  .h2v small { font-size: 13px; }
+  .h2btns { margin-top: 8px; }
+  .h2btns .btn { font-size: 15px; min-height: 46px; }
+  .h2city .muted.small { margin: 0 0 2px; }
+}

@@ -7,7 +7,7 @@
   const FRESH_MS = 3 * 36e5, NEAR_KM = 1, CLOSE_KM = 0.5, AREA_KM = 2;
   const SRC = { sensor: 'เซ็นเซอร์ กทม.', itic: 'หน่วยงาน/iTIC', web: 'ประชาชนปักหมุด', traffy: 'Traffy', news: 'ข่าว', youtube: 'YouTube' };
   const PL_ICON = { home: '🏠', work: '🏢', other: '📍' };
-  let H = null, me = null;
+  let H = null, me = null, fitted = false;
 
   // จุด: [lat, lng, ระดับ, ชื่อ, เขต, ซม., เวลา, แหล่ง[], จำนวน, รายละเอียด]
   const pts = () => (H ? H.c.filter((c) => c[2] >= 2).map(([la, lo, tier, name, d, cm, t, src, n, det]) => ({ la, lo, tier, name, d, cm, t, src, n, det, fresh: t && Date.now() - t <= FRESH_MS })) : []);
@@ -139,6 +139,8 @@
       const stale = Date.now() - new Date(d.updated) > 45 * 6e4;
       $('updated').textContent = `อัปเดต ${fmtTime(new Date(d.updated))}${stale ? ' (ข้อมูลอาจไม่ล่าสุด)' : ''} · รีเฟรชทุก 15 นาที`;
       renderCity(); drawMap(); renderMe(); renderLatest();
+      // ครั้งแรก: ซูมให้เห็นจุดน้ำท่วมใหม่ทั้งหมดพอดีกรอบ (ถ้ายังไม่ได้ดูรอบตัว)
+      if (!fitted && !me) { const f = pts().filter((p) => p.fresh); if (f.length) { map.fitBounds(L.latLngBounds(f.map((p) => [p.la, p.lo])).pad(0.08), { maxZoom: 13 }); fitted = true; } }
     } catch (e) {
       $('updated').textContent = 'โหลดข้อมูลไม่สำเร็จ';
       $('cityLine').innerHTML = `โหลดข้อมูลสรุปไม่สำเร็จ (${esc(e.message)}) · <a href="details.html">ดูหน้ารายละเอียด</a>`;
