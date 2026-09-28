@@ -577,3 +577,8 @@ label.lg-toggle, .rk-filter label, .rt-opts label { display: inline-flex; align-
 .rtr.fast, .rtr.up { background: #1565c0; }
 /* ซูมไกล: เหลือเฉพาะลูกศรสองอัน (เปลี่ยนเร็ว) */
 .zlow .mk-tr:not(.two), .zlow .rtr.up, .zlow .rtr.down { display: none; }
+/* ความสูงพื้นดิน: คำอธิบายสี */
+.elev-lg { background: var(--surface); color: var(--ink); padding: 8px 10px; border-radius: 10px; box-shadow: 0 1px 6px rgba(0,0,0,.25); font-size: 13px; max-width: 240px; }
+.elev-lg .elev-bar { height: 10px; border-radius: 5px; margin: 6px 0 2px; background: linear-gradient(90deg, rgb(8,48,107), rgb(33,113,181) 20%, rgb(107,174,214) 36%, rgb(198,219,239) 50%, rgb(254,227,145) 64%, rgb(254,153,41) 80%, rgb(153,52,4)); }
+.elev-lg .elev-ticks { display: flex; justify-content: space-between; font-size: 12px; }
+.elev-lg .m { color: var(--ink2); font-size: 12px; margin-top: 4px; }

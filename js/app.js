@@ -51,6 +51,7 @@
     sensor: L.layerGroup().addTo(map),
     cam: L.layerGroup().addTo(map),
     web: L.layerGroup().addTo(map),
+    elev: L.layerGroup(), // ความสูงพื้นดิน DeltaDTM (ปิดไว้ก่อน เปิดจากปุ่มชั้นแผนที่)
   };
   L.control.layers(null, {
     'เซ็นเซอร์น้ำท่วมถนน กทม.': layers.sensor,
@@ -65,6 +66,7 @@
     'เรดาร์ฝน (RainViewer)': layers.radar,
     'กล้อง CCTV สาธารณะ': layers.cam,
     'ขอบเขตเขต': layers.districts,
+    'ความสูงพื้นดิน (กดดูค่า)': layers.elev,
   }, { collapsed: true, position: 'topright' }).addTo(map);
 
   // พื้นที่กดอย่างน้อย 22 px รอบจุด (จุดเล็กก็ยังกดง่ายบนมือถือ) โดยขนาดที่มองเห็นเท่าเดิม
@@ -823,6 +825,49 @@
       }, 450);
     });
   }
+
+
+  // ---------- ความสูงพื้นดิน (DeltaDTM v1.1, 30 ม., ไม่รวมตึก/ต้นไม้) ----------
+  // ข้อมูลประกอบเท่านั้น: เทียบกับจุดที่ท่วมจริงแล้วพบว่าจุดท่วมไม่ได้ต่ำกว่ารอบ ๆ (ท่วมเพราะการระบายมากกว่า) จึงไม่ใช้ในการทาย
+  let elevMeta = null, elevGrid = null, elevLegend = null;
+  async function elevLoad() {
+    elevMeta ||= await getJSON('data/elev/bkk-elev.json', 20000);
+    return elevMeta;
+  }
+  layers.elev.on('add', async () => {
+    const m = await elevLoad().catch(() => null);
+    if (!m) return;
+    if (!layers.elev.getLayers().length) L.imageOverlay('data/elev/bkk-elev.png', m.bounds, { opacity: 0.6, interactive: false,
+      attribution: 'ความสูงพื้นดิน: <a href="' + m.doi + '" target="_blank" rel="noopener">DeltaDTM v1.1</a> (Pronk et al. 2024, CC BY 4.0)' }).addTo(layers.elev);
+    elevLegend = L.control({ position: 'bottomleft' });
+    elevLegend.onAdd = () => {
+      const d = L.DomUtil.create('div', 'elev-lg');
+      d.innerHTML = '<b>ความสูงพื้นดิน (ม. เหนือระดับน้ำทะเล)</b><div class="elev-bar"></div><div class="elev-ticks"><span>0.5</span><span>1.0</span><span>1.75</span><span>2.5</span><span>3+</span></div>'
+        + '<div class="m">กดบนแผนที่เพื่อดูค่า · คลาดเคลื่อนได้ราว ±0.45 ม. · ใช้ประกอบเท่านั้น</div>';
+      return d;
+    };
+    elevLegend.addTo(map);
+  });
+  layers.elev.on('remove', () => { if (elevLegend) { elevLegend.remove(); elevLegend = null; } });
+  map.on('click', async (e) => {
+    if (!map.hasLayer(layers.elev) || map.getContainer().classList.contains('picking') || map.getContainer().classList.contains('closing')) return;
+    const m = await elevLoad().catch(() => null);
+    if (!m) return;
+    if (!elevGrid) {
+      const r = await fetch('data/elev/bkk-elev-60m.u8').catch(() => null);
+      if (!r || !r.ok) return;
+      elevGrid = new Uint8Array(await r.arrayBuffer());
+    }
+    const row = Math.floor((e.latlng.lat - m.lat0) / m.dlat), col = Math.floor((e.latlng.lng - m.lon0) / m.dlon);
+    const v = row >= 0 && row < m.rows && col >= 0 && col < m.cols ? elevGrid[row * m.cols + col] : 255;
+    const h = v === 255 ? null : v * 0.02 - 1.0;
+    const diff = h == null ? 0 : Math.round((h - m.median_bkk) * 100);
+    L.popup({ maxWidth: 260 }).setLatLng(e.latlng).setContent(h == null
+      ? '<div class="pp"><div class="m">ความสูงพื้นดิน</div>ไม่มีข้อมูลตรงนี้ (แหล่งน้ำ หรือนอกพื้นที่)</div>'
+      : `<div class="pp"><div class="m">ความสูงพื้นดิน (DeltaDTM)</div><span class="big">${h.toFixed(2)}</span> ม. เหนือระดับน้ำทะเล
+        <div class="m" style="margin-top:4px">${Math.abs(diff) < 10 ? 'ใกล้เคียงค่ากลางของ กทม.' : diff < 0 ? `ต่ำกว่าค่ากลาง กทม. ${-diff} ซม.` : `สูงกว่าค่ากลาง กทม. ${diff} ซม.`} (ค่ากลาง ${m.median_bkk} ม.)<br>
+        ค่าเฉลี่ยช่อง 60 ม. · คลาดเคลื่อนได้ราว ±0.45 ม. · น้ำท่วมใน กทม. ขึ้นกับท่อ/การระบายมากกว่าความสูงพื้นที่</div></div>`).openOn(map);
+  });
 
   // ---------- UI ----------
   const panel = $('panel');
