@@ -19,6 +19,9 @@
   const touch = matchMedia('(pointer: coarse)').matches;
   const map = L.map('map', { zoomControl: !isMobile, minZoom: 9, maxZoom: 18, preferCanvas: true, renderer: L.canvas({ padding: 0.3, tolerance: touch ? 14 : 6 }) }).setView(isMobile ? [13.66, 100.58] : [13.76, 100.55], isMobile ? 10 : 11);
   // แผนที่ฐาน OpenStreetMap (ฟรี ไม่ต้องใช้ key) โหมดมืดใช้ CSS filter ใน style.css
+  // ซูมไกล (เห็นทั้งเมือง): ซ่อนป้ายลูกศรแนวโน้มทีละจุด เหลือแค่ ⬆⬆/⬇⬇ ไม่ให้บังหมุด
+  const zcls = () => map.getContainer().classList.toggle('zlow', map.getZoom() < 13);
+  map.on('zoomend', zcls); map.whenReady(zcls);
   L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png', {
     maxZoom: 19, className: 'basemap',
     attribution: '© <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors',

@@ -12,7 +12,7 @@
 import { readFile, writeFile, mkdir } from 'node:fs/promises';
 import { createHash } from 'node:crypto';
 import path from 'node:path';
-import { loadRoads, scoreRoads, evalUpdate, newEvalState, packSegments, isMain } from './risk.mjs';
+import { loadRoads, scoreRoads, evalUpdate, newEvalState, packSegments, isMain, buildFloodLines } from './risk.mjs';
 import { fileURLToPath } from 'node:url';
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
@@ -741,6 +741,8 @@ async function updateRisk(meta) {
   const segs = scoreRoads(roads, { reports, history: [...history, ...evPts], rain, wl, fc, miss }, now.getTime());
   const counts = { 3: 0, 2: 0 };
   segs.forEach((s) => counts[s.tier]++);
+  // บันทึกอินพุตแบบย่อ 3 วัน (ฝน/พยากรณ์/คลอง/รายงาน) ไว้ทดสอบย้อนหลังว่าค่าตั้งแบบไหนแม่นกว่า (scripts/backtest.mjs)
+  logInputs(state, now.getTime(), { rain, fc, wl, reports });
   // เก็บผลรอบนี้ไว้วัดความแม่นภายหลัง + ตัวเทียบ "จุดท่วมบ่อย" จำนวนเท่ากับระดับควรระวังมาก
   state.runs.push({ t: now.getTime(), rb: roads.built, rain: Math.round(Math.max(0, ...rain.map((r) => r.mm1 || 0))),
     segs: segs.map((s) => [s.id, s.tier, s.drv]), base: segs.hot.slice(0, counts[3]) });
@@ -748,6 +750,12 @@ async function updateRisk(meta) {
   const evalReports = [...history.map((h) => ({ ...h, src: 'traffy' })), ...reports.filter((r) => r.src !== 'news' && r.src !== 'traffy')];
   const accuracy = evalUpdate(state, roads, evalReports, now.getTime());
   await writeJSON('risk-history.json', state);
+  // เส้นถนนบริเวณจุดน้ำท่วม 24 ชม. (หน้าแรกวาดจากไฟล์นี้แทน Overpass)
+  try {
+    const fl = buildFloodLines(roads, reports.filter((r) => r.src !== 'news' && now - r.t <= 24 * 36e5));
+    await writeJSON('flood-lines.json', { updated: now.toISOString(), ...fl });
+    src.floodLines = fl.pts.length;
+  } catch (e) { log('flood lines failed:', e.message); }
   const soi = roads.segments.filter((s) => !isMain(s.cls)).length;
   // จุดที่ควรหลบสำหรับหน้าหาเส้นทาง: 0 = น้ำท่วมจริง (เซ็นเซอร์ ≥10 ซม., iTIC/Traffy/ประชาชน 3 ชม.), 1 = ควรระวังมาก, 2 = ควรระวัง
   {
@@ -840,6 +848,32 @@ function updateTrends(state, roadNow, canalNow, rain, fc) {
   const cnt = (arr) => Object.fromEntries(['fast', 'up', 'peak', 'flat', 'down', 'dfast'].map((k) => [k, arr.filter((x) => x.tr === k).length]));
   meta.sources.trends = { road: cnt(out.road), canal: cnt(out.canal), rain: cnt(out.rain) };
   return { out, road, canal };
+}
+
+// ---------- บันทึกอินพุตของแบบจำลองไว้ทดสอบย้อนหลัง (อยู่ใน risk-history.json ที่ cache อยู่แล้ว) ----------
+// state.bt = { st: { rain: [key], fc: [key], wl: [key] } (key = "lat,lng"), runs: [{ t, rain: [[i, mm1, mm24]], fc: [[i, mm]], wl: [[i, pct, W, r]] }],
+//              rep: { key: [la, lo, t, src, lv] } }
+const BT_KEEP_D = 3;
+function logInputs(state, t, { rain, fc, wl, reports }) {
+  const bt = (state.bt ||= { st: { rain: [], fc: [], wl: [] }, runs: [], rep: {} });
+  const idx = (kind, la, lo) => {
+    const k = (+la).toFixed(4) + ',' + (+lo).toFixed(4), a = bt.st[kind];
+    let i = a.indexOf(k); if (i < 0) { i = a.length; a.push(k); }
+    return i;
+  };
+  const r1 = (v) => Math.round(v * 10) / 10;
+  bt.runs.push({ t,
+    rain: rain.filter((x) => x.mm1 > 0 || x.mm24 > 0).map((x) => [idx('rain', x.la, x.lo), r1(x.mm1), r1(x.mm24)]),
+    fc: fc.filter((x) => x.mm > 0).map((x) => [idx('fc', x.la, x.lo), r1(x.mm)]),
+    wl: wl.filter((x) => x.pct != null).map((x) => [idx('wl', x.la, x.lo), Math.round(x.pct), x.W ?? null, x.r || null]) });
+  for (const r of reports) {
+    if (r.src === 'news') continue;
+    const k = r.src + ':' + (+r.la).toFixed(5) + ',' + (+r.lo).toFixed(5) + '@' + r.t;
+    bt.rep[k] ||= [+(+r.la).toFixed(5), +(+r.lo).toFixed(5), r.t, r.src, r.lv || 0];
+  }
+  const cut = t - BT_KEEP_D * 864e5;
+  bt.runs = bt.runs.filter((x) => x.t >= cut);
+  for (const [k, v] of Object.entries(bt.rep)) if (v[2] < cut - 864e5) delete bt.rep[k];
 }
 
 // ---------- ข้อความแจ้งเตือน "ล้นตลิ่งแล้ว" ของ ThaiWater (กทม. และจังหวัดรอบ ๆ) ----------

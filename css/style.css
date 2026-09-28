@@ -575,3 +575,5 @@ label.lg-toggle, .rk-filter label, .rt-opts label { display: inline-flex; align-
 .rtr { display: inline-block; padding: 0 4px; height: 16px; border-radius: 8px; font: 700 10px/16px system-ui, sans-serif; white-space: nowrap; letter-spacing: -1px;
   background: #1d2330; color: #fff; border: 1px solid #fff; box-shadow: 0 1px 3px rgba(0,0,0,.3); }
 .rtr.fast, .rtr.up { background: #1565c0; }
+/* ซูมไกล: เหลือเฉพาะลูกศรสองอัน (เปลี่ยนเร็ว) */
+.zlow .mk-tr:not(.two), .zlow .rtr.up, .zlow .rtr.down { display: none; }

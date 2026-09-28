@@ -175,7 +175,23 @@
     if (geom.length) out.push([geom[geom.length - 1].lat, geom[geom.length - 1].lon]);
     return out;
   }
+  // เส้นถนนที่ระบบเตรียมไว้ทุก 15 นาที (data/flood-lines.json) เร็วและไม่ล้มเหมือน Overpass — ใช้ Overpass เฉพาะเมื่อไม่มีไฟล์
+  let linesP = null;
+  async function roadsFromFile(spots) {
+    linesP ||= F.getJSON('data/flood-lines.json', 20000, { cache: 'no-cache' }).catch(() => null);
+    const f = await linesP; linesP = null;
+    if (!f || !Array.isArray(f.pts) || Date.now() - new Date(f.updated) > 60 * 6e4) return null;
+    const lines = [];
+    for (const c of spots) {
+      const ids = new Set();
+      for (const [la, lo, segs] of f.pts) if (Math.abs(la - c.la) < 0.001 && Math.abs(lo - c.lo) < 0.001 && mDist(la, lo, c.la, c.lo) <= ROAD_MATCH_M + 30) segs.forEach((i) => ids.add(i));
+      for (const i of ids) lines.push({ tier: c.tier, pts: f.segs[i] });
+    }
+    return lines;
+  }
   async function fetchRoads(spots) {
+    const own = await roadsFromFile(spots);
+    if (own) return own;
     const key = spots.map((c) => c.la.toFixed(4) + ',' + c.lo.toFixed(4)).join(';');
     const cached = store.get(ROAD_CACHE);
     if (cached && cached.key === key && Date.now() - cached.t < 30 * 60e3) return cached.lines;
@@ -222,7 +238,7 @@
         L.polyline(l.pts, { pane: 'roads', color: '#fff', weight: l.tier === 3 ? 12 : 10, opacity: 0.9, lineCap: 'round', interactive: false }).addTo(lyr.roads);
         L.polyline(l.pts, { pane: 'roads', color: red[l.tier], weight: l.tier === 3 ? 8 : 6, opacity: 1, dashArray: l.tier === 3 ? null : '12 8', lineCap: 'round', interactive: false }).addTo(lyr.roads);
       }
-      $('roadNote').textContent = lines.length ? `ระบายสีแดงบนถนน ${lines.length} ช่วง ในรัศมีประมาณ ${ROAD_SPAN_M} ม. จากจุดที่มีรายงาน (ข้อมูลถนน © OpenStreetMap)` : 'ไม่พบเส้นถนนใกล้จุดรายงาน แสดงเป็นวงบริเวณแทน';
+      $('roadNote').textContent = lines.length ? `ระบายสีแดงบนถนน ${lines.length} ช่วง ตามแนวถนนเดียวกันไม่เกิน ${ROAD_SPAN_M} ม. จากจุดที่มีรายงาน (ข้อมูลถนน © OpenStreetMap)` : 'ไม่พบเส้นถนนใกล้จุดรายงาน แสดงเป็นวงบริเวณแทน';
     } catch (e) {
       $('roadNote').textContent = 'โหลดเส้นถนนไม่สำเร็จ (' + e.message + ') แสดงเป็นวงบริเวณสีแดงแทน';
     }
@@ -317,7 +333,9 @@
     const total = main.length;
     if (q) main = main.filter((c) => (c.name + ' ' + (c.district || '') + ' ' + c.members.map((m) => m.detail || '').join(' ')).includes(q));
     if (spotUi.hideOld) main = main.filter((c) => !c.t || Date.now() - c.t <= STALE_MS);
-    const sortFn = spotUi.me ? (a, b) => kmTo(a) - kmTo(b) : (a, b) => (b.cm || 0) - (a.cm || 0) || b.tier - a.tier || (b.t || 0) - (a.t || 0);
+    // รายงานที่เก่าเกิน 3 ชม. (อาจลดแล้ว) ไปอยู่ท้ายกลุ่มเสมอ ทั้งแบบใกล้ฉันและแบบปกติ
+    const old = (c) => (c.t && Date.now() - c.t > STALE_MS ? 1 : 0);
+    const sortFn = spotUi.me ? (a, b) => old(a) - old(b) || kmTo(a) - kmTo(b) : (a, b) => old(a) - old(b) || (b.cm || 0) - (a.cm || 0) || b.tier - a.tier || (b.t || 0) - (a.t || 0);
     $('allCount').textContent = main.length === total ? `${total} จุด` : `แสดง ${main.length} จาก ${total} จุด`;
     $('spots').innerHTML = !total ? '<p class="muted">ยังไม่มีจุดที่มีรายงานน้ำท่วม</p>' : !main.length ? '<p class="muted">ไม่พบจุดที่ตรงกับตัวกรอง</p>'
       : GROUPS.map((g) => {
@@ -533,7 +551,7 @@
     drawDistricts(geo, []);
     const D = {};
     const feeds = FEEDS.map(([key, name]) => ({ key, name, ok: false, pending: true }));
-    let timer = null;
+    let timer = null, roadsDrawn = false;
     const render = (final) => {
       if (my !== gen) return; // มีรอบใหม่เริ่มแล้ว
       try {
@@ -546,8 +564,11 @@
         fitToSpots(clusters);
         const waiting = feeds.filter((f) => f.pending).map((f) => f.name);
         $('asof').textContent = `ข้อมูล ณ ${fmtDT(new Date(last))}`;
-        $('updated').textContent = waiting.length ? `กำลังโหลด: ${waiting.join(', ')}…` : `อัปเดต ${fmtTime(new Date(last))} · รีเฟรชอัตโนมัติทุก 15 นาที`;
-        if (final) drawRoads(clusters, my);
+        // แหล่งหลัก (เซ็นเซอร์ หน่วยงาน Traffy) มาครบแล้วถือว่าอัปเดตแล้ว แหล่งที่ช้า (เช่นหมุดประชาชน) บอกเป็นหมายเหตุเล็ก ๆ
+        const mainWait = feeds.filter((f) => f.pending && ['sensor', 'event', 'traffy'].includes(f.key));
+        $('updated').textContent = mainWait.length ? `กำลังโหลด: ${mainWait.map((f) => f.name).join(', ')}…`
+          : `อัปเดต ${fmtTime(new Date(last))} · รีเฟรชอัตโนมัติทุก 15 นาที${waiting.length ? ` (ยังรอ ${waiting.join(', ')})` : ''}`;
+        if (!roadsDrawn && (final || !mainWait.length)) { roadsDrawn = true; drawRoads(clusters, my); }
       } catch (e) {
         console.error(e);
         $('headline').textContent = 'แสดงผลไม่สำเร็จ: ' + e.message;

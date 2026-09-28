@@ -6,7 +6,10 @@
 //   H  ความเสี่ยงเดิม: จำนวนเรื่องน้ำท่วมใน Traffy ย้อนหลังรอบช่วงถนนนั้น (ท่วมซ้ำบ่อย)
 //   W  น้ำในคลอง/แม่น้ำใกล้ล้นตลิ่ง
 //   M  เรียนรู้จากจุดที่พลาด: ท่วมจริงแต่ไม่ได้ทายไว้ ≥3 ครั้งใน 7 วันในรัศมี 300 ม. → ไวต่อฝนขึ้น (R×(1+2M)) และนับเป็นจุดท่วมบ่อย
-//   score = 1 − (1 − E) × (1 − R'·(0.3 + 0.7·max(H, M))) × (1 − 0.5·W)   โดย R' = min(1, R·(1 + 2M))
+//   score = 1 − (1 − E) × (1 − R'·(0.3 + 0.7·max(H, M)))   โดย R' = min(1, R·(1 + 2M)·(1 + W))
+//   W (คลองสูง) ไม่ทำให้ติดระดับเอง — ข้อมูลจริง 2 วัน: ติดระดับเพราะคลองอย่างเดียวถูกแค่ ~11% (แย่กว่าทายจุดท่วมบ่อย ~24%)
+//   จึงใช้เป็นตัวขยายผลของฝน: ฝนตกตอนคลองเต็ม ระบายไม่ทัน
+//   รายงานในซอย/ถนนสายใดส่งผลตามแนวถนนชื่อเดียวกันไกลกว่า (sameRoadM) ถนนอื่นรอบ ๆ ยังใช้วงแคบ
 // เป็นการประมาณจากหลักฐานรอบข้าง ไม่ใช่แบบจำลองการไหลของน้ำ (ไม่มีข้อมูลท่อ/สถานีสูบ/ระดับถนนละเอียด)
 //
 // วัดความแม่น (evalUpdate): แต่ละรอบที่ครบ 3 ชม. ดูว่าช่วงถนนที่ทายไว้ มีรายงานน้ำท่วม "ใหม่" ภายใน 150 ม. หรือไม่
@@ -21,13 +24,16 @@ export const PARAMS = {
   evidenceRadiusM: 800, evidenceDecayM: 250,
   // รายงานที่อยู่ในซอย (หรือไม่อยู่ใกล้ถนนที่มีในระบบ เช่น ในหมู่บ้าน) น้ำมักท่วมเฉพาะจุด ตีวงแคบกว่า
   soiRadiusM: 300, soiDecayM: 120,
+  // รายงานบนถนน/ซอยชื่อ X: ช่วงถนนชื่อเดียวกันรับผลได้ไกลถึง sameRoadM (น้ำท่วมมักเป็นทั้งแนวซอย)
+  sameRoadM: 600, sameRoadDecayM: 300, onRoadM: 150,
   ageDecayH: { bma: 1, itic: 2, traffy: 3, web: 3, news: 4 },
   srcWeight: { bma: 1.0, itic: 1.0, web: 0.8, traffy: 0.7, news: 0.6 },
   rainIdwKm: 6, fcIdwKm: 8, fcHours: 3,
   histRadiusM: 300, histExcludeH: 6, histSaturate: 10,
   wlRadiusM: 1000,
   // ควรระวังมาก / ควรระวัง (ระดับ 0.2–0.35 เดิมทายถูกแค่ ~6% จึงเลิกแสดง; ขยับจาก 0.6/0.35 เป็น 0.7/0.45 หลังเพิ่มซอย+คลองแล้วติดธง ~16% ของถนน)
-  tiers: [[0.7, 3], [0.45, 2]],
+  // ควรระวัง 0.45 → 0.55 (28 ก.ย.): ระดับนี้ทายถูกแค่ 8–13% จากข้อมูลจริง 2 วัน
+  tiers: [[0.7, 3], [0.55, 2]],
   learnMinMiss: 3, learnRadiusM: 300, learnDays: 7,
   evalHorizonH: 3, evalHitM: 150, aheadLookH: 6, rawKeepH: 8, evalKeepDays: 30, roadNearM: 50,
 };
@@ -57,6 +63,17 @@ function distToLine(la, lo, c) {
   return best;
 }
 // จุดนี้อยู่บนถนนแบบไหน: 'main' ถนนหลัก/รอง, 'soi' ซอย, 'off' ไม่มีถนนในระบบอยู่ใกล้ ๆ
+// ถนน/ซอยที่มีชื่อที่ใกล้ที่สุดภายใน roadNearM (ไม่มี = null)
+function nearestNamed(segIdx, la, lo) {
+  const P = PARAMS;
+  let best = null;
+  for (const s of near(segIdx, la, lo, P.roadNearM + P.segM)) {
+    if (!s.name || distM(la, lo, s.la, s.lo) > P.roadNearM + P.segM) continue;
+    const dm = distToLine(la, lo, s.c);
+    if (dm <= P.roadNearM && (!best || dm < best.dm)) best = { dm, s };
+  }
+  return best && best.s;
+}
 function roadKind(segIdx, la, lo) {
   const P = PARAMS;
   let best = null;
@@ -191,9 +208,10 @@ export function scoreRoads(roads, input, now = Date.now()) {
   // ประเภทตำแหน่งรายงาน: บนถนนหลัก/รอง = ตีวงกว้าง, ในซอยหรือห่างถนน = ตีวงแคบ
   const segIdx = gridIndex(roads.segments);
   for (const r of reports) {
-    const k = roadKind(segIdx, r.la, r.lo);
+    const n = nearestNamed(segIdx, r.la, r.lo), k = !n ? 'off' : isMain(n.cls) ? 'main' : 'soi';
     r.rad = k === 'main' ? P.evidenceRadiusM : P.soiRadiusM;
     r.decay = k === 'main' ? P.evidenceDecayM : P.soiDecayM;
+    r.road = n ? n.name : '';
   }
   const repIdx = gridIndex(reports);
   const hist = input.history.filter((h) => now - h.t > P.histExcludeH * 36e5);
@@ -217,12 +235,16 @@ export function scoreRoads(roads, input, now = Date.now()) {
     // ทายเฉพาะถนน/ซอยที่มีชื่อ (ช่วงไม่มีชื่อบอกผู้ใช้ไม่ได้ว่าคือที่ไหน)
     if (!s.name) continue;
     // E: หลักฐานใกล้เคียง (รวมแบบความน่าจะเป็น)
-    let notE = 1, bestE = null;
+    let notE = 1, bestE = null, onRoad = false;
     for (const r of near(repIdx, s.la, s.lo, P.evidenceRadiusM)) {
       const d = distM(s.la, s.lo, r.la, r.lo);
-      if (d > r.rad) continue;
+      const same = r.road && r.road === s.name;
+      const rad = same ? Math.max(r.rad, P.sameRoadM) : r.rad, decay = same ? Math.max(r.decay, P.sameRoadDecayM) : r.decay;
+      if (d > rad) continue;
       const ageH = (now - r.t) / 36e5;
-      const w = P.srcWeight[r.src] * (r.lv ? Math.min(1, 0.5 + r.lv / 6) : 1) * Math.exp(-d / r.decay) * Math.exp(-ageH / P.ageDecayH[r.src]);
+      // มีรายงานใหม่ (≤3 ชม.) ว่าน้ำท่วมจริงบนถนน/ซอยนี้ใกล้ ๆ → อย่างน้อย "ควรระวัง"
+      if (same && d <= P.onRoadM && ageH <= 3 && (r.lv || 2) >= 2) onRoad = true;
+      const w = P.srcWeight[r.src] * (r.lv ? Math.min(1, 0.5 + r.lv / 6) : 1) * Math.exp(-d / decay) * Math.exp(-ageH / P.ageDecayH[r.src]);
       notE *= 1 - Math.min(0.95, w);
       if (!bestE || w > bestE.w) bestE = { w, d: Math.round(d), src: r.src, ageMin: Math.round(ageH * 60) };
     }
@@ -249,12 +271,12 @@ export function scoreRoads(roads, input, now = Date.now()) {
       const v = st.W ?? Math.max(0, Math.min(1, (st.pct - 80) / 20));
       if (v > W) { W = v; wlSt = st; }
     }
-    const partR = Math.min(1, R * (1 + 2 * M)) * (0.3 + 0.7 * Math.max(H, M)), partW = 0.5 * W;
-    const score = 1 - (1 - E) * (1 - partR) * (1 - partW);
-    const tier = (P.tiers.find(([th]) => score >= th) || [0, 0])[1];
+    const partR = Math.min(1, R * (1 + 2 * M) * (1 + W)) * (0.3 + 0.7 * Math.max(H, M));
+    const score = 1 - (1 - E) * (1 - partR);
+    const tier = Math.max((P.tiers.find(([th]) => score >= th) || [0, 0])[1], onRoad ? 2 : 0);
     if (!tier) continue;
     // ปัจจัยหลักที่ทำให้ติดระดับ: 0 รายงาน/เซ็นเซอร์ใกล้เคียง, 1 ฝน (+ท่วมบ่อย), 2 น้ำในคลอง
-    const drv = E >= partR && E >= partW ? 0 : partR >= partW ? 1 : 2;
+    const drv = E >= partR ? 0 : W >= 0.5 ? 2 : 1;
     const SRCN = { bma: 'เซ็นเซอร์ถนน กทม.', itic: 'หน่วยงาน/iTIC', traffy: 'Traffy', web: 'ประชาชนปักหมุด', news: 'ข่าว' };
     const why = [];
     if (bestE && E >= 0.1) why.push(`มีรายงานน้ำท่วม (${SRCN[bestE.src]}) ห่าง ${bestE.d} ม. เมื่อ ${bestE.ageMin} นาทีที่แล้ว`);
@@ -278,6 +300,32 @@ export function scoreRoads(roads, input, now = Date.now()) {
 
 // ---------- ไฟล์สำหรับหน้าเว็บแบบกะทัดรัด ----------
 // s = [tier, คะแนน×100, ดัชนีชื่อถนน, ดัชนีเขต, พิกัด (จุดแรก ×1e5 แล้วต่อด้วยผลต่าง), เหตุผล x (ชื่อสถานีเป็นดัชนี)]
+// เส้นถนนบริเวณจุดรายงานน้ำท่วม (ให้หน้าแรกวาดแทนการเรียก Overpass จากเบราว์เซอร์ที่ล่มบ่อย)
+// แต่ละจุด: ช่วงถนนที่ใกล้ที่สุด (≤ matchM) + ช่วงชื่อเดียวกันที่ห่างจากจุดไม่เกิน spanM
+// คืน { segs: [[[lat,lng],...]], pts: [[lat, lng, [i, ...]]] }
+export function buildFloodLines(roads, points, matchM = 40, spanM = 300) {
+  const segIdx = gridIndex(roads.segments);
+  const out = { segs: [], pts: [] }, seen = new Map();
+  const add = (s) => { if (!seen.has(s.id)) { seen.set(s.id, out.segs.length); out.segs.push(s.c.map(([a, o]) => [+a.toFixed(5), +o.toFixed(5)])); } return seen.get(s.id); };
+  const done = new Set();
+  for (const p of points) {
+    const key = p.la.toFixed(4) + ',' + p.lo.toFixed(4);
+    if (done.has(key)) continue; done.add(key);
+    let best = null;
+    for (const s of near(segIdx, p.la, p.lo, matchM + PARAMS.segM)) {
+      const dm = distToLine(p.la, p.lo, s.c);
+      if (dm <= matchM && (!best || dm < best.dm)) best = { dm, s };
+    }
+    if (!best) continue;
+    const ids = [add(best.s)];
+    if (best.s.name) for (const s of near(segIdx, p.la, p.lo, spanM + PARAMS.segM)) {
+      if (s !== best.s && s.name === best.s.name && distM(p.la, p.lo, s.la, s.lo) <= spanM) ids.push(add(s));
+    }
+    out.pts.push([+p.la.toFixed(5), +p.lo.toFixed(5), ids]);
+  }
+  return out;
+}
+
 export function packSegments(segs) {
   const names = [], ni = new Map(), dists = [], di = new Map(), stns = [], si = new Map();
   const idx = (arr, m, v) => { if (!m.has(v)) { m.set(v, arr.length); arr.push(v); } return m.get(v); };
