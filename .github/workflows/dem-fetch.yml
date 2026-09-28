@@ -1,0 +1,29 @@
+name: dem-fetch
+# ดึงความสูงพื้นดิน DeltaDTM v1.1 (CC BY 4.0, 30 ม.) เฉพาะไทล์ที่ครอบคลุม กทม. จากไฟล์ Asia.zip 17 GB (อ่านแบบ range ไม่ต้องโหลดทั้งไฟล์)
+# ตัดเฉพาะ กทม. แล้วเก็บไว้ที่ branch dem-bkk
+on:
+  push:
+    branches: [main]
+    paths: ['.github/workflows/dem-fetch.yml', 'scripts/dem-fetch.py']
+  workflow_dispatch:
+permissions:
+  contents: write
+jobs:
+  dem:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - run: pip install -q remotezip rasterio numpy
+      - run: python scripts/dem-fetch.py
+      - name: Publish
+        run: |
+          cd dem-out
+          git init -q -b dem-bkk
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add -A && git commit -qm "DeltaDTM Bangkok crop $(date -u +%FT%TZ)"
+          git push -qf "https://x-access-token:${{ github.token }}@github.com/${{ github.repository }}" dem-bkk
