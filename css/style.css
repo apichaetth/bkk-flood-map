@@ -611,3 +611,4 @@ label.lg-toggle, .rk-filter label, .rt-opts label { display: inline-flex; align-
 .h2t small { color: var(--ink2); font-size: 13px; }
 .more-link { display: block; margin-top: 10px; padding: 10px 0; font-weight: 600; }
 .h2foot { text-align: center; }
+.lg-dotr { display: inline-block; width: 12px; height: 12px; border-radius: 50%; background: var(--c); border: 2px solid #fff; box-shadow: 0 0 0 1px var(--line); margin-right: 4px; vertical-align: -2px; }

@@ -22,7 +22,8 @@
   L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png', {
     maxZoom: 19, className: 'basemap', attribution: '© <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors',
   }).addTo(map);
-  map.createPane('roads').style.zIndex = 450;
+  // ชั้นเส้นถนน (canvas ทั้งผืน) อยู่เหนือจุด: ต้องไม่รับการกด ไม่งั้นกดจุดแดงด้านล่างไม่ได้
+  { const rp = map.createPane('roads'); rp.style.zIndex = 450; rp.style.pointerEvents = 'none'; }
   F.addLocate(map, () => { userMoved = true; }); // ผู้ใช้ไปดูตำแหน่งตัวเองแล้ว ไม่ต้องซูมอัตโนมัติทับ
   const lyr = { districts: L.layerGroup().addTo(map), risk: L.layerGroup().addTo(map), areas: L.layerGroup().addTo(map), roads: L.layerGroup().addTo(map), spots: L.layerGroup().addTo(map), web: L.layerGroup().addTo(map) };
   // พื้นที่เสี่ยงแสดงเป็นค่าเริ่มต้น ยกเลิกติ๊กเพื่อซ่อน
