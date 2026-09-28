@@ -68,7 +68,7 @@
     'เซ็นเซอร์น้ำท่วมถนน กทม.': layers.sensor,
     'รายงานน้ำท่วม (หน่วยงาน/iTIC)': layers.event,
     'ประชาชนแจ้งผ่านเว็บนี้': layers.web,
-    'ประชาชนแจ้ง (Traffy 24 ชม.)': layers.traffy,
+    'ประชาชนแจ้ง (Traffy)': layers.traffy,
     'ตำแหน่งจากข่าว / YouTube': layers.news,
     'ระดับน้ำคลอง/แม่น้ำ (ThaiWater)': layers.wl,
     'ระดับน้ำคลอง กทม. (312 สถานี)': layers.canal,
@@ -187,6 +187,7 @@
     layers.sensor.clearLayers();
     if (!S.sensor) { $('kSensor').textContent = '–'; return; }
     for (const x of S.sensor) {
+      if (x.stale) continue; // เซ็นเซอร์ขัดข้อง/ไม่มีค่าล่าสุด ไม่แสดง (ดูจำนวนได้ในแท็บแหล่งที่มา)
       const tr = S.trend && S.trend.road.get(x.s.code);
       const flooded = x.lv > 0;
       const arrow = tr && TRL[tr.tr] && tr.tr !== 'flat' ? TRL[tr.tr][0] : '';
@@ -241,12 +242,32 @@
     } catch (e) { S.traffy = null; setFeed('traffy', 'fail', Flood.errMsg('traffy', e)); }
     drawTraffy();
   }
+  // แสดง Traffy เฉพาะที่แจ้งใน N ชม. ล่าสุด (ค่าเริ่มต้น 6 ชม. เลือก 3/6/24 ได้ จำไว้ในเครื่อง) ไม่ให้แผนที่แน่นเกินไป
+  let trH = [3, 6, 24].includes(Flood.store.get('bkkflood.traffyH')) ? Flood.store.get('bkkflood.traffyH') : 6;
+  const trCtl = L.control({ position: 'bottomleft' });
+  trCtl.onAdd = () => {
+    const d = L.DomUtil.create('div', 'trh');
+    L.DomEvent.disableClickPropagation(d);
+    d.addEventListener('click', (e) => { const b = e.target.closest('button'); if (!b) return; trH = +b.dataset.h; Flood.store.set('bkkflood.traffyH', trH); drawTraffy(); });
+    return d;
+  };
+  trCtl.addTo(map);
+  const trCtlSync = () => {
+    const el = trCtl.getContainer(); if (!el) return;
+    el.hidden = !map.hasLayer(layers.traffy);
+    el.innerHTML = '<span>Traffy:</span>' + [3, 6, 24].map((h) => `<button type="button" data-h="${h}" class="${h === trH ? 'on' : ''}" aria-pressed="${h === trH}">${h} ชม.</button>`).join('');
+  };
+  map.on('overlayadd overlayremove', trCtlSync);
   function drawTraffy() {
     layers.traffy.clearLayers();
+    trCtlSync();
+    document.querySelectorAll('.kpi[data-layer="traffy"] small').forEach((e) => { e.textContent = `Traffy ${trH} ชม.`; });
     if (!S.traffy) { $('kTraffy').textContent = '–'; return; }
+    const cut = Date.now() - trH * 36e5, shown = S.traffy.filter((x) => x.t >= cut);
     const col = [0, 1, 2, 3].map((l) => cssVar(LEVEL_VAR[l]));
     // วาดบน canvas: จุด Traffy มีได้หลายพันจุด แบบ HTML ทีละจุดทำให้แผนที่ช้ามากบนมือถือ
-    for (const x of S.traffy) {
+    for (const x of S.traffy) x.marker = null;
+    for (const x of shown) {
       const r = x.r;
       const html = () => `<div class="pp">${badge(x.lv)} <span class="m">ประชาชนแจ้ง · ยังไม่ยืนยัน</span>
         <div style="margin-top:6px">${esc((r.description || '').slice(0, 320))}</div>
@@ -256,7 +277,7 @@
       x.marker = L.circleMarker([x.la, x.lo], { keepSize: true, radius: isMobile ? 4 : 5, color: col[x.lv], weight: 2, fillColor: '#fff', fillOpacity: 1 })
         .bindPopup(html, { maxWidth: 300 }).addTo(layers.traffy);
     }
-    $('kTraffy').textContent = S.traffy.length;
+    $('kTraffy').textContent = shown.length;
     renderFloodList(); renderCams();
   }
 
@@ -427,6 +448,7 @@
     if (!S.wl) { $('listWl').innerHTML = '<div class="muted small">ไม่มีข้อมูลระดับน้ำ</div>'; return; }
     const allWl = [...S.wl, ...(S.wlEdge || [])];
     for (const s of allWl) {
+      if (s.stale || s.pct == null) continue; // ไม่มีค่าล่าสุด ไม่แสดง
       const lv = s.pct != null ? wlLevel(s.pct) : 0;
       const html = `<div class="pp"><div class="m">สถานีวัดระดับน้ำ · ${esc(th(s.x.agency && s.x.agency.agency_shortname))}</div><h3>${esc(th(s.x.station.tele_station_name))}</h3>
         ${s.pct != null ? badge(lv, `${s.pct.toFixed(0)}% ของตลิ่ง`) : ''} ${s.stale ? '<span class="badge" style="--c:var(--stale)">ค่าเก่า</span>' : ''}
@@ -463,6 +485,7 @@
     if (!b) return;
     // คลอง: ปกติ/ขัดข้องจุดเล็ก เตือนภัย/วิกฤตจุดใหญ่
     for (const c of b.canal || []) {
+      if (c.st < 0 || c.wl == null) continue; // สถานีขัดข้อง/ไม่มีค่า ไม่แสดง (รกแผนที่)
       const [label, lv] = CANAL[c.st] || CANAL['-1'];
       const color = lv < 0 ? 'var(--stale)' : LEVEL[lv].color;
       const html = `<div class="pp"><div class="m">ระดับน้ำคลอง · สำนักการระบายน้ำ กทม.</div><h3>${esc(c.n)}</h3>
@@ -501,7 +524,11 @@
   }
 
   // ---------- 6) ข่าว + สรุป AI (จาก GitHub Actions) ----------
-  let newsFilter = 'all';
+  // ประเภทข่าว (จัดโดย AI/คำสำคัญ): ค่าเริ่มต้นแสดงเฉพาะสถานการณ์ + เตือนภัย
+  let newsFilter = 'main';
+  const NTYPE = (n) => n.type || 'สถานการณ์';
+  const NF = { main: ['สถานการณ์/เตือนภัย', (n) => ['สถานการณ์', 'เตือนภัย'].includes(NTYPE(n))], help: ['การช่วยเหลือ', (n) => NTYPE(n) === 'ช่วยเหลือ'],
+    other: ['อื่น ๆ', (n) => NTYPE(n) === 'อื่น ๆ'], all: ['ทั้งหมด', () => true] };
   const isYt = (n) => n.kind === 'youtube';
   const ytThumb = (n) => /^https:\/\/i\.ytimg\.com\//.test(n.thumb || '') ? n.thumb : '';
   async function loadNews() {
@@ -527,8 +554,10 @@
   function drawNews() {
     layers.news.clearLayers();
     if (!S.news) { $('kNews').textContent = '–'; $('listNews').innerHTML = '<div class="muted small">ยังไม่มีข้อมูลข่าว</div>'; return; }
-    $('kNews').textContent = S.news.length;
+    $('kNews').textContent = S.news.filter(NF.main[1]).length;
     S.news.forEach((n) => {
+      n.markers = [];
+      if (NTYPE(n) === 'อื่น ๆ') return; // ข่าวเศรษฐกิจ/ความเห็น ไม่ปักบนแผนที่
       const lv = SEV_LV[n.severity] || 2;
       const th = ytThumb(n);
       n.markers = (n.pins || []).map((p) => {
@@ -548,11 +577,10 @@
     renderNewsList();
   }
   function renderNewsList() {
-    const counts = { all: S.news.length, news: S.news.filter((n) => !isYt(n)).length, youtube: S.news.filter(isYt).length };
-    $('newsFilter').innerHTML = [['all', 'ทั้งหมด'], ['news', 'ข่าว'], ['youtube', 'YouTube']]
-      .map(([k, t]) => `<button type="button" data-f="${k}" class="${newsFilter === k ? 'on' : ''}" aria-pressed="${newsFilter === k}">${t} ${counts[k]}</button>`).join('');
+    $('newsFilter').innerHTML = Object.entries(NF)
+      .map(([k, [t, f]]) => `<button type="button" data-f="${k}" class="${newsFilter === k ? 'on' : ''}" aria-pressed="${newsFilter === k}">${t} ${S.news.filter(f).length}</button>`).join('');
     $('newsFilter').querySelectorAll('button').forEach((b) => b.onclick = () => { newsFilter = b.dataset.f; renderNewsList(); });
-    const shown = S.news.map((n, i) => [n, i]).filter(([n]) => newsFilter === 'all' || (newsFilter === 'youtube') === isYt(n));
+    const shown = S.news.map((n, i) => [n, i]).filter(([n]) => NF[newsFilter][1](n));
     $('listNews').innerHTML = shown.length ? shown.map(([n, i]) => {
       const lv = SEV_LV[n.severity] || 2;
       const th = ytThumb(n);
@@ -561,7 +589,8 @@
         <h3><a href="${esc(n.link)}" target="_blank" rel="noopener">${esc(n.title)}</a></h3>
         ${th ? `<button type="button" class="yt-thumb" data-v="${esc(n.videoId)}" aria-label="เล่นคลิป ${esc(n.title)}"><img loading="lazy" src="${esc(th)}" alt=""><span>▶</span></button>` : ''}
         ${n.summary ? `<p>${esc(n.summary)}</p>` : ''}
-        ${(n.pins || []).length ? `<div class="pins">${n.pins.map((p, j) => `<button type="button" data-n="${i}" data-p="${j}">📍 ${esc(p.label)}</button>`).join('')}</div>` : ''}
+        ${(n.more || []).length ? `<p class="small muted">ข่าวเดียวกันจาก: ${n.more.map((o) => `<a href="${esc(o.link)}" target="_blank" rel="noopener">${esc(o.source)}</a>`).join(', ')}</p>` : ''}
+        ${(n.pins || []).length && n.markers.length ? `<div class="pins">${n.pins.map((p, j) => `<button type="button" data-n="${i}" data-p="${j}">📍 ${esc(p.label)}</button>`).join('')}</div>` : ''}
       </article>`;
     }).join('') : '<div class="muted small">ยังไม่พบข่าวหรือคลิปน้ำท่วมใน กทม. ช่วง 48 ชม.</div>';
     $('listNews').querySelectorAll('.pins button').forEach((b) => b.onclick = () => {
@@ -741,7 +770,7 @@
   const floodPts = () => [
     ...(S.sensor || []).filter((x) => x.lv > 0).map((x) => ({ la: x.la, lo: x.lo, lv: x.lv, name: (x.s.name || x.s.road || 'เซ็นเซอร์ กทม.') + ` ${Math.round(x.cm)} ซม.` })),
     ...(S.event || []).map((x) => ({ la: x.la, lo: x.lo, lv: x.lv, name: String(x.e.title || '').replace(/^น้ำท่วม\s*/, '') })),
-    ...(S.traffy || []).map((x) => ({ la: x.la, lo: x.lo, lv: x.lv, name: 'ประชาชนแจ้ง (Traffy)' })),
+    ...(S.traffy || []).filter((x) => x.t >= Date.now() - trH * 36e5).map((x) => ({ la: x.la, lo: x.lo, lv: x.lv, name: 'ประชาชนแจ้ง (Traffy)' })),
     ...(S.web || []).map((x) => ({ la: x.la, lo: x.lo, lv: x.lv || 2, name: 'ประชาชนปักหมุด' })),
   ].filter((x) => x.la && x.lo);
   // สถานะรอบที่: น้ำท่วมใน 500 ม. / รายงานใน 1 กม. / ถนนควรระวังมากใน 300 ม. / ปกติ

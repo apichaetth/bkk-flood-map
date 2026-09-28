@@ -655,3 +655,8 @@ label.lg-toggle, .rk-filter label, .rt-opts label { display: inline-flex; align-
 .dtr.steady { background: #e4e7ec; color: #1d2330; }
 .dlegend .dtr { margin-left: 4px; }
 .dtr.sm { padding: 1px 5px; font-size: 12px; }
+/* แผนที่ละเอียด: เลือกช่วงเวลา Traffy */
+.trh { display: flex; align-items: center; gap: 4px; background: var(--surface); color: var(--ink); padding: 4px 6px; border-radius: 10px; box-shadow: 0 1px 5px rgba(0,0,0,.3); font-size: 13px; }
+.trh[hidden] { display: none; }
+.trh button { border: 1px solid var(--line); background: var(--surface); color: var(--ink); border-radius: 8px; padding: 4px 8px; min-height: 32px; font: inherit; cursor: pointer; }
+.trh button.on { background: var(--accent); border-color: var(--accent); color: #fff; font-weight: 600; }

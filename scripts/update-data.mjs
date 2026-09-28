@@ -142,12 +142,13 @@ async function analyzeWithGemini(batch, districtNames) {
   const model = process.env.GEMINI_MODEL || 'gemini-flash-latest';
   const prompt = `คุณคือผู้ช่วยสรุปสถานการณ์น้ำท่วมในกรุงเทพมหานคร
 อ่านรายการข่าวและคลิปวิดีโอต่อไปนี้ (หัวข้อ + ข้อความย่อ/คำอธิบายคลิป) แล้วตอบเป็น JSON array เท่านั้น หนึ่ง object ต่อข่าว ตามรูปแบบ:
-{"id": string, "relevant": boolean, "summary": string, "severity": "สูง"|"กลาง"|"ต่ำ", "places": [{"name": string, "district": string}]}
+{"id": string, "relevant": boolean, "type": "สถานการณ์"|"เตือนภัย"|"ช่วยเหลือ"|"อื่น ๆ", "summary": string, "severity": "สูง"|"กลาง"|"ต่ำ", "places": [{"name": string, "district": string}]}
 
 กติกา:
 - relevant = true เฉพาะข่าว/คลิปที่รายงานน้ำท่วม/น้ำขัง/ฝนตกหนัก/ระดับน้ำ "ในพื้นที่กรุงเทพมหานคร" ที่เป็นสถานการณ์ปัจจุบัน
 - summary = สรุปภาษาไทยไม่เกิน 2 ประโยค ใช้เฉพาะข้อมูลที่อยู่ในข้อความ ห้ามเดาตัวเลขหรือสถานที่
 - คลิปที่เป็นเพลง เกม รีวิว ละคร หรือเหตุการณ์ในอดีต ให้ relevant = false
+- type: สถานการณ์ = รายงานว่าตอนนี้น้ำท่วม/น้ำขัง/ถนนผ่านไม่ได้/ระดับน้ำ ที่ไหนอย่างไร · เตือนภัย = พยากรณ์ฝน คาดการณ์ เตือนให้ระวัง/เลี่ยงเส้นทาง · ช่วยเหลือ = การสั่งการ ประชุม ส่งเจ้าหน้าที่/เรือ/เครื่องสูบน้ำ อพยพ เยียวยา · อื่น ๆ = เศรษฐกิจ หุ้น ประกัน ท่องเที่ยว การเมือง ความเห็น บทวิเคราะห์ สถิติโซเชียล
 - severity: สูง = ถนนสัญจรไม่ได้/น้ำเข้าบ้าน/มีผู้ได้รับผลกระทบมาก, กลาง = น้ำท่วมขังผ่านได้ลำบาก, ต่ำ = เตือนภัย/เล็กน้อย/น้ำลดแล้ว
 - places = สถานที่ใน กทม. ที่ข่าวระบุชัดเจน (ถนน ซอย แยก ชุมชน) name ต้องเป็นชื่อที่ค้นบนแผนที่ได้ เช่น "ถนนสุขุมวิท ซอย 71"
 - district = ชื่อเขตโดยไม่มีคำว่า "เขต" ต้องเป็นหนึ่งใน: ${districtNames.join(', ')} ถ้าไม่ทราบให้เป็น ""
@@ -185,6 +186,46 @@ ${batch.map((n) => JSON.stringify({ id: n.id, title: n.title, snippet: n.snippet
   const res = {};
   for (const r of Array.isArray(arr) ? arr : []) if (r && r.id) res[r.id] = r;
   return res;
+}
+
+// ---------- ประเภทข่าว (ใช้เมื่อ AI ไม่ได้ให้มา) ----------
+const TYPE_OTHER_RE = /หุ้น|ตลาดหลักทรัพย์|\bSET\b|ประกันภัย|เคลม|ท่องเที่ยว|ททท|Golden Week|เอนเกจ|โซเชียล|ยอดวิว|บททดสอบ|ใครต้องรับผิด|ฝ่ายค้าน|เศรษฐกิจ|ธุรกิจ|ค้าปลีก|อสังหา|กำไร|ขาดทุน|บทวิเคราะห์|ย้อนสถิติ/i;
+const TYPE_HELP_RE = /นายกฯ|นายกรัฐมนตรี|ประชุม|สั่งการ|เยียวยา|งบ|ช่วยเหลือ|แจกจ่าย|ศูนย์พักพิง|อพยพ|ระดม|ลงพื้นที่|ผู้ว่าฯ|รมว\.|รัฐมนตรี|จัดสรร|ส่งเรือ|รถ GMC/;
+const TYPE_WARN_RE = /เตือน|เฝ้าระวัง|พยากรณ์|คาดการณ์|คาดว่า|กรมอุตุ|เลี่ยงเส้นทาง|ระวัง/;
+function newsType(n, a) {
+  const ok = { 'สถานการณ์': 1, 'เตือนภัย': 1, 'ช่วยเหลือ': 1, 'อื่น ๆ': 1 };
+  if (a && ok[a.type]) return a.type;
+  const t = n.title || '';
+  if (TYPE_OTHER_RE.test(t)) return 'อื่น ๆ';
+  if (TYPE_HELP_RE.test(t)) return 'ช่วยเหลือ';
+  if (TYPE_WARN_RE.test(t)) return 'เตือนภัย';
+  return 'สถานการณ์';
+}
+// ข่าวเรื่องเดียวกันจากหลายสำนัก: หัวข้อคล้ายกัน (ตัวอักษรคู่ซ้ำกัน ≥ 40%) ภายใน 12 ชม. รวมเป็นรายการเดียว
+function titleGrams(t) {
+  const s = String(t || '').replace(/[^\u0E00-\u0E7Fa-z0-9]/gi, '').toLowerCase(), g = new Set();
+  for (let i = 0; i < s.length - 1; i++) g.add(s.slice(i, i + 2));
+  return g;
+}
+function dedupeNews(list) {
+  const out = [];
+  for (const n of list) {
+    const g = titleGrams(n.title), t = new Date(n.published).getTime();
+    const hit = out.find((o) => {
+      if (Math.abs(o._t - t) > 12 * 36e5) return false;
+      let inter = 0; for (const x of g) if (o._g.has(x)) inter++;
+      return inter / (g.size + o._g.size - inter || 1) >= 0.4;
+    });
+    if (!hit) { out.push({ ...n, _g: g, _t: t, more: [] }); continue; }
+    // เก็บรายการที่ระบุสถานที่ชัดที่สุดเป็นตัวหลัก แล้วรวมหมุดของทุกสำนัก
+    const score = (x) => (x.pins || []).filter((p) => p.precision === 'place').length * 10 + (x.pins || []).length + (x.summary ? 1 : 0);
+    const pins = [...(hit.pins || []), ...(n.pins || [])].filter((p, i, a) => a.findIndex((q) => q.label === p.label) === i);
+    if (score(n) > score(hit)) {
+      const more = [...hit.more, { source: hit.source, link: hit.link }];
+      Object.assign(hit, n, { _g: g, _t: t, more, pins });
+    } else { hit.more.push({ source: n.source, link: n.link }); hit.pins = pins; }
+  }
+  return out.map(({ _g, _t, ...n }) => n);
 }
 
 // ---------- วิเคราะห์แบบไม่ใช้ AI (fallback) ----------
@@ -270,18 +311,19 @@ async function updateNews(meta) {
     const a = cache[n.id];
     if (!a.relevant) continue;
     for (const p of a.places || []) if (p.name) await geocode(p.name, geo);
-    out.push({ ...n, summary: a.summary || '', severity: a.severity || 'กลาง', ai: !!a.ai, pins: pinsFor(a, districts, geo) });
+    out.push({ ...n, summary: a.summary || '', severity: a.severity || 'กลาง', type: newsType(n, a), ai: !!a.ai, pins: pinsFor(a, districts, geo) });
   }
+  const merged = dedupeNews(out);
 
   // ล้าง cache ที่เก่ากว่า 4 วัน
   const keep = new Set(items.map((n) => n.id));
   for (const [k, v] of Object.entries(cache)) if (!keep.has(k) && now - new Date(v.at) > 4 * 864e5) delete cache[k];
 
-  await writeJSON('news.json', { updated: now.toISOString(), items: out });
+  await writeJSON('news.json', { updated: now.toISOString(), items: merged, raw: out.length });
   await writeJSON('news-cache.json', cache);
   await writeJSON('geocache.json', geo);
-  meta.sources.news = { ok: !newsErr, count: out.filter((n) => n.kind === 'news').length, fetched: newsItems.length, ai: aiStatus, ...(newsErr ? { error: newsErr.message } : {}) };
-  meta.sources.youtube = { ok: yt.status === 'ok', status: yt.status, count: out.filter((n) => n.kind === 'youtube').length, fetched: yt.items.length };
+  meta.sources.news = { ok: !newsErr, count: merged.filter((n) => n.kind === 'news').length, merged: out.length - merged.length, fetched: newsItems.length, ai: aiStatus, ...(newsErr ? { error: newsErr.message } : {}) };
+  meta.sources.youtube = { ok: yt.status === 'ok', status: yt.status, count: merged.filter((n) => n.kind === 'youtube').length, fetched: yt.items.length };
 }
 
 // ---------- ประกาศเตือนภัยกรมอุตุนิยมวิทยา ----------

@@ -35,6 +35,7 @@ window.FloodAgg = (function () {
     }
     for (const n of D.news || []) {
       if ((F.SEV_LV[n.severity] || 2) < 2) continue; // ข่าวเตือนภัย/น้ำลดแล้ว ไม่นับเป็นจุดน้ำท่วม
+      if (n.type === 'อื่น ๆ') continue; // ข่าวเศรษฐกิจ/ความเห็น
       for (const p of n.pins || []) if (p.precision === 'place') {
         out.push({ la: p.lat, lo: p.lng, src: n.kind === 'youtube' ? 'youtube' : 'news', tier: 2, name: p.label, detail: `${n.source}: ${n.title}`, cm: 0, t: new Date(n.published), link: n.link, district: p.district });
       }
