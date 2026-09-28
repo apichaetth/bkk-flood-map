@@ -41,7 +41,6 @@ window.Flood = (function () {
     tmd: 'data/tmd.json',
     meta: 'data/meta.json',
     districts: 'data/districts.geojson',
-    fbPages: 'data/facebook-pages.json',
   };
 
   // ---------- helpers ----------

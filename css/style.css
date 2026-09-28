@@ -124,8 +124,6 @@ h2 { font-size: 14px; font-weight: 600; margin: 18px 0 6px; color: var(--ink2); 
 .yt-thumb:hover img { opacity: 1; }
 .yt-frame { width: 100%; aspect-ratio: 16 / 9; border: 0; border-radius: 8px; margin: 6px 0; }
 
-.fb-box { min-height: 200px; }
-.fb-box iframe { display: block; border: 0; margin: 0 auto; max-width: 100%; background: var(--surface); }
 
 /* ---------- legend ---------- */
 .legend > div { display: flex; align-items: center; gap: 10px; font-size: 13px; padding: 3px 0; }
