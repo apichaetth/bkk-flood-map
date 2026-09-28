@@ -374,20 +374,38 @@
         + `<path d="M12 1.5C12 1.5 2.5 13.5 2.5 21a9.5 9.5 0 0 0 19 0C21.5 13.5 12 1.5 12 1.5z" style="fill:${dry ? '#9aa4b1' : fill};stroke:${hot ? 'var(--critical)' : '#fff'};stroke-width:${hot ? 3.5 : 2}"/>`
         + `${!dry && h >= 20 ? '<path d="M8 20a4.5 4.5 0 0 0 3 5" style="fill:none;stroke:rgba(255,255,255,.7);stroke-width:2;stroke-linecap:round"/>' : ''}</svg></div>` });
   }
-  // หลอดวัดระดับ: น้ำในหลอดสูงตามสัดส่วนของเกณฑ์ (คลอง กทม. = ระดับ/วิกฤต · ThaiWater = % ของตลิ่ง) เส้นขีด = เกณฑ์เตือนภัย
-  // สี: ปกติ = น้ำเงิน · ใกล้เกณฑ์/เตือนภัย = ส้ม · วิกฤต/ล้นตลิ่ง = แดง · ไม่มีค่า = เทา
-  function gaugeIcon(frac, warnFrac, lv, stale, tr, big) {
-    const H = big ? 24 : 18, W = big ? 13 : 10, hit = Math.max(H, touch ? 34 : 24);
+  // หลอดวัดระดับแบบไม้วัดระดับน้ำ: ขีดสเกลด้านซ้าย · เส้นส้ม = เกณฑ์เตือนภัย · เส้นแดง = เกณฑ์วิกฤต/ตลิ่ง
+  // คลอง กทม.: สเกลคงที่ยึดเกณฑ์เตือนภัย (ล่างสุด = ต่ำกว่าเตือนภัย 1.5 ม. · บนสุด = เกินเตือนภัย 0.5 ม. · ขีดละ 50 ซม.)
+  // ThaiWater: % ของตลิ่ง (ขีดละ 25%) · สีน้ำ: ปกติ = น้ำเงิน · เตือนภัย = ส้ม · วิกฤต/ล้นตลิ่ง = แดง · ไม่มีค่า = เทา
+  const CANAL_LO = 1.5, CANAL_HI = 0.5, CANAL_TICK = 0.5;
+  const canalScale = (c) => {
+    if (c.wl == null || c.warn == null) return null;
+    const lo = c.warn - CANAL_LO, span = CANAL_LO + CANAL_HI, f = (v) => (v - lo) / span;
+    const ticks = []; for (let v = CANAL_TICK; v < span - 1e-6; v += CANAL_TICK) ticks.push(v / span);
+    return { frac: f(c.wl), marks: [[f(c.warn), 'var(--serious)'], ...(c.crit != null && c.crit > c.warn ? [[f(c.crit), 'var(--critical)']] : [])], ticks };
+  };
+  function gaugeSvg(frac, marks, ticks, lv, stale, big) {
+    const H = big ? 30 : 24, TW = 4, W = (big ? 13 : 11) + TW;
     const col = stale ? '#9aa4b1' : lv >= 3 ? 'var(--critical)' : lv >= 2 ? 'var(--serious)' : '#1e7fd6';
-    const f = stale || frac == null ? 0 : Math.max(0.06, Math.min(1, frac)), ih = H - 4, fh = Math.round(ih * f);
-    const wy = warnFrac != null ? 2 + Math.round(ih * (1 - Math.min(1, warnFrac))) : null;
+    const f = stale || frac == null ? 0 : Math.max(0.04, Math.min(1, frac)), ih = H - 4, fh = Math.round(ih * f);
+    const y = (fr) => 2 + Math.round(ih * (1 - Math.max(0, Math.min(1, fr))));
+    return `<svg class="gauge" width="${W}" height="${H}" viewBox="0 0 ${W} ${H}" aria-hidden="true">`
+      + `<rect x="${TW + 1}" y="1" width="${W - TW - 2}" height="${H - 2}" rx="3" style="fill:#fff;stroke:${col};stroke-width:1.6"/>`
+      + `<rect x="${TW + 2.5}" y="${2 + ih - fh}" width="${W - TW - 5}" height="${fh}" rx="1.5" style="fill:${col}"/>`
+      + (ticks || []).map((t) => `<line x1="0.5" x2="${TW + 1}" y1="${y(t)}" y2="${y(t)}" style="stroke:#1d2330;stroke-width:1"/>`).join('')
+      + `<line x1="0.5" x2="0.5" y1="2" y2="${H - 2}" style="stroke:#1d2330;stroke-width:1"/>`
+      + (marks || []).filter((m) => m[0] >= 0 && m[0] <= 1).map(([fr, c]) => `<line x1="0" x2="${W}" y1="${y(fr)}" y2="${y(fr)}" style="stroke:${c};stroke-width:1.8"/>`).join('')
+      + `${frac > 1 && !stale ? `<path d="M${TW + (W - TW) / 2} -2l3.5 3.5h-7z" style="fill:${col}"/>` : ''}</svg>`;
+  }
+  function gaugeIcon(frac, marks, ticks, lv, stale, tr, big) {
+    const H = big ? 30 : 24, hit = Math.max(H, touch ? 34 : 26);
     return L.divIcon({ className: '', iconSize: [hit, hit], iconAnchor: [hit / 2, hit / 2], popupAnchor: [0, -H / 2],
-      html: `<div class="mkhit" style="width:${hit}px;height:${hit}px"><svg class="gauge" width="${W}" height="${H}" viewBox="0 0 ${W} ${H}" aria-hidden="true">`
-        + `<rect x="1" y="1" width="${W - 2}" height="${H - 2}" rx="3" style="fill:#fff;stroke:${col};stroke-width:1.6"/>`
-        + `<rect x="2.5" y="${2 + ih - fh}" width="${W - 5}" height="${fh}" rx="1.5" style="fill:${col}"/>`
-        + `${wy != null ? `<line x1="0" x2="${W}" y1="${wy}" y2="${wy}" style="stroke:#1d2330;stroke-width:1"/>` : ''}${frac > 1 && !stale ? `<path d="M${W / 2} -1l3 3h-6z" style="fill:${col}"/>` : ''}</svg>`
+      html: `<div class="mkhit" style="width:${hit}px;height:${hit}px">${gaugeSvg(frac, marks, ticks, lv, stale, big)}`
         + `${tr ? `<span class="mk-tr${tr.length > 1 ? ' two' : ''}">${tr}</span>` : ''}</div>` });
   }
+  // คำอธิบายสัญลักษณ์ใช้หลอดเดียวกับบนแผนที่ (ปกติ / เกินเตือนภัย / เกินวิกฤต)
+  { const el = $('lgGauge'), sc = (wl) => canalScale({ wl, warn: 1, crit: 1.2 });
+    if (el) el.innerHTML = [[0.4, 0], [1.1, 2], [1.6, 3]].map(([wl, lv]) => { const g = sc(wl); return gaugeSvg(g.frac, g.marks, g.ticks, lv, false, false); }).join(''); }
   function heavyRed(mm) {
     const t = Math.max(0, Math.min(1, (mm - RAIN_HEAVY_MM) / (150 - RAIN_HEAVY_MM)));
     const from = [245, 150, 146], to = [122, 14, 10];
@@ -455,7 +473,7 @@
         <div style="margin-top:4px"><span class="big">${s.msl != null ? s.msl.toFixed(2) : '–'}</span> ม.รทก. <span class="m">${trend(s)}</span></div>
         <div class="m">ตลิ่งต่ำสุด ${s.bank != null ? s.bank.toFixed(2) + ' ม.รทก.' : '–'} · ${esc(loc(s))}<br>${fmtDT(s.t)} (${ago(s.t)})</div></div>`;
       const k = wlTr(s);
-      s.marker = L.marker([s.la, s.lo], { icon: gaugeIcon(s.pct != null ? s.pct / 100 : null, 0.9, s.pct >= 100 ? 3 : s.pct >= 90 ? 2 : 0, s.stale || s.pct == null, k && k !== 'flat' ? TRL[k][0] : '', true), zIndexOffset: 200 }).bindPopup(html).addTo(layers.wl);
+      s.marker = L.marker([s.la, s.lo], { icon: gaugeIcon(s.pct != null ? s.pct / 100 : null, [[0.9, 'var(--serious)'], [1, 'var(--critical)']], [0.25, 0.5, 0.75], s.pct >= 100 ? 3 : s.pct >= 90 ? 2 : 0, s.stale || s.pct == null, k && k !== 'flat' ? TRL[k][0] : '', true), zIndexOffset: 200 }).bindPopup(html).addTo(layers.wl);
     }
     const hi = allWl.filter((s) => !s.stale && s.pct != null).sort((a, b) => b.pct - a.pct).slice(0, 6);
     listInto('listWl', hi, (s) => ({ dot: LEVEL[wlLevel(s.pct)].color, title: th(s.x.station.tele_station_name), sub: `${s.edge ? loc(s) + ' · ' : ''}${trend(s) || 'ไม่มีแนวโน้ม'} · ${fmtTime(s.t)}`, right: s.pct.toFixed(0) + '%', go: s }), 'ไม่มีสถานีที่มีค่าล่าสุด');
@@ -493,8 +511,8 @@
         ${c.wl != null && lv >= 0 ? `<div style="margin-top:4px"><span class="big">${c.wl.toFixed(2)}</span> ม.${c.warn != null ? ` <span class="m">(${c.wl >= c.crit ? `เกินเกณฑ์วิกฤต ${(c.wl - c.crit).toFixed(2)} ม.` : c.wl >= c.warn ? `เกินเกณฑ์เตือนภัย ${(c.wl - c.warn).toFixed(2)} ม.` : `ต่ำกว่าเกณฑ์เตือนภัย ${(c.warn - c.wl).toFixed(2)} ม.`})</span>` : ''}</div>` : ''}
         <div class="m">${c.warn != null ? `เกณฑ์เตือนภัย ${c.warn} · วิกฤต ${c.crit} · ` : ''}${c.river ? esc(c.river) + ' · ' : ''}เขต${esc(c.d)}${c.t ? `<br>${fmtDT(new Date(c.t))} (${ago(new Date(c.t))})` : ''}</div>${trendHtml(S.trend && S.trend.canal.get(c.c), ' ม.', 2)}</div>`;
       const ctr = S.trend && S.trend.canal.get(c.c), arrow = ctr && TRL[ctr.tr] && ctr.tr !== 'flat' && lv >= 0 ? TRL[ctr.tr][0] : '';
-      const frac = c.wl != null && c.crit ? c.wl / c.crit : null, wf = c.warn != null && c.crit ? c.warn / c.crit : null;
-      c.marker = L.marker([c.la, c.lo], { icon: gaugeIcon(frac, wf, lv, lv < 0 || c.wl == null, arrow, c.st >= 1), zIndexOffset: c.st * 100 + (arrow ? 50 : 0) }).bindPopup(html).addTo(layers.canal);
+      const g = canalScale(c) || { frac: null, marks: [], ticks: [] };
+      c.marker = L.marker([c.la, c.lo], { icon: gaugeIcon(g.frac, g.marks, g.ticks, lv, lv < 0 || c.wl == null, arrow, c.st >= 1), zIndexOffset: c.st * 100 + (arrow ? 50 : 0) }).bindPopup(html).addTo(layers.canal);
     }
     const hot = (b.canal || []).filter((c) => c.st >= 1).sort((x, y) => y.st - x.st || (y.wl - y.crit) - (x.wl - x.crit));
     listInto('listCanal', hot.slice(0, 8), (c) => ({ dot: LEVEL[CANAL[c.st][1]].color, title: c.n, sub: `${CANAL[c.st][0]} · เขต${c.d}${c.t ? ' · ' + fmtTime(new Date(c.t)) : ''}`, right: c.wl != null ? c.wl.toFixed(2) + ' ม.' : '', go: c }),

@@ -204,7 +204,7 @@ h2 { font-size: 14px; font-weight: 600; margin: 18px 0 6px; color: var(--ink2); 
 @media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) { --flood3: #ff5a52; --flood2: #ff8a84; --flood1: #6b2d2a; --flood-bg: #2a1716; } }
 :root[data-theme="dark"] { --flood3: #ff5a52; --flood2: #ff8a84; --flood1: #6b2d2a; --flood-bg: #2a1716; }
 
-body.summary { overflow: auto; display: block; height: auto; }
+body.summary, body.home2 { overflow: auto; display: block; height: auto; }
 .sum { max-width: 1200px; margin: 0 auto; padding: 16px; display: flex; flex-direction: column; gap: 16px; }
 .card { background: var(--surface); border: 1px solid var(--line); border-radius: 14px; padding: 16px; min-width: 0; }
 .card-h { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; margin-bottom: 10px; flex-wrap: wrap; }
