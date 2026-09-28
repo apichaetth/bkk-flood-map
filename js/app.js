@@ -775,7 +775,7 @@
     if (n && n.km <= 0.5) return [3, `น้ำท่วมห่าง ${m(n.km)} · ${n.c.name}${cnt > 1 ? ` · ในรัศมี 1 กม. มี ${cnt} จุด` : ''}`];
     if (n && n.km <= 1) return [2, `มีรายงานน้ำท่วมห่าง ${m(n.km)} · ${n.c.name}`];
     if ((avoidPts || []).some(([la, lo, k]) => k === 1 && distKm(p.la, p.lo, la, lo) <= 0.3)) return [1, 'ถนนใกล้ ๆ อยู่ในระดับควรระวังมาก'];
-    if (n && n.km <= 3) return [1, `มีน้ำท่วมในรัศมี 3 กม. · ใกล้สุดห่าง ${m(n.km)} · ${n.c.name}`];
+    if (n && n.km <= 2) return [1, `มีน้ำท่วมในรัศมี 2 กม. · ใกล้สุดห่าง ${m(n.km)} · ${n.c.name}`];
     return [0, n ? `ปกติ · จุดน้ำท่วมใกล้สุดห่าง ${m(n.km)}` : 'ปกติ · ไม่มีรายงานน้ำท่วมใกล้ ๆ'];
   }
   function renderPlaces() {
@@ -800,7 +800,9 @@
     // หมุดบนแผนที่: ไอคอนตามประเภท ขอบสีตามสถานะ + วงรัศมี 1 กม.
     places.forEach((p, i) => {
       const [lv, text] = st[i];
-      L.circle([p.la, p.lo], { radius: 1000, color: LEVEL[lv].color, weight: 1, dashArray: '4 4', fill: false, interactive: false }).addTo(layers.places);
+      // วง 1 กม. และ 2 กม. รอบที่ของฉัน (สีตามสถานะ)
+      L.circle([p.la, p.lo], { radius: 1000, color: LEVEL[lv].color, weight: 1.5, dashArray: '4 4', fill: false, interactive: false }).addTo(layers.places);
+      L.circle([p.la, p.lo], { radius: 2000, color: LEVEL[lv].color, weight: 1, opacity: 0.7, dashArray: '2 6', fill: false, interactive: false }).addTo(layers.places);
       p.marker = L.marker([p.la, p.lo], { icon: L.divIcon({ className: '', iconSize: [30, 30], iconAnchor: [15, 15], html: `<div class="plm" style="--c:${LEVEL[lv].color}">${PL_ICON[p.kind] || '📍'}</div>` }), zIndexOffset: 2000 })
         .bindPopup(`<div class="pp"><div class="m">⭐ ที่ของฉัน</div><h3>${esc(p.name)}</h3>${badge(lv, lv ? undefined : 'ปกติ')}<div class="m" style="margin-top:4px">${esc(text)}</div>
           <div style="margin-top:6px"><a href="route.html?to=${p.la.toFixed(5)},${p.lo.toFixed(5)}&name=${encodeURIComponent(p.name)}">🚗 หาเส้นทางเลี่ยงน้ำไปที่นี่</a></div></div>`).addTo(layers.places);
