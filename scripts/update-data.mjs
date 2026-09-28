@@ -703,7 +703,10 @@ async function updateRisk(meta) {
   // ประวัติน้ำท่วมจากเซ็นเซอร์ถนน 1 ปี: จุดที่เซ็นเซอร์วัดน้ำท่วมบ่อย = ท่วมซ้ำบ่อย (H) เสริมประวัติ Traffy
   const evPts = await updateSensorEvents(state, twStations).catch((e) => { log('sensor events failed:', e.message); return []; });
   src.sensorEvents = evPts.length;
-  const segs = scoreRoads(roads, { reports, history: [...history, ...evPts], rain, wl, fc }, now.getTime());
+  // จุดที่ท่วมจริงแต่เราพลาด (7 วัน) ให้แบบจำลองเรียนรู้ (M)
+  const miss = (state.miss || []).filter((m) => m[4] != null).map(([t, , , , la, lo]) => ({ t, la, lo }));
+  src.learnMiss = miss.length;
+  const segs = scoreRoads(roads, { reports, history: [...history, ...evPts], rain, wl, fc, miss }, now.getTime());
   const counts = { 3: 0, 2: 0 };
   segs.forEach((s) => counts[s.tier]++);
   // เก็บผลรอบนี้ไว้วัดความแม่นภายหลัง + ตัวเทียบ "จุดท่วมบ่อย" จำนวนเท่ากับระดับควรระวังมาก
@@ -772,7 +775,7 @@ function updateTrends(state, roadNow, canalNow, rain, fc) {
   const road = new Map(), canal = new Map();
   for (const [c, a] of Object.entries(tr.road)) {
     const x = roadNow.get(c); if (!x) continue;
-    const k = classify(a, { fast: 5, up: 2, dp: 1 }, x.la, x.lo); if (!k) continue;
+    const k = classify(a, { fast: 6, up: 2, dp: 1 }, x.la, x.lo); if (!k) continue;
     // ถนนแห้งและยังแห้ง ไม่ต้องรายงาน
     if (x.v < 2 && Math.max(...a.map((p) => p[1])) < 2) continue;
     const o = { c, n: x.n, d: x.d, la: x.la, lo: x.lo, v: x.v, t: x.t, ...k, s: a.slice(-12) };

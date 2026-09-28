@@ -21,11 +21,12 @@
   }
   function whyOf(s) {
     if (s.why) return s.why;
-    const [src, dist, age, mm1, mm24, hc, pct, st, fc] = s.x, w = [];
+    const [src, dist, age, mm1, mm24, hc, pct, st, fc, mc] = s.x, w = [];
     if (src >= 0) w.push(`มีรายงานน้ำท่วม (${SRC[src]}) ห่าง ${dist} ม. เมื่อ ${age} นาทีที่แล้ว`);
     if (mm1 >= 0) w.push(`ฝนแถวนี้ประมาณ ${mm1} มม./ชม. · ${mm24} มม./24 ชม.`);
     if (fc >= 0) w.push(`กรมอุตุฯ คาดฝนอีกราว ${fc} มม. ใน 3 ชม. ข้างหน้า`);
     if (hc) w.push(`เคยมีคนแจ้งน้ำท่วมแถวนี้ ${hc} ครั้งในช่วงที่ผ่านมา`);
+    if (mc > 0) w.push(`ระบบเรียนรู้: แถวนี้ท่วมจริงแต่เตือนไม่ทัน ${mc} ครั้งใน 7 วัน จึงให้ไวต่อฝนขึ้น`);
     if (pct >= 0) w.push(`ระดับน้ำ${st >= 0 ? ' ' + s.stations[st] : ''} ${pct}% ของตลิ่ง`);
     return w;
   }

@@ -5,7 +5,8 @@
 //   R  ฝน: ฝนที่ตกแล้วจากสถานีรอบ ๆ (IDW) 1 ชม./24 ชม. รวมกับฝนพยากรณ์ 3 ชม. ข้างหน้า (กรมอุตุฯ)
 //   H  ความเสี่ยงเดิม: จำนวนเรื่องน้ำท่วมใน Traffy ย้อนหลังรอบช่วงถนนนั้น (ท่วมซ้ำบ่อย)
 //   W  น้ำในคลอง/แม่น้ำใกล้ล้นตลิ่ง
-//   score = 1 − (1 − E) × (1 − R·(0.3 + 0.7·H)) × (1 − 0.5·W)
+//   M  เรียนรู้จากจุดที่พลาด: ท่วมจริงแต่ไม่ได้ทายไว้ ≥3 ครั้งใน 7 วันในรัศมี 300 ม. → ไวต่อฝนขึ้น (R×(1+2M)) และนับเป็นจุดท่วมบ่อย
+//   score = 1 − (1 − E) × (1 − R'·(0.3 + 0.7·max(H, M))) × (1 − 0.5·W)   โดย R' = min(1, R·(1 + 2M))
 // เป็นการประมาณจากหลักฐานรอบข้าง ไม่ใช่แบบจำลองการไหลของน้ำ (ไม่มีข้อมูลท่อ/สถานีสูบ/ระดับถนนละเอียด)
 //
 // วัดความแม่น (evalUpdate): แต่ละรอบที่ครบ 3 ชม. ดูว่าช่วงถนนที่ทายไว้ มีรายงานน้ำท่วม "ใหม่" ภายใน 150 ม. หรือไม่
@@ -27,6 +28,7 @@ export const PARAMS = {
   wlRadiusM: 1000,
   // ควรระวังมาก / ควรระวัง (ระดับ 0.2–0.35 เดิมทายถูกแค่ ~6% จึงเลิกแสดง; ขยับจาก 0.6/0.35 เป็น 0.7/0.45 หลังเพิ่มซอย+คลองแล้วติดธง ~16% ของถนน)
   tiers: [[0.7, 3], [0.45, 2]],
+  learnMinMiss: 3, learnRadiusM: 300, learnDays: 7,
   evalHorizonH: 3, evalHitM: 150, aheadLookH: 6, rawKeepH: 8, evalKeepDays: 30, roadNearM: 50,
 };
 export const ROADS_VER = 2; // เปลี่ยนเมื่อเปลี่ยนชุดถนนที่ดึง (v2 = เพิ่มซอยที่มีชื่อ)
@@ -196,6 +198,8 @@ export function scoreRoads(roads, input, now = Date.now()) {
   const repIdx = gridIndex(reports);
   const hist = input.history.filter((h) => now - h.t > P.histExcludeH * 36e5);
   const histIdx = gridIndex(hist);
+  // จุดที่พลาดซ้ำ (มีพิกัด) จากการวัดความแม่นรอบก่อน ๆ
+  const missIdx = gridIndex((input.miss || []).filter((m) => now - m.t <= P.learnDays * 864e5));
   const rain = input.rain, fc = input.fc || [];
   const wl = input.wl.filter((s) => s.pct != null);
   const out = [], hot = [];
@@ -231,6 +235,10 @@ export function scoreRoads(roads, input, now = Date.now()) {
     for (const h of near(histIdx, s.la, s.lo, P.histRadiusM)) if (distM(s.la, s.lo, h.la, h.lo) <= P.histRadiusM) hc++;
     const H = Math.min(1, Math.log1p(hc) / Math.log1p(P.histSaturate));
     if (hc) hot.push([hc, s.id]);
+    // M: เรียนรู้จากจุดที่ท่วมจริงแต่เราพลาดซ้ำ ๆ
+    let mc = 0;
+    for (const m of near(missIdx, s.la, s.lo, P.learnRadiusM)) if (distM(s.la, s.lo, m.la, m.lo) <= P.learnRadiusM) mc++;
+    const M = mc >= P.learnMinMiss ? Math.min(1, 0.6 + 0.1 * (mc - P.learnMinMiss)) : 0;
     // W: คลองใกล้ล้นตลิ่ง
     let W = 0, wlSt = null;
     for (const st of wl) {
@@ -239,7 +247,7 @@ export function scoreRoads(roads, input, now = Date.now()) {
       const v = st.W ?? Math.max(0, Math.min(1, (st.pct - 80) / 20));
       if (v > W) { W = v; wlSt = st; }
     }
-    const partR = R * (0.3 + 0.7 * H), partW = 0.5 * W;
+    const partR = Math.min(1, R * (1 + 2 * M)) * (0.3 + 0.7 * Math.max(H, M)), partW = 0.5 * W;
     const score = 1 - (1 - E) * (1 - partR) * (1 - partW);
     const tier = (P.tiers.find(([th]) => score >= th) || [0, 0])[1];
     if (!tier) continue;
@@ -251,14 +259,15 @@ export function scoreRoads(roads, input, now = Date.now()) {
     if (mm1 >= 5 || mm24 >= 20) why.push(`ฝนแถวนี้ประมาณ ${mm1.toFixed(0)} มม./ชม. · ${mm24.toFixed(0)} มม./24 ชม.`);
     if (mmF >= 3) why.push(`กรมอุตุฯ คาดฝนอีกราว ${mmF.toFixed(0)} มม. ใน ${P.fcHours} ชม. ข้างหน้า`);
     if (hc) why.push(`เคยมีคนแจ้งน้ำท่วมแถวนี้ ${hc} ครั้งในช่วงที่ผ่านมา`);
+    if (M) why.push(`ระบบเรียนรู้: แถวนี้ท่วมจริงแต่เตือนไม่ทัน ${mc} ครั้งใน ${P.learnDays} วัน จึงให้ไวต่อฝนขึ้น`);
     if (wlSt) why.push(`ระดับน้ำ${wlSt.name ? ' ' + wlSt.name : ''} ${wlSt.pct.toFixed(0)}% ของตลิ่ง`);
     // x = เหตุผลแบบตัวเลข (หน้าเว็บสร้างข้อความเอง ไฟล์จะเล็กกว่าเก็บข้อความ)
     // [แหล่งรายงาน, ระยะ, อายุ(นาที), ฝน1ชม., ฝน24ชม., ท่วมบ่อย, %ตลิ่ง, สถานี, ฝนพยากรณ์]
     const x = [bestE && E >= 0.1 ? ['itic', 'traffy', 'web', 'news', 'bma'].indexOf(bestE.src) : -1, bestE ? bestE.d : 0, bestE ? bestE.ageMin : 0,
       mm1 >= 5 || mm24 >= 20 ? Math.round(mm1) : -1, Math.round(mm24), hc, wlSt ? Math.round(wlSt.pct) : -1, wlSt ? wlSt.name || '' : '',
-      mmF >= 3 ? Math.round(mmF) : -1];
+      mmF >= 3 ? Math.round(mmF) : -1, M ? mc : -1];
     out.push({ id: s.id, name: s.name, cls: s.cls, district: s.district, c: s.c, la: s.la, lo: s.lo, score: +score.toFixed(3), tier, drv,
-      f: { E: +E.toFixed(2), R: +R.toFixed(2), H: +H.toFixed(2), W: +W.toFixed(2) }, why, x });
+      f: { E: +E.toFixed(2), R: +R.toFixed(2), H: +H.toFixed(2), W: +W.toFixed(2), M: +M.toFixed(2) }, why, x });
   }
   out.sort((a, b) => b.score - a.score);
   out.hot = hot.sort((a, b) => b[0] - a[0]).slice(0, 3000).map(([, id]) => id);
@@ -273,7 +282,7 @@ export function packSegments(segs) {
   const s = segs.map((g) => {
     const flat = []; let pa = 0, po = 0;
     for (const [a, o] of g.c) { const A = Math.round(a * 1e5), O = Math.round(o * 1e5); flat.push(A - pa, O - po); pa = A; po = O; }
-    const x = g.x.slice(0, 7); x.push(g.x[7] ? idx(stns, si, g.x[7]) : -1, g.x[8] ?? -1);
+    const x = g.x.slice(0, 7); x.push(g.x[7] ? idx(stns, si, g.x[7]) : -1, g.x[8] ?? -1, g.x[9] ?? -1);
     return [g.tier, Math.round(g.score * 100), idx(names, ni, g.name || ''), idx(dists, di, g.district || ''), flat, x];
   });
   return { v: 2, names, districts: dists, stations: stns, s };
@@ -338,7 +347,8 @@ export function evalUpdate(state, roads, reports, now = Date.now()) {
     // เก็บจุดที่พลาด (ท่วมจริงแต่ไม่ได้ทายไว้) ไว้ดูว่าพลาดที่ไหนบ่อย
     if (!caught) {
       const s = nearestSeg(segIdx, r.la, r.lo, 400);
-      (state.miss ||= []).push([r.t, (s && s.name) || '', (s && s.district) || '', kind]);
+      // [เวลา, ถนน, เขต, ประเภท, lat, lng] — พิกัดใช้เรียนรู้จุดที่พลาดซ้ำ (M)
+      (state.miss ||= []).push([r.t, (s && s.name) || '', (s && s.district) || '', kind, +r.la.toFixed(5), +r.lo.toFixed(5)]);
     }
   }
   // เก็บกวาด
