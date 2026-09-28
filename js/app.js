@@ -15,7 +15,9 @@
   // ---------- แผนที่ ----------
   const isMobile = matchMedia('(max-width: 860px)').matches;
   const dark = matchMedia('(prefers-color-scheme: dark)').matches && document.documentElement.dataset.theme !== 'light';
-  const map = L.map('map', { zoomControl: !isMobile, minZoom: 9, maxZoom: 18, preferCanvas: false }).setView(isMobile ? [13.66, 100.58] : [13.76, 100.55], isMobile ? 10 : 11);
+  // จอสัมผัส: จุดเล็ก ๆ กดยาก — วาดด้วย canvas ที่มีระยะกดรอบจุด (tolerance) และหมุด HTML มีพื้นที่กดอย่างน้อย 34 px
+  const touch = matchMedia('(pointer: coarse)').matches;
+  const map = L.map('map', { zoomControl: !isMobile, minZoom: 9, maxZoom: 18, preferCanvas: true, renderer: L.canvas({ padding: 0.3, tolerance: touch ? 14 : 6 }) }).setView(isMobile ? [13.66, 100.58] : [13.76, 100.55], isMobile ? 10 : 11);
   // แผนที่ฐาน OpenStreetMap (ฟรี ไม่ต้องใช้ key) โหมดมืดใช้ CSS filter ใน style.css
   L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png', {
     maxZoom: 19, className: 'basemap',
@@ -32,8 +34,6 @@
     L.circle([la, lo], { radius: 250, color: cssVar('--critical'), weight: 2, dashArray: '6 5', fill: false, interactive: false }).addTo(map);
   })();
 
-  // canvas สำหรับจุดจำนวนมาก (tolerance = พื้นที่กดรอบจุดเล็ก ๆ บนจอสัมผัส)
-  const fastR = L.canvas({ padding: 0.3, tolerance: isMobile ? 10 : 4 });
   const LEVEL_VAR = { 0: '--good', 1: '--warning', 2: '--serious', 3: '--critical' };
   const layers = {
     districts: L.layerGroup().addTo(map),
@@ -69,7 +69,7 @@
   const icon = (cls, color, text = '', size = 18, extra = '', tr = '') => {
     size = Math.max(5, Math.round(size * Flood.MS));
     if (size < 14) text = ''; // เล็กเกินอ่านตัวเลข ดูได้ในป๊อปอัป
-    const hit = Math.max(size, 22);
+    const hit = Math.max(size, touch ? 34 : 24);
     return L.divIcon({
       className: '', iconSize: [hit, hit], iconAnchor: [hit / 2, hit / 2], popupAnchor: [0, -size / 2],
       html: `<div class="mkhit" style="width:${hit}px;height:${hit}px"><div class="mk ${cls} ${extra}" style="--c:${color};width:${size}px;height:${size}px">${text}</div>${tr ? `<span class="mk-tr${tr.length > 1 ? ' two' : ''}">${tr}</span>` : ''}</div>`,
@@ -237,7 +237,7 @@
         ${r.photo_url ? `<img loading="lazy" src="${esc(r.photo_url)}" alt="ภาพจากผู้แจ้ง" referrerpolicy="no-referrer">` : ''}
         <div class="m" style="margin-top:6px">${esc(r.address || '')}<br>แจ้งเมื่อ ${fmtDT(x.t)} (${ago(x.t)}) · สถานะ: ${esc(r.state || '')}<br>
         <a href="https://share.traffy.in.th/teamchadchart/${encodeURIComponent(r.ticket_id)}" target="_blank" rel="noopener">ดูเรื่อง ${esc(r.ticket_id)}</a></div></div>`;
-      x.marker = L.circleMarker([x.la, x.lo], { renderer: fastR, keepSize: true, radius: isMobile ? 4 : 5, color: col[x.lv], weight: 2, fillColor: '#fff', fillOpacity: 1 })
+      x.marker = L.circleMarker([x.la, x.lo], { keepSize: true, radius: isMobile ? 4 : 5, color: col[x.lv], weight: 2, fillColor: '#fff', fillOpacity: 1 })
         .bindPopup(html, { maxWidth: 300 }).addTo(layers.traffy);
     }
     $('kTraffy').textContent = S.traffy.length;

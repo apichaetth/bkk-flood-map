@@ -17,7 +17,8 @@
   const mapLink = (c) => `map.html?lat=${c.la.toFixed(5)}&lng=${c.lo.toFixed(5)}&z=16`;
 
   // ---------- แผนที่ ----------
-  const map = L.map('smap', { scrollWheelZoom: false, minZoom: 9, maxZoom: 17 }).setView([13.75, 100.6], 10);
+  // จอสัมผัส: เพิ่มระยะกดรอบจุดเล็ก ๆ (canvas tolerance)
+  const map = L.map('smap', { scrollWheelZoom: false, minZoom: 9, maxZoom: 17, preferCanvas: true, renderer: L.canvas({ padding: 0.3, tolerance: matchMedia('(pointer: coarse)').matches ? 14 : 6 }) }).setView([13.75, 100.6], 10);
   L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png', {
     maxZoom: 19, className: 'basemap', attribution: '© <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors',
   }).addTo(map);
