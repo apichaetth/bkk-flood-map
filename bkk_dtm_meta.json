@@ -1,0 +1,11 @@
+{
+ "rows": 1764,
+ "cols": 2268,
+ "lat0": 13.97,
+ "lon0": 100.32,
+ "dlat": -0.0002777777777777778,
+ "dlon": 0.0002777777777777778,
+ "nodata": -32768,
+ "unit": "cm",
+ "source": "DeltaDTM v1.1 (Pronk et al. 2024), CC BY 4.0, https://doi.org/10.4121/1da2e70f-6c4d-4b03-86bd-b53e789cc629"
+}
