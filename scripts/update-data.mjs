@@ -275,6 +275,7 @@ async function roadLengths() {
   return (roadLenCache = m);
 }
 function placePrecision(name, lens) {
+  if (/^(เขต|แขวง|อำเภอ|จังหวัด)/.test(name)) return 'area'; // ระดับพื้นที่ (ตรวจก่อน เช่น "เขตลาดกระบัง" มีคำว่า "ตลาด" ซ้อนอยู่)
   if (SPECIFIC_RE.test(name)) return 'place';
   const n = normRoad(name);
   // "ถนนสุขุมวิท ซอย 71" = "ซอยสุขุมวิท 71" ในแผนที่
