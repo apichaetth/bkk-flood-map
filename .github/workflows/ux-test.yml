@@ -1,0 +1,33 @@
+name: ux-test
+# ทดสอบแบบผู้ใช้จริงบนเว็บจริง แล้วเก็บรายงาน + ภาพหน้าจอไว้ที่ branch ux-report
+on:
+  push:
+    branches: [main]
+    paths: ['scripts/ux-test.mjs', '.github/workflows/ux-test.yml']
+  workflow_dispatch:
+permissions:
+  contents: write
+concurrency:
+  group: ux-test
+  cancel-in-progress: true
+jobs:
+  ux:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - run: npm install --no-save playwright-core@1.49.1
+      - run: node scripts/ux-test.mjs
+      - name: Publish report to ux-report branch
+        if: always()
+        run: |
+          cd ux-out
+          git init -q -b ux-report
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add -A
+          git commit -qm "UX test $(date -u +%FT%TZ)"
+          git push -qf "https://x-access-token:${{ github.token }}@github.com/${{ github.repository }}" ux-report
