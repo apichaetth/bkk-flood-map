@@ -1,0 +1,31 @@
+name: windows-relay-test
+# ทดสอบตัวส่งข้อมูลสำหรับ Windows (start-bma.bat + bma-run.ps1) บนเครื่อง Windows จริง
+# เครื่อง GitHub ไม่ได้อยู่ในไทย จึงคาดว่าขั้นดึงข้อมูล กทม. จะไม่สำเร็จ แต่ขั้นอื่นต้องผ่านหมด
+on:
+  push:
+    branches: [main]
+    paths: ['bma-fetcher/windows/**', '.github/workflows/windows-relay-test.yml']
+jobs:
+  test:
+    runs-on: windows-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - name: Parse PowerShell
+        shell: powershell
+        run: |
+          $e = $null; [System.Management.Automation.Language.Parser]::ParseFile("$PWD\bma-fetcher\windows\bma-run.ps1", [ref]$null, [ref]$e) | Out-Null
+          if ($e) { $e | ForEach-Object { $_.ToString() }; exit 1 } else { 'parse ok' }
+      - name: Seed a dummy token (DPAPI) so the runner skips the prompt
+        shell: powershell
+        run: |
+          $d = Join-Path $env:LOCALAPPDATA 'bkk-flood-bma'; New-Item -ItemType Directory -Force $d | Out-Null
+          ConvertTo-SecureString 'dummy-token-for-ci-000' -AsPlainText -Force | ConvertFrom-SecureString | Set-Content (Join-Path $d 'token.dat')
+      - name: Double-click equivalent (one round)
+        shell: cmd
+        env:
+          BMA_ONCE: '1'
+        run: echo.| bma-fetcher\windows\start-bma.bat
+      - name: Check files
+        shell: powershell
+        run: Get-ChildItem (Join-Path $env:LOCALAPPDATA 'bkk-flood-bma') | Format-Table Name, Length
