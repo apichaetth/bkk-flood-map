@@ -39,17 +39,8 @@ const toMs = (s) => { if (!s) return null; const x = String(s).replace(' ', 'T')
 const num = (v) => (v == null || v === '' || isNaN(+v) ? null : +v);
 
 // เซิร์ฟเวอร์ กทม. ตอบ 503 "Under pressure" บ่อยช่วงมีคนใช้มาก: รอแล้วลองใหม่อีก 2 ครั้ง
-async function bmaGet(url, opts = {}) {
-  for (let i = 0; ; i++) {
-    try { return await get(url, opts, 45000); }
-    catch (e) {
-      const busy = !e.status || e.status >= 500;
-      if (!busy || i >= 2) throw e;
-      log(`เซิร์ฟเวอร์ กทม. ไม่ว่าง (${e.status || e.message}) รอ ${20 * (i + 1)} วินาทีแล้วลองใหม่…`);
-      await new Promise((r) => setTimeout(r, 20000 * (i + 1)));
-    }
-  }
-}
+// ดึงครั้งเดียวต่อรอบ ถ้าไม่สำเร็จ ตัววนหลักจะรอ 1 นาทีแล้วลองทั้งรอบใหม่ (สูงสุด 2 ครั้ง)
+const bmaGet = (url, opts = {}) => get(url, opts, 45000);
 let profiles = null, profilesAt = 0;
 // 1) เซ็นเซอร์น้ำท่วมถนน (ระบบใหม่ floodbangkok): ตำแหน่ง + การแจ้งเตือนล่าสุดใน 3 ชม.
 async function collectSensors() {
@@ -161,8 +152,19 @@ async function once() {
 
 if (LOOP) {
   log(`เริ่มวนทุก ${LOOP} นาที (กด Ctrl+C เพื่อหยุด)`);
-  // รอบที่ไม่สำเร็จ ลองใหม่ใน 3 นาที ไม่ต้องรอครบรอบ
-  for (;;) { const ok = await once(); await new Promise((r) => setTimeout(r, (ok ? LOOP : 3) * 6e4)); }
+  // รอบที่ไม่สำเร็จ: รอ 1 นาทีแล้วลองอีก 2 ครั้ง ถ้ายังไม่ได้ ไปรอรอบถัดไปตามปกติ
+  const RETRIES = 2, RETRY_MS = (+process.env.BMA_RETRY_SEC || 60) * 1000;
+  const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
+  for (;;) {
+    let ok = await once();
+    for (let i = 1; !ok && i <= RETRIES; i++) {
+      log(`ลองใหม่ใน ${RETRY_MS / 1000} วินาที (ครั้งที่ ${i}/${RETRIES})`);
+      await sleep(RETRY_MS);
+      ok = await once();
+    }
+    if (!ok) log(`ยังไม่สำเร็จ ข้ามไปรอบถัดไปใน ${LOOP} นาที`);
+    await sleep(LOOP * 6e4);
+  }
 } else {
   process.exitCode = (await once()) ? 0 : 1;
 }
