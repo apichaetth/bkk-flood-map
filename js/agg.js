@@ -27,7 +27,7 @@ window.FloodAgg = (function () {
     }
     for (const x of D.traffy || []) {
       out.push({ la: x.la, lo: x.lo, src: 'traffy', tier: 2, name: String(x.r.address || 'จุดที่ประชาชนแจ้ง').split(/\s+(?:แขวง|เขต)/)[0], detail: x.why, cm: x.cm || 0, t: x.t,
-        link: `https://share.traffy.in.th/teamchadchart/${encodeURIComponent(x.r.ticket_id)}` });
+        link: `traffy.html?t=${encodeURIComponent(x.r.ticket_id)}` });
     }
     for (const x of D.web || []) {
       out.push({ la: x.la, lo: x.lo, src: 'web', tier: 2, name: x.r.place || 'จุดที่ประชาชนปักหมุด', detail: `น้ำระดับ${x.r.level}${x.r.message ? ' · ' + x.r.message : ''}`, cm: 0, t: x.t,

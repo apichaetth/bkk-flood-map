@@ -86,7 +86,7 @@
       <div style="margin-top:6px">${esc((r.description || '').slice(0, 300))}</div>
       ${r.photo_url ? `<img loading="lazy" src="${esc(r.photo_url)}" alt="ภาพจากผู้แจ้ง" referrerpolicy="no-referrer">` : ''}
       <div class="m" style="margin-top:6px">${esc(r.address || '')}<br>แจ้งเมื่อ ${fmtDT(x.t)} (${ago(x.t)})<br>
-      <a href="https://share.traffy.in.th/teamchadchart/${encodeURIComponent(r.ticket_id)}" target="_blank" rel="noopener">เปิดใน Traffy (${esc(r.ticket_id)})</a></div></div>`;
+      เลขเรื่อง ${esc(r.ticket_id)}</div></div>`;
   }
   function drawMap(list, hots) {
     hotLayer.clearLayers(); ptLayer.clearLayers();
@@ -147,19 +147,20 @@
   }
 
   // ---------- รายการ ----------
-  function drawList(list) {
-    $('listCount').textContent = `${list.length} เรื่อง`;
-    $('list').innerHTML = list.length ? list.slice(0, shown).map((x) => {
-      const r = x.r;
-      return `<article class="tf-item ${x.g}">
+  function cardOf(x) {
+    const r = x.r;
+    return `<article class="tf-item ${x.g}">
         ${r.photo_url ? `<img loading="lazy" src="${esc(r.photo_url)}" alt="" referrerpolicy="no-referrer">` : '<div class="noimg">ไม่มีรูป</div>'}
         <div class="tf-body">
           <div class="t-row">${F.badge(x.lv)}<span class="st st-${x.g}">${esc(r.state || '')}</span><span class="muted small">${fmtDT(x.t)} · ${ago(x.t)}</span></div>
           <p>${esc((r.description || '').slice(0, 220))}</p>
-          <p class="muted small">${esc(r.address || '')}${x.district ? ` · เขต${esc(x.district)}` : ''}</p>
-          <div class="small"><a href="#" data-go="${x.la},${x.lo}">ดูบนแผนที่</a> · <a href="https://share.traffy.in.th/teamchadchart/${encodeURIComponent(r.ticket_id)}" target="_blank" rel="noopener">เปิดใน Traffy</a></div>
+          <p class="muted small">${esc(r.address || '')}${x.district ? ` · เขต${esc(x.district)}` : ''} · เลขเรื่อง ${esc(r.ticket_id)}</p>
+          <div class="small"><a href="#" data-go="${x.la},${x.lo}">ดูบนแผนที่</a></div>
         </div></article>`;
-    }).join('') : `<p class="muted">ไม่มีเรื่องแจ้งน้ำท่วมในช่วงเวลาและสถานะที่เลือก${all.length ? ` (ทั้งหมดที่ดึงได้มี ${all.length} เรื่อง ลองเลือกช่วงเวลาให้ยาวขึ้น)` : rawCount ? ` (ยังไม่มีเรื่องน้ำท่วมในข้อมูลที่ดึงได้)` : ''}</p>`;
+  }
+  function drawList(list) {
+    $('listCount').textContent = `${list.length} เรื่อง`;
+    $('list').innerHTML = list.length ? list.slice(0, shown).map((x) => cardOf(x)).join('') : `<p class="muted">ไม่มีเรื่องแจ้งน้ำท่วมในช่วงเวลาและสถานะที่เลือก${all.length ? ` (ทั้งหมดที่ดึงได้มี ${all.length} เรื่อง ลองเลือกช่วงเวลาให้ยาวขึ้น)` : rawCount ? ` (ยังไม่มีเรื่องน้ำท่วมในข้อมูลที่ดึงได้)` : ''}</p>`;
     $('more').hidden = list.length <= shown;
     $('list').querySelectorAll('[data-go]').forEach((a) => a.onclick = (e) => {
       e.preventDefault();
@@ -199,6 +200,41 @@
   }
   $('more').onclick = () => { shown += PAGE; drawList(filtered()); };
 
+  // ---------- เปิดจากลิงก์ traffy.html?t=<เลขเรื่อง> (จากแผนที่/หน้าแรก): แสดงเรื่องนั้นด้านบน + ปักบนแผนที่ ----------
+  const FOCUS = new URLSearchParams(location.search).get('t');
+  let focusDone = false, focusMk = null;
+  function focusTicket(final) {
+    if (!FOCUS || focusDone) return;
+    const find = (arr) => (arr || []).find((x) => String(x.r.ticket_id) === FOCUS);
+    let x = find(all) || find(arch);
+    const box = $('tfFocus');
+    if (!x) {
+      if (!final) return; // รอข้อมูลชุดใหม่/ย้อนหลังก่อน
+      if (!arch) { loadArchive().then(() => focusTicket(true)); return; }
+      focusDone = true; box.hidden = false;
+      box.innerHTML = `<p class="muted">ไม่พบเรื่องเลขที่ ${esc(FOCUS)} (อาจเก่ากว่า 30 วัน หรือไม่ใช่เรื่องน้ำท่วม)</p>`;
+      return;
+    }
+    focusDone = true;
+    // ให้ตัวกรองครอบคลุมเรื่องนี้ (สถานะทั้งหมด + ช่วงเวลาที่ยาวพอ)
+    const ageH = (Date.now() - x.t) / 36e5;
+    let saved = null; try { saved = localStorage.getItem('bkkflood.traffyFilter'); } catch (e) { /* ไม่เป็นไร */ }
+    fState = 'all'; fTime = (TIMES.find(([h]) => h >= ageH) || TIMES[TIMES.length - 1])[0];
+    render();
+    try { if (saved) localStorage.setItem('bkkflood.traffyFilter', saved); } catch (e) { /* ไม่เป็นไร */ } // ไม่ทับตัวกรองที่ผู้ใช้เลือกไว้
+    x = find(all) || find(arch) || x;
+    box.hidden = false;
+    box.innerHTML = `<div class="card-h"><h2>เรื่องที่คุณเลือก</h2><a class="small" href="traffy.html">ดูทั้งหมด</a></div>${cardOf(x)}`;
+    box.querySelector('[data-go]').onclick = (e) => { e.preventDefault(); map.setView([x.la, x.lo], 17); focusMk && focusMk.openPopup(); $('tmap').scrollIntoView({ behavior: 'smooth', block: 'center' }); };
+    userMoved = true;
+    if (focusMk) focusMk.remove();
+    focusMk = L.marker([x.la, x.lo], { zIndexOffset: 2000, icon: L.divIcon({ className: '', iconSize: [30, 40], iconAnchor: [15, 38], popupAnchor: [0, -34],
+      html: '<svg width="30" height="40" viewBox="0 0 30 40" style="filter:drop-shadow(0 2px 3px rgba(0,0,0,.4))"><path d="M15 39s13-13.5 13-24A13 13 0 0 0 2 15c0 10.5 13 24 13 24z" fill="#c62828" stroke="#fff" stroke-width="2"/><circle cx="15" cy="15" r="5" fill="#fff"/></svg>' }) }).bindPopup(popupOf(x), { maxWidth: 300 }).addTo(map);
+    map.setView([x.la, x.lo], 16);
+    focusMk.openPopup();
+    box.scrollIntoView({ block: 'start' });
+  }
+
   // โหลดจากไฟล์ที่ระบบดึงไว้ (เร็ว) ถ้าไม่มีค่อยดึงตรงจาก Traffy
   // เก็บผลล่าสุดไว้ในเบราว์เซอร์ ครั้งหน้าเปิดแล้วแสดงได้ทันที (เก็บเฉพาะเรื่องน้ำท่วม + ฟิลด์ที่ใช้ เพื่อไม่ให้ใหญ่)
   const CACHE = 'bkkflood.traffyCache';
@@ -237,7 +273,7 @@
       ({ items: all, raw: rawCount, oldest } = first);
       cachedAt = null;
       clearInterval(tick); // ได้ข้อมูลแล้ว หยุดตัวนับเวลารอ
-      render(); saveCache();
+      render(); saveCache(); focusTicket(true);
       if (my === loading) $('updated').textContent = `อัปเดต ${fmtDT(new Date())} · ${status()} · รีเฟรชทุก 15 นาที`;
     } catch (e) {
       if (my !== loading) return;
@@ -252,6 +288,7 @@
   const c = loadCache();
   if (c) { ({ items: all, raw: rawCount, oldest } = c); cachedAt = c.saved; }
   render(); // แสดงตัวกรองและโครงหน้าทันที ระหว่างรอข้อมูล
+  if (c) focusTicket(false);
   if (c) $('updated').textContent = `แสดงข้อมูลที่บันทึกไว้เมื่อ ${fmtDT(cachedAt)} (${ago(cachedAt)}) · กำลังโหลดข้อมูลใหม่…`;
   load();
 })();

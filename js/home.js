@@ -34,7 +34,7 @@
   // แถวรายงานรายเรื่อง: บอกแหล่ง เวลาแจ้งจริง ระยะ และลิงก์ไปดูเรื่องนั้นที่ต้นทาง (เช่น Traffy)
   function repRow(p, from) {
     const km = from ? `ห่าง ${m(distKm(from[0], from[1], p.la, p.lo))} · ` : '';
-    const open = p.link ? `<a class="h2src" href="${esc(p.link)}" target="_blank" rel="noopener">ดูเรื่องนี้ที่ ${esc(SRC[p.src] || p.src)} ↗</a>` : '';
+    const open = p.link ? (/^https?:/.test(p.link) ? `<a class="h2src" href="${esc(p.link)}" target="_blank" rel="noopener">ดูเรื่องนี้ที่ ${esc(SRC[p.src] || p.src)} ↗</a>` : `<a class="h2src" href="${esc(p.link)}">ดูเรื่องนี้ ›</a>`) : '';
     return `<div class="h2row${p.fresh ? '' : ' old'}"><span class="h2d" style="--c:${p.fresh ? LEVEL[p.tier >= 3 ? 3 : 2].color : '#9aa4b1'}">${p.cm ? p.cm + '<small>ซม.</small>' : '•'}</span>`
       + `<span class="h2t"><b>${esc(p.name || 'ไม่ระบุชื่อ')}</b><small>${km}${esc(SRC[p.src] || p.src)} · แจ้ง ${p.t ? ago(new Date(p.t)) : '–'}${p.det ? ' · ' + esc(p.det) : ''}</small>${open}</span></div>`;
   }
@@ -72,7 +72,7 @@
   }
   function popup(p) {
     return `<div class="pp"><h3>${esc(p.name)}</h3>${p.d ? `<div class="m">เขต${esc(p.d)}</div>` : ''}<div><b>${esc(depth(p))}</b> · ${p.t ? `${fmtDT(new Date(p.t))} (${ago(new Date(p.t))})` : ''}${p.fresh ? '' : ' <span class="m">อาจลดแล้ว</span>'}</div>`
-      + `<div class="m" style="margin-top:4px">${(p.det || []).map(([s, txt, t, link]) => `${esc(SRC[s] || s)}${t ? ` (${ago(new Date(t))})` : ''}: ${esc(txt)}${link ? ` <a href="${esc(link)}" target="_blank" rel="noopener">ดู ↗</a>` : ''}`).join('<br>')}</div>`
+      + `<div class="m" style="margin-top:4px">${(p.det || []).map(([s, txt, t, link]) => `${esc(SRC[s] || s)}${t ? ` (${ago(new Date(t))})` : ''}: ${esc(txt)}${link ? (/^https?:/.test(link) ? ` <a href="${esc(link)}" target="_blank" rel="noopener">ดู ↗</a>` : ` <a href="${esc(link)}">ดู ›</a>`) : ''}`).join('<br>')}</div>`
       + `<div style="margin-top:6px"><a href="map.html?lat=${p.la}&lng=${p.lo}&z=16">ดูบนแผนที่ละเอียด →</a></div></div>`;
   }
   function drawMap() {

@@ -41,3 +41,5 @@
   .tf-item { grid-template-columns: 72px 1fr; }
   .tf-item img, .tf-item .noimg { width: 72px; height: 72px; }
 }
+.tf-focus { border: 2px solid var(--accent); }
+.tf-focus .card-h { margin-bottom: 8px; }

@@ -271,7 +271,7 @@
         <div style="margin-top:6px">${esc((r.description || '').slice(0, 320))}</div>
         ${r.photo_url ? `<img loading="lazy" src="${esc(r.photo_url)}" alt="ภาพจากผู้แจ้ง" referrerpolicy="no-referrer">` : ''}
         <div class="m" style="margin-top:6px">${esc(r.address || '')}<br>แจ้งเมื่อ ${fmtDT(x.t)} (${ago(x.t)}) · สถานะ: ${esc(r.state || '')}<br>
-        <a href="https://share.traffy.in.th/teamchadchart/${encodeURIComponent(r.ticket_id)}" target="_blank" rel="noopener">ดูเรื่อง ${esc(r.ticket_id)}</a></div></div>`;
+        <a href="traffy.html?t=${encodeURIComponent(r.ticket_id)}">ดูเรื่องนี้ในหน้าประชาชนแจ้ง ›</a></div></div>`;
       x.marker = L.circleMarker([x.la, x.lo], { keepSize: true, radius: isMobile ? 4 : 5, color: col[x.lv], weight: 2, fillColor: '#fff', fillOpacity: 1 })
         .bindPopup(html, { maxWidth: 300 }).addTo(layers.traffy);
     }
