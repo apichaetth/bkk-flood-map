@@ -663,3 +663,10 @@ label.lg-toggle, .rk-filter label, .rt-opts label { display: inline-flex; align-
 /* หลอดระดับน้ำที่ปกติ (น้ำเงิน) ซูมไกลให้จางและเล็กลง เด่นเฉพาะที่เตือนภัย/วิกฤต */
 .zlow .mkhit.gn .gauge { opacity: .6; transform: scale(.8); }
 .zlow .mkhit.gn .mk-tr { display: none; }
+/* แผนที่ละเอียด: โหมดแสดงเฉพาะ */
+.kpi.on { border-color: var(--accent); box-shadow: inset 0 0 0 2px var(--accent); }
+.fchip { position: absolute; top: 10px; left: 50%; transform: translateX(-50%); z-index: 1000; display: flex; align-items: center; gap: 8px; max-width: calc(100% - 120px);
+  background: var(--surface); color: var(--ink); border: 1px solid var(--accent); border-radius: 999px; padding: 4px 4px 4px 12px; box-shadow: 0 2px 8px rgba(0,0,0,.25); font-size: 13px; }
+.fchip[hidden] { display: none; }
+.fchip span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; min-width: 0; }
+.fchip button { flex: none; border: 0; border-radius: 999px; background: var(--accent); color: #fff; font: inherit; font-weight: 600; padding: 5px 10px; min-height: 30px; cursor: pointer; }

@@ -53,6 +53,7 @@
     elev: L.layerGroup(), // ความสูงพื้นดิน DeltaDTM (ปิดไว้ก่อน เปิดจากปุ่มชั้นแผนที่)
   };
   // เปิดครั้งแรก: เซ็นเซอร์น้ำท่วมถนน + ระดับน้ำคลอง/แม่น้ำ + ฝน ชั้นอื่นเปิดเองจากปุ่มชั้นแผนที่ แล้วจำค่าที่เลือกไว้ในเครื่อง
+  let lyrQuiet = false; // ระหว่างโหมด "แสดงเฉพาะ" ไม่บันทึกการเปิด/ปิดชั้นเป็นค่าของผู้ใช้
   const LYR_KEY = 'bkkflood.layers2', LYR_ON = ['sensor', 'wl', 'canal', 'rain'];
   {
     const saved = Flood.store.get(LYR_KEY) || {};
@@ -60,7 +61,7 @@
       const want = k in saved ? saved[k] : LYR_ON.includes(k);
       if (want && !map.hasLayer(l)) map.addLayer(l); else if (!want && map.hasLayer(l)) map.removeLayer(l);
     }
-    const save = (e, on) => { const k = Object.keys(layers).find((x) => layers[x] === e.layer); if (!k) return; const v = Flood.store.get(LYR_KEY) || {}; v[k] = on; Flood.store.set(LYR_KEY, v); };
+    const save = (e, on) => { if (lyrQuiet) return; const k = Object.keys(layers).find((x) => layers[x] === e.layer); if (!k) return; const v = Flood.store.get(LYR_KEY) || {}; v[k] = on; Flood.store.set(LYR_KEY, v); };
     map.on('overlayadd', (e) => save(e, true)); map.on('overlayremove', (e) => save(e, false));
   }
   L.control.layers(null, {
@@ -242,7 +243,7 @@
   }
   // แสดง Traffy เฉพาะที่แจ้งใน N ชม. ล่าสุด (ค่าเริ่มต้น 6 ชม. เลือก 3/6/24 ได้ จำไว้ในเครื่อง) ไม่ให้แผนที่แน่นเกินไป
   let trH = [3, 6, 24].includes(Flood.store.get('bkkflood.traffyH')) ? Flood.store.get('bkkflood.traffyH') : 6;
-  const trCtl = L.control({ position: 'bottomleft' });
+  const trCtl = L.control({ position: 'topleft' });
   trCtl.onAdd = () => {
     const d = L.DomUtil.create('div', 'trh');
     L.DomEvent.disableClickPropagation(d);
@@ -947,12 +948,58 @@
     // แท็บที่ต้องอ่านเยอะ (ข่าว แหล่งข้อมูล กล้อง) เปิดเต็มจอบนมือถือ แท็บอื่นเปิดครึ่งจอ
     if (isMobile) setPanel(['news', 'src', 'cam'].includes(b.dataset.tab) ? 2 : Math.max(1, stateNow()));
     else panel.classList.remove('min');
+    // แผนที่ตามแท็บ: ที่ของฉัน/ข่าว/กล้อง = แสดงเฉพาะเรื่องนั้น · สรุป/แหล่งที่มา = กลับมาแสดงทั้งหมด
+    const tf = { pl: 'pl', news: 'news', cam: 'cam' }[b.dataset.tab];
+    if (tf) setFocus(tf); else if (focusKey && FOCUS[focusKey].tab) setFocus(null);
   });
+  // ---------- โหมด "แสดงเฉพาะ": กดตัวเลขด้านบนหรือแท็บแผงข้าง แผนที่เหลือเฉพาะเรื่องนั้น (ชั่วคราว ไม่บันทึกเป็นค่าชั้นแผนที่) ----------
+  const FOCUS = {
+    sensor: { layers: ['sensor'], label: 'ถนนมีน้ำท่วม (เซ็นเซอร์ กทม.)' },
+    event: { layers: ['event'], label: 'จุดรายงานน้ำท่วม (หน่วยงาน/iTIC)' },
+    traffy: { layers: ['traffy'], label: 'ประชาชนแจ้ง (Traffy)' },
+    rain: { layers: ['rain'], label: 'ฝน 24 ชม.' },
+    news: { layers: ['news'], label: 'ตำแหน่งจากข่าว', tab: true },
+    cam: { layers: ['cam'], label: 'กล้อง CCTV', tab: true },
+    pl: { layers: ['places', 'sensor', 'event', 'traffy', 'web'], label: 'ที่ของฉัน + น้ำท่วมรอบ ๆ', fit: ['places'], tab: true },
+  };
+  const KEEP = ['districts', 'elev']; // ชั้นพื้นหลัง คงตามที่ผู้ใช้เปิดไว้
+  let focusKey = null, focusPrev = null;
+  const chip = L.DomUtil.create('div', 'fchip', map.getContainer());
+  chip.hidden = true;
+  L.DomEvent.disableClickPropagation(chip);
+  function applyLayers(want) {
+    lyrQuiet = true;
+    for (const [k, l] of Object.entries(layers)) {
+      if (KEEP.includes(k)) continue;
+      const on = want.has(k);
+      if (on && !map.hasLayer(l)) map.addLayer(l); else if (!on && map.hasLayer(l)) map.removeLayer(l);
+    }
+    lyrQuiet = false;
+  }
+  function setFocus(key) {
+    if (key === focusKey) return;
+    if (focusPrev) applyLayers(focusPrev);
+    focusKey = key; focusPrev = null;
+    if (key) {
+      const f = FOCUS[key];
+      focusPrev = new Set(Object.keys(layers).filter((k) => map.hasLayer(layers[k])));
+      applyLayers(new Set(f.layers));
+      const pts = (f.fit || f.layers).flatMap((k) => layers[k].getLayers()).filter((m) => m.getLatLng).map((m) => m.getLatLng());
+      // มือถือ: เว้นส่วนที่แผงด้านล่างบังอยู่ ให้จุดอยู่ในส่วนที่มองเห็น
+      const padB = isMobile ? Math.max(0, map.getContainer().getBoundingClientRect().bottom - panel.getBoundingClientRect().top) : 0;
+      if (pts.length) map.fitBounds(L.latLngBounds(pts), { maxZoom: 14, paddingTopLeft: [20, 60], paddingBottomRight: [20, padB + 20] });
+      chip.innerHTML = `<span>แสดงเฉพาะ: <b>${esc(f.label)}</b>${pts.length || f.fit ? '' : ' (ยังไม่มีข้อมูล)'}</span><button type="button">แสดงทั้งหมด ✕</button>`;
+      chip.querySelector('button').onclick = () => setFocus(null);
+    }
+    chip.hidden = !key;
+    document.querySelectorAll('.kpi').forEach((k) => { k.classList.toggle('on', k.dataset.layer === key); k.setAttribute('aria-pressed', k.dataset.layer === key); });
+  }
+  // กดตัวเลขซ้ำ = กลับมาแสดงทั้งหมด · ข่าวเปิดแท็บข่าวด้วย
   document.querySelectorAll('.kpi').forEach((k) => k.onclick = () => {
-    const l = layers[k.dataset.layer];
-    if (l && !map.hasLayer(l)) map.addLayer(l);
-    if (k.dataset.layer === 'news') document.querySelector('.tabs [data-tab="news"]').click();
-    else { const pts = l ? l.getLayers().filter((m) => m.getLatLng) : []; if (pts.length) map.fitBounds(L.latLngBounds(pts.map((m) => m.getLatLng())).pad(0.1), { maxZoom: 14 }); }
+    const key = k.dataset.layer;
+    if (focusKey === key) { setFocus(null); return; }
+    if (key === 'news') document.querySelector('.tabs [data-tab="news"]').click();
+    else setFocus(key);
   });
 
   let last = 0;
