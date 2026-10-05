@@ -81,13 +81,23 @@
 
   // พื้นที่กดอย่างน้อย 22 px รอบจุด (จุดเล็กก็ยังกดง่ายบนมือถือ) โดยขนาดที่มองเห็นเท่าเดิม
   // tr: ป้ายลูกศรแนวโน้มมุมขวาบนของหมุด (⬆⬆ เพิ่มมาก … ⬇⬇ ลดมาก)
+  // ป้ายแนวโน้มบนหมุด: วาดลูกศรเป็นเส้น (ไม่ใช้อีโมจิที่เล็ก/มืดจนอ่านไม่ออก) · ขึ้น = ส้ม/แดง · ลง = เขียว · ใกล้สูงสุด = ม่วง
+  const TRB = { '⬆⬆': ['fast', 1, 2], '⬆': ['up', 1, 1], '⬇': ['down', -1, 1], '⬇⬇': ['dfast', -1, 2], '⏸': ['peak', 0, 0] };
+  const chev = (dir, n, w = 12) => {
+    if (!dir) return `<svg width="${w}" height="${w}" viewBox="0 0 12 12" aria-hidden="true"><path d="M4 2.5v7M8 2.5v7" style="stroke:#fff;stroke-width:2.4;stroke-linecap:round"/></svg>`;
+    const h = n > 1 ? 15 : 10, ys = n > 1 ? [3, 9] : [3];
+    const d = ys.map((y) => (dir > 0 ? `M2 ${y + 4}l4-4 4 4` : `M2 ${y}l4 4 4-4`)).join('');
+    return `<svg width="${w}" height="${Math.round(w * h / 12)}" viewBox="0 0 12 ${h}" aria-hidden="true"><path d="${d}" style="fill:none;stroke:#fff;stroke-width:2.4;stroke-linecap:round;stroke-linejoin:round"/></svg>`;
+  };
+  const trBadge = (g) => { const t = TRB[g]; return t ? `<span class="mk-tr ${t[0]}${t[2] > 1 ? ' two' : ''}" title="${esc(TRL_TXT[t[0]])}">${chev(t[1], t[2])}</span>` : ''; };
+  const TRL_TXT = { fast: 'เพิ่มขึ้นมาก', up: 'เพิ่มขึ้น', peak: 'ใกล้จุดสูงสุด', down: 'ลดลง', dfast: 'ลดลงมาก' };
   const icon = (cls, color, text = '', size = 18, extra = '', tr = '') => {
     size = Math.max(5, Math.round(size * Flood.MS));
     if (size < 14) text = ''; // เล็กเกินอ่านตัวเลข ดูได้ในป๊อปอัป
     const hit = Math.max(size, touch ? 34 : 24);
     return L.divIcon({
       className: '', iconSize: [hit, hit], iconAnchor: [hit / 2, hit / 2], popupAnchor: [0, -size / 2],
-      html: `<div class="mkhit" style="width:${hit}px;height:${hit}px"><div class="mk ${cls} ${extra}" style="--c:${color};width:${size}px;height:${size}px">${text}</div>${tr ? `<span class="mk-tr${tr.length > 1 ? ' two' : ''}">${tr}</span>` : ''}</div>`,
+      html: `<div class="mkhit" style="width:${hit}px;height:${hit}px"><div class="mk ${cls} ${extra}" style="--c:${color};width:${size}px;height:${size}px">${text}</div>${tr ? trBadge(tr) : ''}</div>`,
     });
   };
 
@@ -323,7 +333,7 @@
     // ป้ายลูกศรฝนแรงขึ้น/เบาลง เทียบฝน 1 ชม. กับชั่วโมงก่อน (เฉพาะสถานีที่แสดงอยู่)
     for (const x of (S.trend && S.trend.rainList) || []) {
       if (x.tr === 'flat' || !shown.has(x.c)) continue;
-      L.marker([x.la, x.lo], { icon: L.divIcon({ className: '', iconSize: [30, 16], iconAnchor: [-2, 18], html: `<span class="rtr ${x.tr}">🌧${TRL[x.tr][0]}</span>` }),
+      L.marker([x.la, x.lo], { icon: L.divIcon({ className: '', iconSize: [34, 20], iconAnchor: [-2, 22], html: `<span class="rtr ${x.tr}">🌧${(TRB[TRL[x.tr][0]] || [])[1] != null ? chev(TRB[TRL[x.tr][0]][1], TRB[TRL[x.tr][0]][2], 10) : ''}</span>` }),
         zIndexOffset: 300, interactive: false, keyboard: false }).addTo(layers.rain);
     }
     const top = all.filter((s) => !s.edge).sort((a, b) => b.mm - a.mm);
@@ -423,9 +433,13 @@
     const H = big ? 22 : 16, hit = Math.max(H, touch ? 30 : 20);
     return L.divIcon({ className: '', iconSize: [hit, hit], iconAnchor: [hit / 2, hit / 2], popupAnchor: [0, -H / 2],
       html: `<div class="mkhit${lv >= 2 ? '' : ' gn'}" style="width:${hit}px;height:${hit}px">${gaugeSvg(frac, marks, ticks, lv, stale, big, tw)}`
-        + `${tr ? `<span class="mk-tr${tr.length > 1 ? ' two' : ''}">${tr}</span>` : ''}</div>` });
+        + `${tr ? trBadge(tr) : ''}</div>` });
   }
   // คำอธิบายสัญลักษณ์ใช้หลอดเดียวกับบนแผนที่ (ปกติ / เกินเตือนภัย / เกินวิกฤต)
+  { const el = $('lgTrend');
+    if (el) el.innerHTML = ['⬆⬆', '⬆', '⏸', '⬇', '⬇⬇'].map((g) => `<span class="lgtr">${trBadge(g)}${TRL_TXT[TRB[g][0]]}</span>`).join('') + '<br>' + el.innerHTML;
+    const u = $('lgRainUp'), d = $('lgRainDn');
+    if (u) u.innerHTML = '🌧' + chev(1, 1, 10); if (d) d.innerHTML = '🌧' + chev(-1, 1, 10); }
   { const el = $('lgGauge'), sc = (wl) => staffScale(wl, 1.2, 1);
     if (el) el.innerHTML = [[0.2, 0, false], [1.1, 2, true], [1.8, 3, true]].map(([wl, lv, big]) => { const g = sc(wl); return gaugeSvg(g.frac, g.marks, g.ticks, lv, false, big); }).join('') + '<span style="width:6px"></span>' + (() => { const g = sc(0.5); return gaugeSvg(g.frac, g.marks, g.ticks, 0, false, false, true); })(); }
   function heavyRed(mm) {

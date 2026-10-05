@@ -65,7 +65,7 @@
         <div id="listFlood" class="list"></div>
         <div id="secTrend" hidden><h2>น้ำกำลังขึ้น / ลง</h2>
           <p id="trendSum" class="muted small"></p><div id="listTrend" class="list"></div>
-          <p class="muted small">บนแผนที่: สีหมุด = ระดับน้ำตอนนี้ · ป้ายลูกศร = แนวโน้ม (⬆⬆ เพิ่มมาก · ⬆ เพิ่ม · ⏸ ใกล้สูงสุด · ⬇ ลด · ⬇⬇ ลดมาก) · จุดที่ไม่มีลูกศร = ทรงตัว</p></div>
+          <p class="muted small">บนแผนที่: สีหมุด = ระดับน้ำตอนนี้ · ป้ายลูกศร = แนวโน้ม (สีแดง/ส้มชี้ขึ้น = น้ำเพิ่ม · สีเขียวชี้ลง = น้ำลด · สองชั้น = เปลี่ยนเร็ว · ม่วง = ใกล้สูงสุด) · จุดที่ไม่มีลูกศร = ทรงตัว</p></div>
         <h2>คลอง/แม่น้ำ ระดับน้ำสูง</h2>
         <div id="listWl" class="list"></div>
         <div id="secCanal" hidden><h2>คลอง กทม. ระดับเตือนภัย/วิกฤต</h2>
@@ -100,8 +100,8 @@
           <div><i class="sym news" style="--c:var(--news)"></i>ข่าวเตือนภัย / ฝนตก / น้ำลดแล้ว</div>
           <div><i class="sym yt" style="--c:var(--yt)"></i>ตำแหน่งจากคลิป YouTube (สรุปโดย AI)</div>
           <div><i class="sym cam"></i>กล้อง CCTV สาธารณะ</div>
-          <div><i class="sym sensor" style="--c:var(--serious)"></i><b class="mk-tr two" style="position:static">⬆⬆</b> ป้ายลูกศรบนหมุดเซ็นเซอร์ถนน/คลอง/สถานีระดับน้ำ = แนวโน้มน้ำ: ⬆⬆ เพิ่มมาก · ⬆ เพิ่ม · ⏸ ใกล้สูงสุด · ⬇ ลด · ⬇⬇ ลดมาก (สีหมุด = ระดับน้ำตอนนี้)</div>
-          <div><span class="rtr up" style="position:static">🌧⬆</span> ฝนแรงขึ้น · <span class="rtr" style="position:static">🌧⬇</span> ฝนเบาลง (ฝน 1 ชม. เทียบกับชั่วโมงก่อน: ลูกศรเดียว ≥ 3 มม. · สองอัน ≥ 10 มม.) · สถานี ThaiWater ใช้ลูกศรเดียวกัน เทียบกับค่าก่อนหน้า (0.03 / 0.10 ม.)</div>
+          <div id="lgTrend">ป้ายลูกศรบนหมุดเซ็นเซอร์ถนน/คลอง/สถานีระดับน้ำ = แนวโน้มน้ำ (สีหมุด = ระดับน้ำตอนนี้)</div>
+          <div><span class="rtr up" id="lgRainUp">🌧</span> ฝนแรงขึ้น · <span class="rtr" id="lgRainDn">🌧</span> ฝนเบาลง (ฝน 1 ชม. เทียบกับชั่วโมงก่อน: ลูกศรเดียว ≥ 3 มม. · สองอัน ≥ 10 มม.) · สถานี ThaiWater ใช้ลูกศรเดียวกัน เทียบกับค่าก่อนหน้า (0.03 / 0.10 ม.)</div>
           <div class="scale">
             <span style="--c:var(--good)">ปกติ</span><span style="--c:var(--warning)">เล็กน้อย</span><span style="--c:var(--serious)">ท่วม</span><span style="--c:var(--critical)">ท่วมสูง</span>
           </div>
