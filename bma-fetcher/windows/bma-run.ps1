@@ -18,7 +18,7 @@ try { $got = $Mtx.WaitOne(0) } catch [System.Threading.AbandonedMutexException] 
 if (-not $got) {
   Write-Host 'มีหน้าต่างส่งข้อมูลทำงานอยู่แล้ว ไม่ต้องเปิดซ้ำ (หน้าต่างนี้จะปิดเอง)' -ForegroundColor Yellow
   Start-Sleep -Seconds 6
-  exit 0
+  exit 3  # start-bma.bat ปิดหน้าต่างเองเมื่อได้รหัสนี้
 }
 function Say($t, $c = 'Gray') { Write-Host $t -ForegroundColor $c }
 
