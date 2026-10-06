@@ -26,6 +26,13 @@ jobs:
         env:
           BMA_ONCE: '1'
         run: echo.| bma-fetcher\windows\start-bma.bat
+      - name: Second window closes itself while one is running
+        shell: powershell
+        run: |
+          $env:BMA_ONCE = '1'  # กันค้างถ้าการกันเปิดซ้ำไม่ทำงาน
+          $m = New-Object System.Threading.Mutex($false, 'Local\bkk-flood-bma-relay'); $null = $m.WaitOne(0)
+          $p = Start-Process cmd -ArgumentList '/c','echo.| bma-fetcher\windows\start-bma.bat' -NoNewWindow -PassThru -Wait
+          "exit code: $($p.ExitCode)"; if ($p.ExitCode -ne 0) { exit 1 }
       - name: Check files
         shell: powershell
         run: Get-ChildItem (Join-Path $env:LOCALAPPDATA 'bkk-flood-bma') | Format-Table Name, Length

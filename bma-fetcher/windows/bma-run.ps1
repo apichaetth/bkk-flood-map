@@ -10,6 +10,16 @@ $Js = Join-Path $Dir 'bma-fetch.mjs'
 $Tok = Join-Path $Dir 'token.dat'
 $Raw = 'https://raw.githubusercontent.com/apichaetth/bkk-flood-map/main/scripts/bma-fetch.mjs'
 New-Item -ItemType Directory -Force -Path $Dir | Out-Null
+
+# เปิดได้ทีละหน้าต่าง: ถ้ามีตัวส่งข้อมูลทำงานอยู่แล้ว (เช่น เปิดเองตอนเปิดคอม แล้วดับเบิลคลิกซ้ำ) ให้ปิดตัวใหม่
+$Mtx = New-Object System.Threading.Mutex($false, 'Local\bkk-flood-bma-relay')
+$got = $false
+try { $got = $Mtx.WaitOne(0) } catch [System.Threading.AbandonedMutexException] { $got = $true }  # ตัวก่อนถูกปิดกลางคัน
+if (-not $got) {
+  Write-Host 'มีหน้าต่างส่งข้อมูลทำงานอยู่แล้ว ไม่ต้องเปิดซ้ำ (หน้าต่างนี้จะปิดเอง)' -ForegroundColor Yellow
+  Start-Sleep -Seconds 6
+  exit 0
+}
 function Say($t, $c = 'Gray') { Write-Host $t -ForegroundColor $c }
 
 # 1) Node.js 18+

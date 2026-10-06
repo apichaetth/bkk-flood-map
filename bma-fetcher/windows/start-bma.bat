@@ -13,6 +13,8 @@ if not exist "%D%\bma-run.ps1" (
 set "R="
 if /i "%~1"=="reset" set "R=-Reset"
 powershell -NoProfile -ExecutionPolicy Bypass -File "%D%\bma-run.ps1" -Launcher "%~f0" %R%
+rem 3 = another relay window is already running: close quietly
+if "%ERRORLEVEL%"=="3" exit /b 0
 echo.
 echo Stopped. Double-click this file again to restart.
 pause
