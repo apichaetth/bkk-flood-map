@@ -1,5 +1,5 @@
 name: windows-relay-test
-# ทดสอบตัวส่งข้อมูลสำหรับ Windows (start-bma.bat + bma-run.ps1) บนเครื่อง Windows จริง
+# ทดสอบตัวส่งข้อมูลสำหรับ Windows (start-bma.bat + bma-run.ps1) บนเครื่อง Windows จริง (ตรวจกันเปิดซ้ำ)
 # เครื่อง GitHub ไม่ได้อยู่ในไทย จึงคาดว่าขั้นดึงข้อมูล กทม. จะไม่สำเร็จ แต่ขั้นอื่นต้องผ่านหมด
 on:
   push:
