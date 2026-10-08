@@ -1,0 +1,24 @@
+name: nas-relay-test
+# ทดสอบไฟล์ docker-compose สำหรับ NAS ด้วย Docker จริง: ดึง image + สคริปต์ล่าสุด แล้วเริ่มวนรอบ
+# เครื่อง GitHub อยู่นอกไทย ขั้นดึงข้อมูล กทม. จะได้ 403 (คาดไว้) แต่ต้องเห็นว่าสคริปต์เริ่มทำงานและลองใหม่ตามกติกา
+on:
+  push:
+    branches: [main]
+    paths: ['bma-fetcher/docker-compose*.yml', '.github/workflows/nas-relay-test.yml']
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - name: Run the paste-in compose for ~90 s
+        run: |
+          cd bma-fetcher
+          sed -i 's/วาง_token_ตรงนี้/dummy-token-for-ci/' docker-compose.paste.yml
+          docker compose -f docker-compose.paste.yml up -d
+          sleep 90
+          docker logs bma-fetch 2>&1 | tee log.txt
+          docker inspect -f 'restarts={{.RestartCount}} running={{.State.Running}}' bma-fetch
+          grep -q "เริ่มวนทุก 15 นาที" log.txt
+          grep -q "ลองใหม่ใน 60 วินาที (ครั้งที่ 1/2)" log.txt
+          docker compose -f docker-compose.paste.yml down

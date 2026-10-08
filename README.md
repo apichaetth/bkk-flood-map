@@ -80,6 +80,7 @@ data/                       districts.json/geojson (คงที่), news.json,
 
 ชุดติดตั้งสำเร็จรูปอยู่ในโฟลเดอร์ `bma-fetcher/`:
 - **NAS / Docker** (Synology Container Manager, QNAP Container Station): `docker-compose.yml` + คัดลอก `.env.example` เป็น `.env` แล้วใส่ token
+- **NAS ที่สร้าง Project ด้วยการวาง YAML** (UGREEN UGOS Pro ฯลฯ): วาง `docker-compose.paste.yml` แล้วแก้บรรทัด `GH_TOKEN`
 - **มือถือ Android**: ติดตั้ง Termux และ Termux:Boot จาก F-Droid แล้วรัน `bash termux-setup.sh` (ปิดโหมดประหยัดแบตให้ Termux ด้วย)
 
 อย่าใส่ token ไว้ในไฟล์ที่ commit

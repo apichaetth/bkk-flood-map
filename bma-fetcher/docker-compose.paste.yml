@@ -1,0 +1,18 @@
+# วางทั้งไฟล์นี้ในหน้า "สร้าง Project" ของแอป Docker บน NAS (UGREEN UGOS Pro / Synology Container Manager / QNAP)
+# แก้แค่บรรทัด GH_TOKEN ให้เป็น token จริง (ไฟล์นี้อยู่บน NAS ของคุณเท่านั้น ห้าม commit ฉบับที่ใส่ token แล้ว)
+# ดูผลที่ Container > bma-fetch > Log: ควรเห็น "ส่งแล้ว: เซ็นเซอร์ ... จุด" ทุก 15 นาที
+services:
+  bma-fetch:
+    container_name: bma-fetch
+    image: node:22-alpine
+    restart: unless-stopped
+    environment:
+      TZ: Asia/Bangkok
+      GH_TOKEN: "วาง_token_ตรงนี้"
+      GH_REPO: apichaetth/bkk-flood-map
+    # ดึงสคริปต์ล่าสุดทุกครั้งที่ container เริ่ม แล้ววนส่งทุก 15 นาที (ไม่สำเร็จ: รอ 1 นาทีลองใหม่ 2 ครั้ง)
+    command: ["sh", "-c", "wget -qO /tmp/bma-fetch.mjs https://raw.githubusercontent.com/$${GH_REPO}/main/scripts/bma-fetch.mjs && exec node /tmp/bma-fetch.mjs --loop 15"]
+    mem_limit: 128m
+    logging:
+      driver: json-file
+      options: { max-size: "1m", max-file: "2" }
