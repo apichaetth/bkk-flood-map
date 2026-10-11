@@ -9,8 +9,9 @@
 //   score = 1 − (1 − E) × (1 − R'·(0.3 + 0.7·max(H, M)))   โดย R' = min(1, R·(1 + 2M)·(1 + W))
 //   W (คลองสูง) ไม่ทำให้ติดระดับเอง — ข้อมูลจริง 2 วัน: ติดระดับเพราะคลองอย่างเดียวถูกแค่ ~11% (แย่กว่าทายจุดท่วมบ่อย ~24%)
 //   จึงใช้เป็นตัวขยายผลของฝน: ฝนตกตอนคลองเต็ม ระบายไม่ทัน
-//   "ควรระวังมาก" ต้องมีรายงานใกล้เคียงเป็นปัจจัยหลัก หรือเป็นจุดที่พลาดซ้ำ (M) — ข้อมูลจริง 29 ก.ย.–3 ต.ค.:
-//   ติดระดับเพราะฝนอย่างเดียวถูก 6.3% เพราะคลอง 5.3% (ทายจุดท่วมบ่อยได้ 7.8%) ส่วนเพราะมีรายงานถูก 37.8% · ฝน/คลองล้วนจึงขึ้นได้แค่ "ควรระวัง"
+//   "ควรระวังมาก" ต้องมีรายงานใกล้เคียงเป็นปัจจัยหลัก — ข้อมูลจริง 29 ก.ย.–3 ต.ค.: ติดระดับเพราะฝนอย่างเดียวถูก 6.3%
+//   เพราะคลอง 5.3% (ทายจุดท่วมบ่อยได้ 7.8%) ส่วนเพราะมีรายงานถูก 37.8% · ฝน/คลองล้วนจึงขึ้นได้แค่ "ควรระวัง"
+//   (11 ต.ค.: ยกเลิกข้อยกเว้นฝนตกที่จุดพลาดซ้ำด้วย — 6–10 ต.ค. ทายถูก 7.2% แทบไม่ต่างจากทายจุดท่วมบ่อย 5.5%)
 //   รายงานในซอย/ถนนสายใดส่งผลตามแนวถนนชื่อเดียวกันไกลกว่า (sameRoadM) ถนนอื่นรอบ ๆ ยังใช้วงแคบ
 // เป็นการประมาณจากหลักฐานรอบข้าง ไม่ใช่แบบจำลองการไหลของน้ำ (ไม่มีข้อมูลท่อ/สถานีสูบ/ระดับถนนละเอียด)
 //
@@ -250,7 +251,7 @@ export function scoreRoads(roads, input, now = Date.now()) {
       if (same && d <= P.onRoadM && ageH <= 3 && (r.lv || 2) >= 2) onRoad = true;
       const w = P.srcWeight[r.src] * (r.lv ? Math.min(1, 0.5 + r.lv / 6) : 1) * Math.exp(-d / decay) * Math.exp(-ageH / P.ageDecayH[r.src]);
       notE *= 1 - Math.min(0.95, w);
-      if (!bestE || w > bestE.w) bestE = { w, d: Math.round(d), src: r.src, ageMin: Math.round(ageH * 60) };
+      if (!bestE || w > bestE.w) bestE = { w, d: Math.round(d), src: r.src, ageMin: Math.round(ageH * 60), tr: !!r.trend };
     }
     const E = 1 - notE;
     // R: ฝนที่ตกแล้ว (IDW จากสถานีในรัศมี) รวมกับฝนพยากรณ์ 3 ชม. ข้างหน้า
@@ -277,13 +278,14 @@ export function scoreRoads(roads, input, now = Date.now()) {
     }
     const partR = Math.min(1, R * (1 + 2 * M) * (1 + W)) * (0.3 + 0.7 * Math.max(H, M));
     const score = 1 - (1 - E) * (1 - partR);
-    // ปัจจัยหลักที่ทำให้ติดระดับ: 0 มีรายงาน/เซ็นเซอร์ใกล้เคียงจริง, 1 ฝน (+ท่วมบ่อย), 2 น้ำในคลอง
+    // ปัจจัยหลักที่ทำให้ติดระดับ: 0 มีรายงาน/เซ็นเซอร์ใกล้เคียงจริง, 1 ฝน (+ท่วมบ่อย), 2 น้ำในคลอง,
+    // 3 เซ็นเซอร์ที่แนวโน้มน้ำกำลังขึ้นช่วยดัน (รายงานที่ระดับถูกยกขึ้น/สร้างจากแนวโน้ม) — แยกไว้วัดผลของแนวโน้ม
     // (มีรายงาน E ≥ reportE หรือรายงานบนถนนนี้ = นับเป็น "มีรายงาน" แม้ฝนหนักจนคะแนนฝนสูงกว่า)
     const hasRep = E >= P.reportE || onRoad;
-    const drv = hasRep || E >= partR ? 0 : W >= 0.5 ? 2 : 1;
+    const drv = hasRep || E >= partR ? (bestE && bestE.tr ? 3 : 0) : W >= 0.5 ? 2 : 1;
     let tier = Math.max((P.tiers.find(([th]) => score >= th) || [0, 0])[1], onRoad ? 2 : 0);
-    // ไม่มีรายงานใกล้เคียง (ฝน/คลองล้วน) ขึ้นได้แค่ "ควรระวัง" ยกเว้นฝนตกที่จุดที่พลาดซ้ำ
-    if (tier === 3 && !hasRep && (drv === 2 || !M)) tier = 2;
+    // ไม่มีรายงานใกล้เคียง (ฝน/คลองล้วน แม้ที่จุดพลาดซ้ำ) ขึ้นได้แค่ "ควรระวัง"
+    if (tier === 3 && !hasRep) tier = 2;
     if (!tier) continue;
     const SRCN = { bma: 'เซ็นเซอร์ถนน กทม.', itic: 'หน่วยงาน/iTIC', traffy: 'Traffy', web: 'ประชาชนปักหมุด', news: 'ข่าว' };
     const why = [];
@@ -352,7 +354,7 @@ export function packSegments(segs) {
 //   days: สถิติรายวัน (เวลาไทย) เก็บ evalKeepDays วัน  ·  seen: รายงานที่นับการจับได้ไปแล้ว
 // reports = รายงานน้ำท่วมจริงที่ใช้ตรวจ (ไม่ซ้ำกัน ไม่รวมข่าว) [{ la, lo, t, src }]
 const dayOf = (t) => new Date(t + 7 * 36e5).toISOString().slice(0, 10);
-const emptyDay = () => ({ runs: 0, rain: 0, t: { 3: [0, 0, 0, 0], 2: [0, 0, 0, 0] }, base: [0, 0], drv: [[0, 0], [0, 0], [0, 0]], rec: { main: [0, 0, 0], soi: [0, 0, 0], off: [0, 0, 0] } });
+const emptyDay = () => ({ runs: 0, rain: 0, t: { 3: [0, 0, 0, 0], 2: [0, 0, 0, 0] }, base: [0, 0], drv: [[0, 0], [0, 0], [0, 0], [0, 0]], rec: { main: [0, 0, 0], soi: [0, 0, 0], off: [0, 0, 0] } });
 export function newEvalState(old) {
   // รูปแบบเดิม (อาร์เรย์ของรอบ) ใช้ id ถนนชุดเก่า ตรวจต่อไม่ได้ เริ่มนับใหม่
   if (!old || Array.isArray(old) || old.v !== 3) return { v: 3, runs: [], days: {}, seen: {} };
@@ -380,7 +382,7 @@ export function evalUpdate(state, roads, reports, now = Date.now()) {
       const c = d.t[tier];
       c[0]++; if (hit) c[1]++;
       if (ahead) { c[2]++; if (hit) c[3]++; }
-      if (tier === 3) { d.drv[drv][0]++; if (hit) d.drv[drv][1]++; }
+      if (tier === 3) { const c3 = (d.drv[drv] ||= [0, 0]); c3[0]++; if (hit) c3[1]++; } // วันเก่ามี 3 ช่อง
     }
     for (const id of run.base || []) { const s = segById.get(id); if (!s) continue; d.base[0]++; if (hitNear(s, run.t, run.t + H)) d.base[1]++; }
   }
@@ -425,7 +427,7 @@ function summarize(state) {
     const d = state.days[k];
     total.runs += d.runs; total.rain = Math.max(total.rain, d.rain);
     add(total.t[3], d.t[3]); add(total.t[2], d.t[2]); add(total.base, d.base);
-    d.drv.forEach((v, i) => add(total.drv[i], v));
+    d.drv.forEach((v, i) => add(total.drv[i] ||= [0, 0], v));
     for (const kind of ['main', 'soi', 'off']) add(total.rec[kind], d.rec[kind]);
     return { d: k, ...d };
   });

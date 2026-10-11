@@ -105,7 +105,7 @@
         : `<p class="rk-verdict warn">ยังไม่ดีกว่าวิธีง่าย ๆ (ทายแค่จุดที่ท่วมบ่อย) ชัดเจน — ${p3}% เทียบกับ ${pb}% ต้องเก็บข้อมูลเพิ่มและปรับค่าน้ำหนัก</p>`;
     }
     if (nDays < 7) verdict += `<p class="muted small">เก็บข้อมูลมาแล้ว ${nDays} วัน ตัวเลขยังแกว่งได้มาก ควรดูอีกครั้งเมื่อผ่านวันที่ฝนตกหนักหลายวัน</p>`;
-    const DRV = ['มีรายงาน/เซ็นเซอร์ใกล้ ๆ', 'ฝน (+จุดท่วมบ่อย)', 'น้ำในคลองใกล้ล้น'];
+    const DRV = ['มีรายงาน/เซ็นเซอร์ใกล้ ๆ', 'ฝน (+จุดท่วมบ่อย)', 'น้ำในคลองใกล้ล้น', 'เซ็นเซอร์ใกล้ ๆ น้ำกำลังขึ้น'];
     const row = (label, c, note) => `<tr><td>${label}${note ? `<br><span class="muted small">${note}</span>` : ''}</td><td class="n">${n0(c[0])}</td><td class="n">${n0(c[1])}</td><td class="n"><b>${pcs(c[1], c[0])}</b></td></tr>`;
     const recRow = (label, c) => `<tr><td>${label}</td><td class="n">${n0(c[0])}</td><td class="n">${n0(c[1])}</td><td class="n"><b>${pcs(c[1], c[0])}</b></td></tr>`;
     box.innerHTML = `<div class="rk-eval">

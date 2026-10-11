@@ -786,11 +786,11 @@ async function updateRisk(meta) {
   for (const r of reports) {
     const tr = r.src === 'bma' && trends.road.get(r.c);
     if (!tr) continue;
-    if (tr.tr === 'fast' || tr.tr === 'up') r.lv = Math.min(3, r.lv + 1);
+    if (tr.tr === 'fast' || tr.tr === 'up') { r.lv = Math.min(3, r.lv + 1); r.trend = true; } // trend = แยกวัดผลแนวโน้มในสถิติความแม่น
     else if (tr.tr === 'down' || tr.tr === 'dfast') r.lv = Math.max(1, r.lv - 1);
   }
   for (const [c, tr] of trends.road) {
-    if (tr.tr === 'fast' && tr.v >= 2 && tr.v < 5 && !seenFlooded(c)) reports.push({ c, la: tr.la, lo: tr.lo, t: tr.t, src: 'bma', lv: 1 });
+    if (tr.tr === 'fast' && tr.v >= 2 && tr.v < 5 && !seenFlooded(c)) reports.push({ c, la: tr.la, lo: tr.lo, t: tr.t, src: 'bma', lv: 1, trend: true });
   }
   for (const w of wl) {
     const tr = w.c && trends.canal.get(w.c);
