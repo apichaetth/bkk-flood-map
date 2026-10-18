@@ -16,7 +16,8 @@ permissions:
   id-token: write
 
 concurrency:
-  group: pages
+  # เปลี่ยนชื่อกลุ่ม 18 ต.ค.: รอบวันที่ 12 ต.ค. ค้างสถานะ waiting ที่ environment github-pages (ไม่มีผู้อนุมัติ) จนทุกรอบหลังจากนั้นถูกยกเลิก
+  group: pages-2
   cancel-in-progress: false
 
 jobs:
