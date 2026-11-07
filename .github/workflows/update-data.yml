@@ -14,6 +14,7 @@ permissions:
   contents: read
   pages: write
   id-token: write
+  actions: read
 
 concurrency:
   # เปลี่ยนชื่อกลุ่ม 18 ต.ค.: รอบวันที่ 12 ต.ค. ค้างสถานะ waiting ที่ environment github-pages (ไม่มีผู้อนุมัติ) จนทุกรอบหลังจากนั้นถูกยกเลิก
@@ -21,7 +22,27 @@ concurrency:
   cancel-in-progress: false
 
 jobs:
+  # รอบตามเวลาของ GitHub เป็นตัวสำรอง: ถ้า NAS (ตัวดึงเซ็นเซอร์) เพิ่งสั่งอัปเดตไปไม่เกิน 20 นาที ข้ามรอบนี้ ไม่ประมวลผลซ้ำ
+  gate:
+    runs-on: ubuntu-latest
+    timeout-minutes: 2
+    outputs:
+      run: ${{ steps.check.outputs.run }}
+    steps:
+      - id: check
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          if [ "${{ github.event_name }}" != "schedule" ]; then echo "run=true" >> "$GITHUB_OUTPUT"; exit 0; fi
+          last=$(gh api "repos/${{ github.repository }}/actions/workflows/update-data.yml/runs?event=workflow_dispatch&status=success&per_page=1" --jq '.workflow_runs[0].created_at // empty' || true)
+          age=999999
+          if [ -n "$last" ]; then age=$(( $(date +%s) - $(date -d "$last" +%s) )); fi
+          echo "last NAS-triggered run: ${last:-none} (${age}s ago)"
+          if [ "$age" -lt 1200 ]; then echo "run=false" >> "$GITHUB_OUTPUT"; else echo "run=true" >> "$GITHUB_OUTPUT"; fi
+
   build-deploy:
+    needs: gate
+    if: needs.gate.outputs.run == 'true'
     runs-on: ubuntu-latest
     timeout-minutes: 20
     environment:

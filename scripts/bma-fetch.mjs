@@ -134,6 +134,22 @@ async function push(obj) {
   await gh('/contents/' + FILE, { method: 'PUT', body: JSON.stringify({ message: 'bma sensors ' + obj.updated, content, sha, branch: BRANCH }) });
 }
 
+// หลังส่งสำเร็จ: สั่งให้ GitHub ประมวลผลและอัปเดตเว็บทันที (แทน cron ภายนอก) — token ต้องมีสิทธิ์ Actions: Read and write
+// ถ้าไม่มีสิทธิ์ก็ไม่เป็นไร เว็บยังอัปเดตตามรอบตั้งเวลาของ GitHub เอง · ปิดได้ด้วย BMA_DISPATCH=0
+const WORKFLOW = process.env.BMA_WORKFLOW || 'update-data.yml';
+let dispatchWarned = false;
+async function dispatch() {
+  if (process.env.BMA_DISPATCH === '0') return;
+  try {
+    await gh(`/actions/workflows/${WORKFLOW}/dispatches`, { method: 'POST', body: JSON.stringify({ ref: 'main' }) });
+    log('สั่งอัปเดตเว็บแล้ว');
+  } catch (e) {
+    if (dispatchWarned) return;
+    dispatchWarned = true;
+    log('สั่งอัปเดตเว็บไม่ได้:', e.message, e.status === 403 || e.status === 404 ? '(เพิ่มสิทธิ์ Actions: Read and write ให้ token · ระหว่างนี้เว็บยังอัปเดตตามรอบปกติ)' : '');
+  }
+}
+
 async function once() {
   try {
     const d = await collect();
@@ -141,6 +157,7 @@ async function once() {
     if (!process.env.GH_TOKEN) throw new Error('ไม่ได้ตั้ง GH_TOKEN');
     await push(d);
     log('ส่งแล้ว: ' + summary(d));
+    await dispatch();
     return true;
   } catch (e) {
     const hint = e.status === 403 && /bangkok/.test(e.message) ? '(เครื่องนี้อาจไม่ได้อยู่ในไทย หรือใช้ VPN อยู่)'
