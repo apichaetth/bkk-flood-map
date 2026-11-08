@@ -12,7 +12,7 @@ try { meta = await get('data/meta.json'); } catch (e) { problems.push('อ่า
 if (meta) {
   const age = (Date.now() - new Date(meta.updated)) / 60000;
   console.log('updated', meta.updated, `(${age.toFixed(0)} นาทีที่แล้ว)`);
-  if (!(age <= 60)) problems.push(`ข้อมูลไม่อัปเดตมา ${isFinite(age) ? age.toFixed(0) : '?'} นาที (cron-job.org หรือ workflow update-data อาจหยุด)`);
+  if (!(age <= 60)) problems.push(`ข้อมูลไม่อัปเดตมา ${isFinite(age) ? age.toFixed(0) : '?'} นาที (NAS อาจหยุดสั่งอัปเดต หรือ workflow update-data มีปัญหา — ดู Logs ของ bma-fetch ใน Container Station)`);
   const s = meta.sources || {};
   for (const [k, v] of Object.entries(s)) console.log(k.padEnd(12), v && v.ok === false ? 'FAIL ' + (v.error || '') : 'ok');
   // เซ็นเซอร์ถนนต้องมาอย่างน้อยหนึ่งทาง (เครื่องส่งต่อ หรือ ThaiWater)
@@ -29,7 +29,7 @@ try {
   const age = (Date.now() - new Date(relay.updated)) / 60000;
   console.log('relay', relay.source || '', relay.updated, `(${age.toFixed(0)} นาที)`);
   // แค่เตือน ไม่ทำให้ล้ม: ThaiWater ยังเป็นสำรองอยู่
-  if (age > 120) console.log('::warning::เครื่องส่งต่อข้อมูล กทม. ไม่ส่งมา ' + age.toFixed(0) + ' นาที');
+  if (age > 120) console.log('::warning::ตัวดึงข้อมูล กทม. บน NAS ไม่ส่งมา ' + age.toFixed(0) + ' นาที (เช็ก bma-fetch ใน Container Station)');
 } catch (e) { console.log('::warning::' + e.message); }
 if (problems.length) {
   for (const p of problems) console.log('::error::' + p);
