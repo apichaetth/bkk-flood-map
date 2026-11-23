@@ -47,7 +47,7 @@ jobs:
     timeout-minutes: 20
     environment:
       name: github-pages
-      url: ${{ steps.deploy.outputs.page_url }}
+      url: ${{ steps.deploy.outputs.page_url || steps.deploy2.outputs.page_url }}
     steps:
       - uses: actions/checkout@v4
 
@@ -147,5 +147,19 @@ jobs:
         with:
           path: _site
 
+      # deploy-pages บางรอบหาไฟล์ที่เพิ่งอัปโหลดไม่เจอ ("No artifacts named github-pages", Found 0 artifact)
+      # เพราะ API ของ GitHub ยังไม่เห็นไฟล์ในวินาทีแรก: รอสักครู่ก่อน แล้วถ้ายังพลาดให้ลองใหม่อีกครั้ง
+      - name: Wait for artifact to register
+        run: sleep 10
+
       - id: deploy
+        continue-on-error: true
+        uses: actions/deploy-pages@v4
+
+      - name: Wait before retrying deploy
+        if: steps.deploy.outcome == 'failure'
+        run: sleep 45
+
+      - id: deploy2
+        if: steps.deploy.outcome == 'failure'
         uses: actions/deploy-pages@v4
